@@ -1,0 +1,133 @@
+# Localization file. Keep this UTF-8 (no BOM).
+# The filename is just the culture code (en-US), so NO prefix is applied — the
+# full "Mods.MoreAIPlayer." path is written out inside. Do NOT rename this to
+# "en-US_Mods.MoreAIPlayer.hjson", or the prefix gets doubled and nothing matches.
+
+Mods: {
+	MoreAIPlayer: {
+		Configs: {
+			MoreAIPlayerClientConfig: {
+				// DisplayName: Phantom Companion Client Settings
+				// Headers.CompanionDiagnostics: Companion Diagnostics
+
+				EnablePhantomPlayerDebugText: {
+					// Label: "[i:GoldenKey] Enable Phantom Player Debug Text"
+					// Tooltip: Shows the live development readout above phantom companions. Disabled by default.
+				}
+			}
+		}
+
+		Items: {
+			DamageTestDummy: {
+				DisplayName: Petit lapin
+				Tooltip:
+					'''
+					Quel adorable petit lapin.
+					Il acceptera sûrement de servir à tester les dégâts de mes armes.
+					Clic gauche : placer un mannequin. Clic droit : effacer les mannequins.
+					'''
+			}
+
+			DevelopmentNotice: {
+				// DisplayName: Phantom Companion Development Notice
+				// Development: This mod is actively under development.
+				// SoloCreator: It is made and maintained by one creator.
+				// Updates: I will keep updating it, improving companions, and fixing problems reported by players.
+				// Compatibility: Popular weapons from large mods will receive one-to-one compatibility work over time.
+				// Complexity: Similar-looking weapons can use very different code internally; some therefore need much more time to support safely. Thank you for your patience.
+				// Tooltip: ""
+			}
+
+			CompanionDebugger: {
+				DisplayName: Grimoire de débogage
+				Tooltip:
+					'''
+					Clic gauche : invoque un compagnon à la position du curseur. Réutilisez-le pour invoquer le compagnon sauvegardé suivant.
+					Les compagnons sont liés au joueur, non au monde, et chacun consomme un emplacement de serviteur.
+					Clic droit : ouvre le gestionnaire de compagnons. Vous pouvez y renvoyer certains compagnons ou tous à la fois.
+					Clic droit sur un compagnon : ouvre son équipement et son sac. Vous n'avez pas besoin de tenir un objet.
+					Armes : toutes les armes sont acceptées, y compris celles d'invocation. La barre d'armes est vérifiée de gauche à droite ; les armes à distance utilisent des munitions de base si elles n'en ont plus.
+
+					Notes techniques :
+					Les compagnons sont de véritables entités joueur inscrites dans des emplacements de joueur : animations d'armes, effets d'équipement et physique de déplacement passent par le jeu de base.
+					Ils vous suivent grâce au pathfinding, sautent, volent et traversent les plateformes ; ils ne se téléportent qu'après être restés longtemps trop loin.
+					Subissez un coup ou double-cliquez rapidement à droite pour les rappeler à vos côtés ; ils reviennent aussi automatiquement s'ils sont coincés.
+					Ce système étant assez inhabituel, seul le mode solo est pris en charge pour l'instant.
+					Certaines armes de mods complexes ou avancées peuvent être incompatibles. Il n'existe pas de liste complète : testez-les progressivement.
+					'''
+			}
+
+			CompanionCommandBook: {
+				DisplayName: Grimoire d'ordres
+				Tooltip:
+					'''
+					Maintenir le clic droit : alterne entre les trois modes de combat Attaque / Défense / Garnison. Le mode choisi s'affiche au-dessus de votre tête.
+					· Attaque : suit librement et combat, mine et ramasse activement.
+					· Défense : reste près de vous comme garde du corps et n'attaque pas les ennemis de lui-même.
+					· Garnison : marque l'endroit à l'activation, y combat et y retourne s'il est repoussé.
+					Trois modes non-combat existent aussi : Pêche / Capture / Minage.
+					Clic gauche : place un point de passage sous le curseur. Les compagnons s'y rendent et tiennent la position ; cliquez de nouveau près du repère pour l'annuler.
+					Un point de passage dure au plus 5 s et disparaît s'il n'est pas atteint. Une fois sur place, le compagnon y reste jusqu'à un nouvel ordre ou un appel de secours.
+					Le comportement d'attaque est identique dans tous les modes ; seul le déplacement change.
+
+					Notes techniques :
+					De nombreuses formes tactiques seront ajoutées avec le temps pour répondre à différents besoins.
+					Même maintenant, le pathfinding peut échouer dans un terrain complexe.
+					Essayez librement. Si quelque chose ne va pas, rechargez puis réessayez ; pour un problème grave, signalez-le dans les commentaires.
+					Il y a certainement beaucoup de problèmes qu'une seule personne ne peut pas découvrir.
+					'''
+			}
+
+			CompanionHunterBook: {
+				DisplayName: Grimoire des chasseurs
+				Tooltip:
+					'''
+					Note : cet objet est encore en test et peut comporter des problèmes.
+					Clic gauche : active ou désactive le mode Traque. Des chasseurs hostiles suivront votre piste.
+					Clic droit : ouvre les réglages de Traque et permet de choisir 1 à 3 chasseurs.
+					L'équipement des chasseurs évolue selon la progression du monde et votre défense. Le mode Traque active le JcJ tant qu'il est en cours.
+					Les chasseurs vous poursuivent pendant 2 minutes, se reposent 45 secondes, puis reprennent la chasse.
+					Les chasseurs vaincus reviennent après 60 secondes avec un nouvel équipement.
+					'''
+			}
+		}
+
+		CompanionCommand: {
+			ModeAttack: Mode Attaque
+			ModeDefense: Mode Défense
+			ModeGarrison: Mode Garnison
+			Switched: Compagnon fantôme : {0}
+			NoCompanion: Vous n'avez aucun compagnon fantôme invoqué.
+			SingleplayerOnly: Les compagnons fantômes ne sont disponibles qu'en solo pour le moment.
+			Reviving: "{0} revient dans {1}s"
+			NoFreeSlot: Aucun emplacement de joueur libre n'est disponible pour un compagnon fantôme.
+			MinionSlotsFull: Pas assez d'emplacements de serviteurs pour invoquer un compagnon fantôme.
+			HunterModeEnabled: "[Mode Traque] activé ! Des chasseurs hostiles suivent votre piste..."
+			HunterModeDisabled: "[Mode Traque] désactivé. L'alerte est levée."
+			HunterSpawned: "[Avertissement] Le joueur hostile {0} s'est infiltré dans votre monde !"
+			HunterDefeated: "[Annonce] Le joueur hostile {0} a été vaincu ! Il reviendra dans 60 secondes avec un nouvel équipement..."
+			HunterRespawned: "[Avertissement] Le joueur hostile {0} est revenu et reprend la traque !"
+			HunterSingleplayerOnly: Le mode Traque n'est disponible qu'en solo pour le moment.
+			Diagnostics: Diagnostic fantôme : {0}  Build {1}
+			Enabled: Activé
+			Disabled: Désactivé
+			HunterResting: "[Alerte de traque] {0} se retire pour se reposer et réunir des provisions !"
+			HunterHunting: "[Alerte de traque] {0} a retrouvé votre piste et reprend la traque !"
+			HunterPanelTitle: ⚔ Réglages du mode Traque
+			Close: Fermer
+			HunterPanelEnabled: "[État du mode] Activé (cliquer pour désactiver)"
+			HunterPanelDisabled: "[État du mode] Désactivé (cliquer pour activer)"
+			HunterCountTitle: Nombre de chasseurs :
+			HunterCount: "{0} chasseur(s)"
+			HunterStatusTitle: État des chasseurs :
+			HunterInactive: · Le mode Traque est inactif
+			HunterPanelReviving: · {0} : réapparition ({1}s restantes)
+			HunterPanelResting: · {0} : se repose et réunit des provisions
+			HunterPanelHunting: · {0} : se rapproche pour vous abattre !
+			HunterRefresh: 🔄 Reconstruire et déployer l'escouade de chasseurs
+			HunterRefreshed: L'escouade de chasseurs a été reconstruite et redéployée !
+		}
+
+		// NPCs.DamageTestDummyNPC.DisplayName: Damage Test Dummy N P C
+	}
+}

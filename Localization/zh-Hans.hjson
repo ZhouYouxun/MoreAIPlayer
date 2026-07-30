@@ -1,0 +1,133 @@
+# Localization file. Keep this UTF-8 (no BOM).
+# The filename is just the culture code (en-US), so NO prefix is applied — the
+# full "Mods.MoreAIPlayer." path is written out inside. Do NOT rename this to
+# "en-US_Mods.MoreAIPlayer.hjson", or the prefix gets doubled and nothing matches.
+
+Mods: {
+	MoreAIPlayer: {
+		Configs: {
+			MoreAIPlayerClientConfig: {
+				DisplayName: 幻影伙伴客户端设置
+				Headers.CompanionDiagnostics: 伙伴调试
+
+				EnablePhantomPlayerDebugText: {
+					Label: "[i:GoldenKey] 开启幻影玩家的调试文本"
+					Tooltip: 在幻影伙伴头顶显示实时开发调试读数。默认关闭，仅在需要排查问题时手动开启。
+				}
+			}
+		}
+
+		Items: {
+			DamageTestDummy: {
+				DisplayName: 小兔兔
+				Tooltip:
+					'''
+					多么可爱的小兔兔
+					想必它一定同意做我的武器测试伤害工具
+					点击左键放置傀儡，点击右键清除傀儡
+					'''
+			}
+
+			DevelopmentNotice: {
+				DisplayName: 幻影伙伴开发说明
+				Development: 本模组仍在持续开发中。
+				SoloCreator: 目前由作者一人制作与维护。
+				Updates: 我会持续更新、完善伙伴功能，并处理玩家遇到的各种问题。
+				Compatibility: 后续会逐步为各大型模组的热门武器制作点对点兼容。
+				Complexity: 外观相近的武器，底层代码机制可能完全不同；有些兼容需要更多时间才能安全完成，感谢理解与耐心等待。
+				// Tooltip: ""
+			}
+
+			CompanionDebugger: {
+				DisplayName: 调试书
+				Tooltip:
+					'''
+					左键：在鼠标位置召唤伙伴；再次使用会召唤下一个已保存的伙伴
+					所有伙伴将会绑定至玩家而不是世界，这需要消换召唤栏位
+					右键：打开伙伴管理面板；可以删除一些伙伴，也可以全部一键解散
+					右键点击伙伴：打开其装备与背包【不需要拿任何东西右键】
+					武器：可放入任意武器（含召唤武器）；按武器栏从左到右选择，远程武器无弹时会用默认弹药
+
+					技术要点：
+					伙伴是注册在玩家槽位上的真实玩家实体：武器动画、装备效果与移动物理均由原版处理
+					伙伴会寻路跟随（跳跃、飞行、下平台），只有长时间距离过远才会传送
+					受伤或快速双击右键会让伙伴瞬间传送到身边护驾；卡死时也会自动传送回来
+					由于这涉及的技术相对抽象，因此目前仅支持单人模式
+					一些比较复杂或高级的模组武器不一定支持，具体不支持列表我没法给出，只能慢慢尝试
+					'''
+			}
+
+			CompanionCommandBook: {
+				DisplayName: 指令书
+				Tooltip:
+					'''
+					按住右键：在「进攻 / 防卫 / 镇守」三种战斗模式间循环切换，切换时头顶会提示当前模式。
+					· 进攻：自由跟随并主动攻击、挖矿与采集。
+					· 防卫：紧贴玩家护卫，不主动攻击敌人。
+					· 镇守：在进入模式的位置立下标记，守在原地作战，被击退也会返回。
+					以及另外三种非战斗模式：「钓鱼 / 捕捉 / 挖矿」
+					左键：在鼠标位置立一个信号标，伙伴会前往该处并镇守；再次左键点击标记附近可取消。
+					信号标最多存在 5 秒，未抵达会自动消失；抵达后伙伴会镇守此处，直到收到新指令或受伤护驾。
+					无论哪种模式，攻击方式都相同，只是移动方式不同。
+
+					技术要点：
+					未来会加入尽可能多的战术形态，以适应不同需求
+					但即便是现在在一些复杂的地形中，也有可能出现寻路失败的bug
+					总而言之，多尝试，出问题了就重新刷新，有严重问题就来评论区反馈
+					我相信一定有大量问题是我一个人没法测出来的
+					'''
+			}
+
+			CompanionHunterBook: {
+				DisplayName: 猎人书
+				Tooltip:
+					'''
+					注：该物品还在测试中，可能存在一些问题
+					左键：开启或关闭「猎人追杀模式」，敌对猎人会开始追杀你。
+					右键：打开追杀模式配置面板，可选择生成 1 至 3 名猎人。
+					猎人的装备会根据世界进度与玩家防御力调整；模式开启期间会自动开启 PvP。
+					猎人会持续追杀 2 分钟，随后休整 45 秒，再继续追击。
+					被击败的猎人会在 60 秒后携带重新生成的装备复活。
+					'''
+			}
+		}
+
+		CompanionCommand: {
+			ModeAttack: 进攻模式
+			ModeDefense: 防卫模式
+			ModeGarrison: 镇守模式
+			Switched: 幻影伙伴：{0}
+			NoCompanion: 当前没有已召唤的幻影伙伴。
+			SingleplayerOnly: 幻影伙伴目前仅支持单人模式。
+			Reviving: "{0} 复活中 {1}s"
+			NoFreeSlot: 没有可用的玩家槽位来召唤幻影伙伴。
+			MinionSlotsFull: 召唤栏位不足，无法召唤幻影伙伴！
+			HunterModeEnabled: 【猎人追杀模式】已开启！敌对猎人开始追踪你的痕迹...
+			HunterModeDisabled: 【猎人追杀模式】已关闭。警报解除。
+			HunterSpawned: 【警告】敌对玩家 {0} 已潜入你的世界！
+			HunterDefeated: 【广播】敌对玩家 {0} 被击败了！将在 60 秒后重构配装复活...
+			HunterRespawned: 【警告】敌对玩家 {0} 已复活并重新发起追逐！
+			HunterSingleplayerOnly: 猎人追杀模式目前仅支持单人模式。
+			Diagnostics: 幻影调试信息：{0}　构建 {1}
+			Enabled: 开
+			Disabled: 关
+			HunterResting: "[猎人警告] {0} 暂时拉开距离，开始原地休整与收集资源！"
+			HunterHunting: "[猎人警告] {0} 再次发现了你的踪迹，重新发起追杀！"
+			HunterPanelTitle: ⚔ 猎人追杀模式配置
+			Close: 关闭
+			HunterPanelEnabled: 【模式状态】已开启（点击关闭）
+			HunterPanelDisabled: 【模式状态】已关闭（点击开启）
+			HunterCountTitle: 设定追杀猎人数量：
+			HunterCount: "{0} 名猎人"
+			HunterStatusTitle: 猎人当前状态：
+			HunterInactive: · 追杀模式未激活
+			HunterPanelReviving: · {0}：阵亡复活中（剩余 {1}s）
+			HunterPanelResting: · {0}：原地休整并收集资源
+			HunterPanelHunting: · {0}：正在全力追赶并试图击杀你！
+			HunterRefresh: 🔄 重新构建并派遣猎人小队
+			HunterRefreshed: 已重构并重新派遣敌对猎人小队！
+		}
+
+		// NPCs.DamageTestDummyNPC.DisplayName: Damage Test Dummy N P C
+	}
+}

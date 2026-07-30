@@ -1,0 +1,133 @@
+# Localization file. Keep this UTF-8 (no BOM).
+# The filename is just the culture code (en-US), so NO prefix is applied — the
+# full "Mods.MoreAIPlayer." path is written out inside. Do NOT rename this to
+# "en-US_Mods.MoreAIPlayer.hjson", or the prefix gets doubled and nothing matches.
+
+Mods: {
+	MoreAIPlayer: {
+		Configs: {
+			MoreAIPlayerClientConfig: {
+				// DisplayName: Phantom Companion Client Settings
+				// Headers.CompanionDiagnostics: Companion Diagnostics
+
+				EnablePhantomPlayerDebugText: {
+					// Label: "[i:GoldenKey] Enable Phantom Player Debug Text"
+					// Tooltip: Shows the live development readout above phantom companions. Disabled by default.
+				}
+			}
+		}
+
+		Items: {
+			DamageTestDummy: {
+				DisplayName: Conejito
+				Tooltip:
+					'''
+					Qué conejito tan adorable.
+					Seguro que acepta ser mi herramienta para probar el daño de armas.
+					Clic izquierdo: colocar un muñeco. Clic derecho: eliminar muñecos.
+					'''
+			}
+
+			DevelopmentNotice: {
+				// DisplayName: Phantom Companion Development Notice
+				// Development: This mod is actively under development.
+				// SoloCreator: It is made and maintained by one creator.
+				// Updates: I will keep updating it, improving companions, and fixing problems reported by players.
+				// Compatibility: Popular weapons from large mods will receive one-to-one compatibility work over time.
+				// Complexity: Similar-looking weapons can use very different code internally; some therefore need much more time to support safely. Thank you for your patience.
+				// Tooltip: ""
+			}
+
+			CompanionDebugger: {
+				DisplayName: Libro de depuración
+				Tooltip:
+					'''
+					Clic izquierdo: invoca a un compañero en el cursor. Úsalo otra vez para invocar al siguiente compañero guardado.
+					Los compañeros se vinculan al jugador, no al mundo, y cada uno consume un espacio de esbirro.
+					Clic derecho: abre el gestor de compañeros. Desde ahí puedes despedir a algunos o a todos de una vez.
+					Clic derecho sobre un compañero: abre su equipo y mochila. No necesitas llevar ningún objeto en la mano.
+					Armas: admite cualquier arma, incluso de invocación. La barra de armas se revisa de izquierda a derecha; las armas a distancia usan munición básica cuando se quedan sin ella.
+
+					Notas técnicas:
+					Los compañeros son entidades de jugador reales registradas en huecos de jugador: las animaciones, efectos de equipo y física de movimiento los procesa el juego base.
+					Te siguen mediante búsqueda de ruta, saltando, volando y bajando por plataformas; solo se teletransportan tras permanecer muy lejos durante un tiempo.
+					Si recibes daño o haces doble clic derecho rápido, los compañeros acuden a protegerte; también regresan solos si se atascan.
+					Como este sistema es bastante inusual, por ahora solo funciona en un jugador.
+					Algunas armas complejas o avanzadas de otros mods podrían no ser compatibles. No hay una lista completa; pruébalas poco a poco.
+					'''
+			}
+
+			CompanionCommandBook: {
+				DisplayName: Libro de órdenes
+				Tooltip:
+					'''
+					Mantén clic derecho: alterna entre los tres modos de combate Asalto / Defensa / Guarnición. El modo elegido aparece sobre tu cabeza.
+					· Asalto: sigue libremente y ataca, mina y recoge de forma activa.
+					· Defensa: permanece cerca como guardaespaldas y no ataca enemigos por iniciativa propia.
+					· Guarnición: marca el lugar al entrar en el modo, combate allí y vuelve si lo apartan.
+					También hay tres modos no combativos: Pesca / Captura / Minería.
+					Clic izquierdo: deja un punto de ruta en el cursor. Los compañeros irán allí y mantendrán la posición; vuelve a hacer clic cerca de la marca para cancelarla.
+					Un punto de ruta dura como máximo 5 s y desaparece si no se alcanza. Al llegar, el compañero se queda allí hasta recibir una orden nueva o una llamada de rescate.
+					El comportamiento de ataque es igual en todos los modos; solo cambia la forma de moverse.
+
+					Notas técnicas:
+					Con el tiempo se añadirán tantas formas tácticas como sea posible para cubrir distintas necesidades.
+					Incluso ahora, la búsqueda de ruta puede fallar en terrenos complejos.
+					Experimenta todo lo que quieras. Si algo sale mal, actualiza y vuelve a intentarlo; si es grave, repórtalo en los comentarios.
+					Seguro que hay muchos problemas que una sola persona no puede descubrir.
+					'''
+			}
+
+			CompanionHunterBook: {
+				DisplayName: Libro de cazadores
+				Tooltip:
+					'''
+					Nota: este objeto sigue en pruebas y puede tener problemas.
+					Clic izquierdo: activa o desactiva el modo Cacería. Cazadores hostiles seguirán tu rastro.
+					Clic derecho: abre los ajustes de Cacería y permite elegir de 1 a 3 cazadores.
+					El equipo de los cazadores escala con el progreso del mundo y tu defensa. El modo Cacería activa PvP mientras esté activo.
+					Los cazadores te persiguen durante 2 minutos, descansan 45 segundos y reanudan la cacería.
+					Los cazadores derrotados regresan con equipo nuevo tras 60 segundos.
+					'''
+			}
+		}
+
+		CompanionCommand: {
+			ModeAttack: Modo de asalto
+			ModeDefense: Modo de defensa
+			ModeGarrison: Modo de guarnición
+			Switched: Compañero espectral: {0}
+			NoCompanion: No tienes compañeros espectrales invocados.
+			SingleplayerOnly: Los compañeros espectrales por ahora solo funcionan en un jugador.
+			Reviving: "{0} revive en {1}s"
+			NoFreeSlot: No hay un hueco de jugador libre para un compañero espectral.
+			MinionSlotsFull: No hay suficientes espacios de esbirros para invocar a un compañero espectral.
+			HunterModeEnabled: "[Modo Cacería] activado. Los cazadores hostiles siguen tu rastro..."
+			HunterModeDisabled: "[Modo Cacería] desactivado. La alerta ha terminado."
+			HunterSpawned: "[Advertencia] ¡El jugador hostil {0} se ha infiltrado en tu mundo!"
+			HunterDefeated: "[Aviso] ¡El jugador hostil {0} fue derrotado! Regresará con equipo nuevo en 60 segundos..."
+			HunterRespawned: "[Advertencia] ¡El jugador hostil {0} ha regresado y reanuda la persecución!"
+			HunterSingleplayerOnly: El modo Cacería por ahora solo funciona en un jugador.
+			Diagnostics: Diagnóstico espectral: {0}  Compilación {1}
+			Enabled: Activado
+			Disabled: Desactivado
+			HunterResting: "[Alerta de caza] ¡{0} se ha retirado para descansar y reunir suministros!"
+			HunterHunting: "[Alerta de caza] ¡{0} ha encontrado tu rastro y reanuda la cacería!"
+			HunterPanelTitle: ⚔ Ajustes del modo Cacería
+			Close: Cerrar
+			HunterPanelEnabled: "[Estado] Activado (clic para desactivar)"
+			HunterPanelDisabled: "[Estado] Desactivado (clic para activar)"
+			HunterCountTitle: Número de cazadores:
+			HunterCount: "{0} cazador(es)"
+			HunterStatusTitle: Estado de los cazadores:
+			HunterInactive: · El modo Cacería está inactivo
+			HunterPanelReviving: · {0}: reviviendo ({1}s restantes)
+			HunterPanelResting: · {0}: descansando y reuniendo suministros
+			HunterPanelHunting: · {0}: ¡se acerca para rematarte!
+			HunterRefresh: 🔄 Reconstruir y desplegar al escuadrón de cazadores
+			HunterRefreshed: ¡El escuadrón de cazadores fue reconstruido y desplegado!
+		}
+
+		// NPCs.DamageTestDummyNPC.DisplayName: Damage Test Dummy N P C
+	}
+}

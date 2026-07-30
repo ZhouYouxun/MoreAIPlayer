@@ -1,0 +1,133 @@
+# Localization file. Keep this UTF-8 (no BOM).
+# The filename is just the culture code (en-US), so NO prefix is applied — the
+# full "Mods.MoreAIPlayer." path is written out inside. Do NOT rename this to
+# "en-US_Mods.MoreAIPlayer.hjson", or the prefix gets doubled and nothing matches.
+
+Mods: {
+	MoreAIPlayer: {
+		Configs: {
+			MoreAIPlayerClientConfig: {
+				// DisplayName: Phantom Companion Client Settings
+				// Headers.CompanionDiagnostics: Companion Diagnostics
+
+				EnablePhantomPlayerDebugText: {
+					// Label: "[i:GoldenKey] Enable Phantom Player Debug Text"
+					// Tooltip: Shows the live development readout above phantom companions. Disabled by default.
+				}
+			}
+		}
+
+		Items: {
+			DamageTestDummy: {
+				DisplayName: Coelhinho
+				Tooltip:
+					'''
+					Que coelhinho adorável.
+					Certamente ele aceita ser minha ferramenta para testar o dano de armas.
+					Clique esquerdo: coloque um boneco. Clique direito: limpe os bonecos.
+					'''
+			}
+
+			DevelopmentNotice: {
+				// DisplayName: Phantom Companion Development Notice
+				// Development: This mod is actively under development.
+				// SoloCreator: It is made and maintained by one creator.
+				// Updates: I will keep updating it, improving companions, and fixing problems reported by players.
+				// Compatibility: Popular weapons from large mods will receive one-to-one compatibility work over time.
+				// Complexity: Similar-looking weapons can use very different code internally; some therefore need much more time to support safely. Thank you for your patience.
+				// Tooltip: ""
+			}
+
+			CompanionDebugger: {
+				DisplayName: Livro de depuração
+				Tooltip:
+					'''
+					Clique esquerdo: invoca um companheiro na posição do cursor. Use de novo para invocar o próximo companheiro salvo.
+					Companheiros ficam vinculados ao jogador, não ao mundo, e cada um consome um espaço de lacaio.
+					Clique direito: abre o gerenciador de companheiros. Nele, você pode dispensar alguns companheiros ou todos de uma vez.
+					Clique direito em um companheiro: abre seus equipamentos e sua mochila. Não é preciso segurar item algum.
+					Armas: qualquer arma é aceita, inclusive armas de invocação. A barra de armas é verificada da esquerda para a direita; armas à distância usam munição básica quando ela acaba.
+
+					Notas técnicas:
+					Companheiros são entidades de jogador reais registradas em espaços de jogador: animações de armas, efeitos de equipamentos e física de movimento são processados pelo jogo base.
+					Eles seguem você por busca de caminho, pulando, voando e atravessando plataformas; só se teletransportam depois de ficarem muito longe por algum tempo.
+					Leve um golpe ou dê dois cliques direitos rápidos para chamá-los para protegê-lo; eles também voltam sozinhos se ficarem presos.
+					Como este sistema é relativamente incomum, por enquanto ele só funciona no modo solo.
+					Algumas armas complexas ou avançadas de outros mods podem não ser compatíveis. Não há uma lista completa; experimente aos poucos.
+					'''
+			}
+
+			CompanionCommandBook: {
+				DisplayName: Livro de comandos
+				Tooltip:
+					'''
+					Segure o clique direito: alterna entre os três modos de combate Ataque / Defesa / Guarnição. O modo escolhido aparece sobre sua cabeça.
+					· Ataque: segue livremente e ataca, minera e coleta ativamente.
+					· Defesa: fica perto como guarda-costas e não ataca inimigos por iniciativa própria.
+					· Guarnição: marca o local ao entrar no modo, luta ali e retorna se for empurrado para longe.
+					Também há três modos não combativos: Pesca / Captura / Mineração.
+					Clique esquerdo: coloca um ponto de rota no cursor. Os companheiros vão até lá e mantêm a posição; clique de novo perto do marcador para cancelá-lo.
+					Um ponto de rota dura no máximo 5 s e desaparece se não for alcançado. Ao chegar, o companheiro fica lá até receber uma nova ordem ou um chamado de resgate.
+					O comportamento de ataque é igual em todos os modos; só o movimento muda.
+
+					Notas técnicas:
+					Com o tempo serão adicionadas o máximo possível de formas táticas para atender a necessidades diferentes.
+					Mesmo agora, a busca de caminho pode falhar em terrenos complexos.
+					Experimente à vontade. Se algo der errado, recarregue e tente de novo; para problemas sérios, informe nos comentários.
+					Certamente há muitos problemas que uma pessoa só não consegue descobrir.
+					'''
+			}
+
+			CompanionHunterBook: {
+				DisplayName: Livro dos caçadores
+				Tooltip:
+					'''
+					Nota: este item ainda está em teste e pode apresentar problemas.
+					Clique esquerdo: ativa ou desativa o modo Caçada. Caçadores hostis seguirão seu rastro.
+					Clique direito: abre as configurações de Caçada e permite escolher de 1 a 3 caçadores.
+					O equipamento dos caçadores escala com o progresso do mundo e sua defesa. O modo Caçada ativa PvP enquanto estiver ativo.
+					Os caçadores perseguem você por 2 minutos, descansam 45 segundos e então retomam a caçada.
+					Caçadores derrotados voltam após 60 segundos com equipamentos novos.
+					'''
+			}
+		}
+
+		CompanionCommand: {
+			ModeAttack: Modo de Ataque
+			ModeDefense: Modo de Defesa
+			ModeGarrison: Modo de Guarnição
+			Switched: Companheiro fantasma: {0}
+			NoCompanion: Você não tem companheiros fantasmas invocados.
+			SingleplayerOnly: Companheiros fantasmas por enquanto só estão disponíveis no modo solo.
+			Reviving: "{0} volta em {1}s"
+			NoFreeSlot: Não há espaço de jogador livre para um companheiro fantasma.
+			MinionSlotsFull: Não há espaços de lacaios suficientes para invocar um companheiro fantasma.
+			HunterModeEnabled: "[Modo Caçada] ativado! Caçadores hostis seguem seu rastro..."
+			HunterModeDisabled: "[Modo Caçada] desativado. O alerta acabou."
+			HunterSpawned: "[Aviso] O jogador hostil {0} infiltrou-se no seu mundo!"
+			HunterDefeated: "[Aviso] O jogador hostil {0} foi derrotado! Ele voltará em 60 segundos com equipamentos novos..."
+			HunterRespawned: "[Aviso] O jogador hostil {0} voltou e retomou a perseguição!"
+			HunterSingleplayerOnly: O modo Caçada por enquanto só está disponível no modo solo.
+			Diagnostics: Diagnóstico fantasma: {0}  Build {1}
+			Enabled: Ligado
+			Disabled: Desligado
+			HunterResting: "[Alerta de caçada] {0} recuou para descansar e reunir suprimentos!"
+			HunterHunting: "[Alerta de caçada] {0} encontrou seu rastro novamente e retomou a caçada!"
+			HunterPanelTitle: ⚔ Configurações do modo Caçada
+			Close: Fechar
+			HunterPanelEnabled: "[Status do modo] Ativado (clique para desativar)"
+			HunterPanelDisabled: "[Status do modo] Desativado (clique para ativar)"
+			HunterCountTitle: Número de caçadores:
+			HunterCount: "{0} caçador(es)"
+			HunterStatusTitle: Status dos caçadores:
+			HunterInactive: · O modo Caçada está inativo
+			HunterPanelReviving: · {0}: revivendo ({1}s restantes)
+			HunterPanelResting: · {0}: descansando e reunindo suprimentos
+			HunterPanelHunting: · {0}: está chegando para matar você!
+			HunterRefresh: 🔄 Reconstruir e enviar o esquadrão de caçadores
+			HunterRefreshed: Esquadrão de caçadores reconstruído e enviado!
+		}
+
+		// NPCs.DamageTestDummyNPC.DisplayName: Damage Test Dummy N P C
+	}
+}

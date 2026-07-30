@@ -1,0 +1,11 @@
+# Local IDE state and generated build output
+.vs/
+bin/
+obj/
+
+# tModLoader build packages
+*.tmod
+
+# Personal local assistant metadata
+.agents/
+.codex/

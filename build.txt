@@ -1,0 +1,7 @@
+displayName = MoreAIPlayer 幻影伙伴
+author = 剃刀刃台风
+version = 1.0.7
+hideCode = false
+hideResources = false
+includeSource = true
+buildIgnore = *.zip*

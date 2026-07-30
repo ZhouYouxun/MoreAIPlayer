@@ -1,0 +1,133 @@
+# Localization file. Keep this UTF-8 (no BOM).
+# The filename is just the culture code (en-US), so NO prefix is applied — the
+# full "Mods.MoreAIPlayer." path is written out inside. Do NOT rename this to
+# "en-US_Mods.MoreAIPlayer.hjson", or the prefix gets doubled and nothing matches.
+
+Mods: {
+	MoreAIPlayer: {
+		Configs: {
+			MoreAIPlayerClientConfig: {
+				// DisplayName: Phantom Companion Client Settings
+				// Headers.CompanionDiagnostics: Companion Diagnostics
+
+				EnablePhantomPlayerDebugText: {
+					// Label: "[i:GoldenKey] Enable Phantom Player Debug Text"
+					// Tooltip: Shows the live development readout above phantom companions. Disabled by default.
+				}
+			}
+		}
+
+		Items: {
+			DamageTestDummy: {
+				DisplayName: Coniglietto
+				Tooltip:
+					'''
+					Che adorabile coniglietto.
+					Sicuramente accetterà di essere il mio strumento per testare i danni delle armi.
+					Clic sinistro: piazza un manichino. Clic destro: rimuovi i manichini.
+					'''
+			}
+
+			DevelopmentNotice: {
+				// DisplayName: Phantom Companion Development Notice
+				// Development: This mod is actively under development.
+				// SoloCreator: It is made and maintained by one creator.
+				// Updates: I will keep updating it, improving companions, and fixing problems reported by players.
+				// Compatibility: Popular weapons from large mods will receive one-to-one compatibility work over time.
+				// Complexity: Similar-looking weapons can use very different code internally; some therefore need much more time to support safely. Thank you for your patience.
+				// Tooltip: ""
+			}
+
+			CompanionDebugger: {
+				DisplayName: Libro di debug
+				Tooltip:
+					'''
+					Clic sinistro: evoca un compagno alla posizione del cursore. Usalo di nuovo per evocare il successivo compagno salvato.
+					I compagni sono legati al giocatore, non al mondo, e ciascuno consuma uno slot servitore.
+					Clic destro: apre il gestore dei compagni. Da lì puoi congedarne alcuni o tutti insieme.
+					Clic destro su un compagno: apre il suo equipaggiamento e lo zaino. Non devi tenere alcun oggetto in mano.
+					Armi: è consentita qualsiasi arma, comprese quelle di evocazione. La barra delle armi viene controllata da sinistra a destra; le armi a distanza usano munizioni base quando finiscono le munizioni.
+
+					Note tecniche:
+					I compagni sono vere entità giocatore registrate negli slot giocatore: animazioni, effetti dell'equipaggiamento e fisica del movimento sono gestiti dal gioco base.
+					Ti seguono con il pathfinding, saltando, volando e attraversando le piattaforme; si teletrasportano solo dopo essere rimasti molto lontani per un po'.
+					Subisci un colpo o fai rapidamente doppio clic destro per richiamarli a proteggerti; tornano automaticamente anche se si bloccano.
+					Poiché questo sistema è piuttosto insolito, al momento supporta solo il giocatore singolo.
+					Alcune armi complesse o avanzate di altri mod potrebbero non essere compatibili. Non esiste un elenco completo: provale gradualmente.
+					'''
+			}
+
+			CompanionCommandBook: {
+				DisplayName: Libro dei comandi
+				Tooltip:
+					'''
+					Tieni premuto il clic destro: passa tra le tre modalità di combattimento Assalto / Difesa / Guarnigione. La modalità scelta appare sopra la tua testa.
+					· Assalto: segue liberamente e attacca, scava e raccoglie attivamente.
+					· Difesa: resta vicino come guardia del corpo e non attacca i nemici di sua iniziativa.
+					· Guarnigione: segna il luogo all'attivazione, combatte lì e vi ritorna se viene respinto.
+					Esistono anche tre modalità non di combattimento: Pesca / Cattura / Estrazione.
+					Clic sinistro: colloca un punto di passaggio al cursore. I compagni andranno lì e terranno la posizione; fai di nuovo clic vicino al segnale per annullarlo.
+					Un punto di passaggio dura al massimo 5 s e scompare se non viene raggiunto. Una volta arrivato, il compagno resta lì fino a un nuovo ordine o a una chiamata di soccorso.
+					L'attacco è identico in tutte le modalità; cambia solo il movimento.
+
+					Note tecniche:
+					Nel tempo verranno aggiunte più forme tattiche possibile, per adattarsi a esigenze diverse.
+					Anche ora, il pathfinding può fallire in terreni complessi.
+					Sperimenta liberamente. Se qualcosa non va, ricarica e riprova; per problemi gravi, segnalali nei commenti.
+					Ci sono sicuramente molti problemi che una sola persona non può scoprire.
+					'''
+			}
+
+			CompanionHunterBook: {
+				DisplayName: Libro dei cacciatori
+				Tooltip:
+					'''
+					Nota: questo oggetto è ancora in prova e potrebbe avere problemi.
+					Clic sinistro: attiva o disattiva la modalità Caccia. Cacciatori ostili seguiranno le tue tracce.
+					Clic destro: apre le impostazioni Caccia e permette di scegliere da 1 a 3 cacciatori.
+					L'equipaggiamento dei cacciatori scala con il progresso del mondo e la tua difesa. La modalità Caccia attiva il PvP finché è attiva.
+					I cacciatori ti inseguono per 2 minuti, riposano 45 secondi e poi riprendono la caccia.
+					I cacciatori sconfitti tornano dopo 60 secondi con nuovo equipaggiamento.
+					'''
+			}
+		}
+
+		CompanionCommand: {
+			ModeAttack: Modalità Assalto
+			ModeDefense: Modalità Difesa
+			ModeGarrison: Modalità Guarnigione
+			Switched: Compagno fantasma: {0}
+			NoCompanion: Non hai compagni fantasma evocati.
+			SingleplayerOnly: I compagni fantasma al momento sono disponibili solo in giocatore singolo.
+			Reviving: "{0} ritorna tra {1}s"
+			NoFreeSlot: Non è disponibile uno slot giocatore libero per un compagno fantasma.
+			MinionSlotsFull: Non ci sono abbastanza slot servitore per evocare un compagno fantasma.
+			HunterModeEnabled: "[Modalità Caccia] attivata! Cacciatori ostili seguono le tue tracce..."
+			HunterModeDisabled: "[Modalità Caccia] disattivata. L'allarme è rientrato."
+			HunterSpawned: "[Avviso] Il giocatore ostile {0} si è infiltrato nel tuo mondo!"
+			HunterDefeated: "[Annuncio] Il giocatore ostile {0} è stato sconfitto! Tornerà tra 60 secondi con nuovo equipaggiamento..."
+			HunterRespawned: "[Avviso] Il giocatore ostile {0} è tornato e riprende l'inseguimento!"
+			HunterSingleplayerOnly: La modalità Caccia al momento è disponibile solo in giocatore singolo.
+			Diagnostics: Diagnostica fantasma: {0}  Build {1}
+			Enabled: Attiva
+			Disabled: Disattiva
+			HunterResting: "[Allerta Caccia] {0} si ritira per riposare e raccogliere rifornimenti!"
+			HunterHunting: "[Allerta Caccia] {0} ha ritrovato le tue tracce e riprende la caccia!"
+			HunterPanelTitle: ⚔ Impostazioni modalità Caccia
+			Close: Chiudi
+			HunterPanelEnabled: "[Stato modalità] Attiva (clicca per disattivare)"
+			HunterPanelDisabled: "[Stato modalità] Disattiva (clicca per attivare)"
+			HunterCountTitle: Numero di cacciatori:
+			HunterCount: "{0} cacciatore/i"
+			HunterStatusTitle: Stato dei cacciatori:
+			HunterInactive: · La modalità Caccia non è attiva
+			HunterPanelReviving: · {0}: resurrezione ({1}s rimanenti)
+			HunterPanelResting: · {0}: riposa e raccoglie rifornimenti
+			HunterPanelHunting: · {0}: ti sta raggiungendo per ucciderti!
+			HunterRefresh: 🔄 Ricrea e schiera la squadra di cacciatori
+			HunterRefreshed: Squadra di cacciatori ricreata e schierata!
+		}
+
+		// NPCs.DamageTestDummyNPC.DisplayName: Damage Test Dummy N P C
+	}
+}

@@ -1,0 +1,133 @@
+# Localization file. Keep this UTF-8 (no BOM).
+# The filename is just the culture code (en-US), so NO prefix is applied — the
+# full "Mods.MoreAIPlayer." path is written out inside. Do NOT rename this to
+# "en-US_Mods.MoreAIPlayer.hjson", or the prefix gets doubled and nothing matches.
+
+Mods: {
+	MoreAIPlayer: {
+		Configs: {
+			MoreAIPlayerClientConfig: {
+				DisplayName: Phantom Companion Client Settings
+				Headers.CompanionDiagnostics: Companion Diagnostics
+
+				EnablePhantomPlayerDebugText: {
+					Label: "[i:GoldenKey] Enable Phantom Player Debug Text"
+					Tooltip: Shows the live development readout above phantom companions. Disabled by default.
+				}
+			}
+		}
+
+		Items: {
+			DamageTestDummy: {
+				DisplayName: Little Bunny
+				Tooltip:
+					'''
+					Such a cute little bunny.
+					Surely it agrees to be my weapon damage test tool.
+					Left click to place a dummy. Right click to clear dummies.
+					'''
+			}
+
+			DevelopmentNotice: {
+				DisplayName: Phantom Companion Development Notice
+				Development: This mod is actively under development.
+				SoloCreator: It is made and maintained by one creator.
+				Updates: I will keep updating it, improving companions, and fixing problems reported by players.
+				Compatibility: Popular weapons from large mods will receive one-to-one compatibility work over time.
+				Complexity: Similar-looking weapons can use very different code internally; some therefore need much more time to support safely. Thank you for your patience.
+				Tooltip: ""
+			}
+
+			CompanionDebugger: {
+				DisplayName: Debug Book
+				Tooltip:
+					'''
+					Left click: summon a companion at the cursor. Use it again to summon the next saved companion.
+					Companions are tied to the player, not the world, and each one uses a minion slot.
+					Right click: open the companion manager. Dismiss individual companions there, or dismiss everyone at once.
+					Right-click a companion: open its equipment and backpack. You do not need to hold any item.
+					Weapons: any weapon is allowed, including summon weapons. The weapon bar is checked from left to right; ranged weapons use default ammunition when empty.
+
+					Technical notes:
+					Companions are real player entities registered in player slots: weapon animations, equipment effects, and movement physics are handled by vanilla.
+					They follow using pathfinding — jumping, flying, and dropping through platforms — and teleport only after staying far away for a while.
+					Taking a hit or quickly double-right-clicking recalls companions to guard you; they also recall automatically if stuck.
+					Because this system is fairly unconventional, it currently supports single-player only.
+					Some complex or advanced mod weapons may not be compatible. There is no complete incompatibility list, so please try them gradually.
+					'''
+			}
+
+			CompanionCommandBook: {
+				DisplayName: Command Book
+				Tooltip:
+					'''
+					Hold right click: cycle through the three combat modes — Attack / Defense / Garrison. The selected mode appears above your head.
+					· Attack: follow freely and actively fight, mine, and gather.
+					· Defense: stay close as a bodyguard and do not proactively attack enemies.
+					· Garrison: mark your position when entering the mode, fight there, and return if knocked away.
+					There are also three non-combat modes: Fishing / Catching / Mining.
+					Left click: place a waypoint at the cursor. Companions travel there and garrison it; left-click near the marker again to cancel it.
+					A waypoint lasts at most 5 seconds and disappears if unreached. Once reached, companions stay there until a new order or a rescue call.
+					Attack behavior is the same in every mode; only movement behavior differs.
+
+					Technical notes:
+					More tactical modes will be added over time to cover as many needs as possible.
+					Even now, pathfinding can fail in complicated terrain.
+					Experiment freely. If something goes wrong, refresh and try again; for serious issues, please report them in the comments.
+					I am sure there are many problems one person cannot uncover alone.
+					'''
+			}
+
+			CompanionHunterBook: {
+				DisplayName: Hunter Book
+				Tooltip:
+					'''
+					Note: this item is still being tested and may have issues.
+					Left click: toggle Manhunt Mode. Hostile hunters will track you down.
+					Right click: open the Manhunt settings and choose 1 to 3 hunters.
+					Hunter gear scales with your world progression and defense. Manhunt Mode enables PvP while it is active.
+					Hunters pursue you for 2 minutes, then rest for 45 seconds before resuming the hunt.
+					Defeated hunters return with fresh gear after 60 seconds.
+					'''
+			}
+		}
+
+		CompanionCommand: {
+			ModeAttack: Attack Mode
+			ModeDefense: Defense Mode
+			ModeGarrison: Garrison Mode
+			Switched: Phantom companion: {0}
+			NoCompanion: You have no companions summoned.
+			SingleplayerOnly: Phantom companions are single-player only for now.
+			Reviving: "{0} reviving {1}s"
+			NoFreeSlot: No free player slot is available for a phantom companion.
+			MinionSlotsFull: Not enough minion slots to summon a phantom companion.
+			HunterModeEnabled: "[Manhunt Mode] enabled! Hostile hunters are tracking your trail..."
+			HunterModeDisabled: "[Manhunt Mode] disabled. The alert is over."
+			HunterSpawned: "[Warning] Hostile player {0} has infiltrated your world!"
+			HunterDefeated: "[Broadcast] Hostile player {0} was defeated! They will return with a fresh loadout in 60 seconds..."
+			HunterRespawned: "[Warning] Hostile player {0} has returned and resumed the chase!"
+			HunterSingleplayerOnly: Manhunt Mode is single-player only for now.
+			Diagnostics: Phantom diagnostics: {0}  Build {1}
+			Enabled: On
+			Disabled: Off
+			HunterResting: "[Hunter Alert] {0} has fallen back to rest and gather supplies!"
+			HunterHunting: "[Hunter Alert] {0} has found your trail again and resumed the hunt!"
+			HunterPanelTitle: ⚔ Manhunt Settings
+			Close: Close
+			HunterPanelEnabled: "[Mode Status] Enabled (click to disable)"
+			HunterPanelDisabled: "[Mode Status] Disabled (click to enable)"
+			HunterCountTitle: Number of hunters:
+			HunterCount: "{0} hunter(s)"
+			HunterStatusTitle: Hunter status:
+			HunterInactive: · Manhunt Mode is inactive
+			HunterPanelReviving: · {0}: reviving ({1}s remaining)
+			HunterPanelResting: · {0}: resting and gathering supplies
+			HunterPanelHunting: · {0}: closing in for the kill!
+			HunterRefresh: 🔄 Rebuild and deploy the hunter squad
+			HunterRefreshed: Hunter squad rebuilt and redeployed!
+		}
+
+		NPCs.DamageTestDummyNPC.DisplayName: Damage Test Dummy N P C
+	}
+}
