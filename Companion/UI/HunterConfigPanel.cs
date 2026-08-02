@@ -69,7 +69,7 @@ public static class HunterConfigPanel
         Texture2D pixel = TextureAssets.MagicPixel.Value;
 
         const int panelW = 380;
-        const int panelH = 340;
+        const int panelH = 368;
         Vector2 center = new(Main.screenWidth * 0.5f, Main.screenHeight * 0.5f);
         Rectangle panelRect = new((int)(center.X - panelW * 0.5f), (int)(center.Y - panelH * 0.5f), panelW, panelH);
 
@@ -108,6 +108,13 @@ public static class HunterConfigPanel
         }
 
         int currY = panelRect.Y + 54;
+
+        string stageText = HunterSystem.HunterModeActive
+            ? Text(HunterSystem.ActiveStage == HunterGameStage.PreHardmode ? "HunterStagePreHardmode" : "HunterStageEarlyHardmode")
+            : Text("HunterStageUnavailable");
+        Terraria.Utils.DrawBorderString(sb, Text("HunterStageStatus", stageText),
+            new Vector2(panelRect.X + 20, currY), new Color(255, 210, 130) * opacity, 0.78f);
+        currY += 24;
 
         // 1. Master Mode Toggle Button
         Rectangle toggleRect = new(panelRect.X + 20, currY, panelW - 40, 40);
@@ -208,8 +215,7 @@ public static class HunterConfigPanel
             Main.mouseLeftRelease = false;
             if (HunterSystem.HunterModeActive)
             {
-                HunterSystem.ClearAllHunters();
-                Main.NewText(Text("HunterRefreshed"), 255, 200, 100);
+                HunterSystem.RestartHunt();
             }
             else
             {

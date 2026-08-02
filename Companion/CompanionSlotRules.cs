@@ -45,6 +45,12 @@ public static class CompanionSlotRules
 
     public static bool IsFishingPole(Item item) => item.IsAir || item.fishingPole > 0;
 
+    public static bool IsGrapplingHook(Item item) =>
+        item.IsAir || (item.shoot > ProjectileID.None &&
+            item.shoot < Main.projHook.Length && Main.projHook[item.shoot]);
+
+    public static bool IsMount(Item item) => item.IsAir || item.mountType != MountID.None;
+
     /// <summary>
     /// Pickaxes only. Axes and hammers are deliberately excluded even though vanilla lets one
     /// item be several tools at once: the mining rules are tightly scoped to breaking blocks the

@@ -5,6 +5,7 @@ using Terraria;
 using Terraria.Audio;
 using Terraria.GameContent;
 using Terraria.ID;
+using Terraria.Localization;
 
 namespace MoreAIPlayer.Companion.UI;
 
@@ -35,6 +36,7 @@ public static class CompanionManagerPanel
     private static Vector2 panelTopLeft;
     private static bool positionInitialized;
     private static int lastHoveredSlot = -1;
+    private static int lastQuickHoveredSlot = -1;
 
     public static bool IsOpen => open;
 
@@ -72,7 +74,105 @@ public static class CompanionManagerPanel
         panelTopLeft = Vector2.Zero;
         positionInitialized = false;
         lastHoveredSlot = -1;
+        lastQuickHoveredSlot = -1;
         PreviewsBySlot.Clear();
+    }
+
+    /// <summary>
+    /// Persistent top-centre matrix. It gives every summoned companion a stable click target,
+    /// so opening a loadout never depends on catching a moving character in the world.
+    /// </summary>
+    public static void DrawQuickAccessBar()
+    {
+        if (Main.gameMenu || Main.dedServ || Main.netMode != NetmodeID.SinglePlayer ||
+            Main.hideUI || Main.mapFullscreen)
+        {
+            lastQuickHoveredSlot = -1;
+            return;
+        }
+
+        List<CompanionInstance> entries = CollectEntries();
+        if (entries.Count == 0)
+        {
+            lastQuickHoveredSlot = -1;
+            return;
+        }
+        PruneStalePreviews(entries);
+
+        const int cellSize = 54;
+        const int gap = 6;
+        const int top = 18;
+        const int sideMargin = 24;
+        int maxColumns = System.Math.Max(1, (Main.screenWidth - sideMargin * 2 + gap) / (cellSize + gap));
+        int columns = System.Math.Min(entries.Count, maxColumns);
+        Rectangle mouseRect = new((int)Main.MouseScreen.X, (int)Main.MouseScreen.Y, 2, 2);
+        bool leftClick = Main.mouseLeft && Main.mouseLeftRelease;
+        int hoveredSlot = -1;
+        var previewDraws = new List<(Rectangle Area, CompanionInstance Instance)>(entries.Count);
+
+        for (int i = 0; i < entries.Count; i++)
+        {
+            int row = i / columns;
+            int column = i % columns;
+            int entriesInRow = System.Math.Min(columns, entries.Count - row * columns);
+            int rowWidth = entriesInRow * cellSize + (entriesInRow - 1) * gap;
+            int rowLeft = (Main.screenWidth - rowWidth) / 2;
+            Rectangle cell = new(
+                rowLeft + column * (cellSize + gap),
+                top + row * (cellSize + gap),
+                cellSize,
+                cellSize);
+
+            CompanionInstance companion = entries[i];
+            bool hovered = cell.Intersects(mouseRect);
+            bool selected = CompanionUISystem.IsOpen && CompanionUISystem.TargetSlot == companion.Slot;
+            Color back = hovered ? new Color(56, 72, 90, 235) : new Color(24, 31, 42, 220);
+            Color border = selected ? new Color(100, 255, 170)
+                : hovered ? new Color(145, 215, 255)
+                : new Color(76, 94, 116);
+            DrawRect(cell, back);
+            DrawBorder(cell, border, selected ? 3 : 2);
+
+            int maxLife = System.Math.Max(1, companion.Entity.statLifeMax2);
+            float lifeRatio = MathHelper.Clamp(companion.Entity.statLife / (float)maxLife, 0f, 1f);
+            Rectangle lifeBack = new(cell.X + 4, cell.Bottom - 6, cell.Width - 8, 3);
+            Rectangle lifeFill = new(lifeBack.X, lifeBack.Y, (int)(lifeBack.Width * lifeRatio), lifeBack.Height);
+            DrawRect(lifeBack, new Color(10, 12, 16, 230));
+            DrawRect(lifeFill, Color.Lerp(new Color(220, 65, 65), new Color(75, 220, 120), lifeRatio));
+
+            previewDraws.Add((cell, companion));
+            if (!hovered)
+                continue;
+
+            hoveredSlot = companion.Slot;
+            Main.blockMouse = true;
+            Main.LocalPlayer.mouseInterface = true;
+
+            if (leftClick)
+            {
+                Main.mouseLeftRelease = false;
+                Main.LocalPlayer.controlUseItem = false;
+                CompanionUISystem.Open(companion.Slot);
+                SoundEngine.PlaySound(SoundID.MenuOpen with { Volume = 0.55f, Pitch = 0.08f });
+            }
+        }
+
+        DrawQuickPreviews(previewDraws);
+
+        if (hoveredSlot >= 0)
+        {
+            CompanionInstance hovered = CompanionEntitySystem.GetBySlot(hoveredSlot);
+            if (hovered is not null)
+            {
+                string text = Language.GetTextValue(
+                    "Mods.MoreAIPlayer.CompanionCommand.QuickAccess", hovered.Entity.name);
+                Main.instance.MouseText(text);
+            }
+        }
+
+        if (hoveredSlot >= 0 && hoveredSlot != lastQuickHoveredSlot)
+            SoundEngine.PlaySound(SoundID.MenuTick with { Volume = 0.32f, Pitch = 0.22f });
+        lastQuickHoveredSlot = hoveredSlot;
     }
 
     /// <summary>Runs inside an interface layer (UI scale batch): draws the panel and handles clicks.</summary>
@@ -99,7 +199,8 @@ public static class CompanionManagerPanel
 
         int columns = System.Math.Clamp(entries.Count, 1, MaxColumns);
         int rows = entries.Count == 0 ? 0 : (entries.Count + columns - 1) / columns;
-        int contentWidth = System.Math.Max(columns * CardWidth + (columns - 1) * CardGap, 330);
+        // The translated instruction line is wider than Chinese in several cultures.
+        int contentWidth = System.Math.Max(columns * CardWidth + (columns - 1) * CardGap, 440);
         int contentHeight = rows == 0 ? 46 : rows * CardHeight + (rows - 1) * CardGap;
         int panelWidth = PanelPad * 2 + contentWidth;
         int panelHeight = PanelPad * 2 + HeaderHeight + 8 + contentHeight + 10 + FooterHeight;
@@ -121,9 +222,9 @@ public static class CompanionManagerPanel
 
         DrawPanelBackground(panelArea, op);
 
-        Utils.DrawBorderString(Main.spriteBatch, "幻影伙伴管理",
+        Utils.DrawBorderString(Main.spriteBatch, T("ManagerTitle"),
             new Vector2(panelArea.X + PanelPad + 2, panelArea.Y + PanelPad), new Color(210, 228, 255) * op, 0.95f);
-        Utils.DrawBorderString(Main.spriteBatch, "左键卡片：打开背包 · 右键卡片：解散 · 点击面板外关闭",
+        Utils.DrawBorderString(Main.spriteBatch, T("ManagerInstructions"),
             new Vector2(panelArea.X + PanelPad + 2, panelArea.Y + PanelPad + 22), new Color(140, 158, 182) * op, 0.68f);
 
         int contentX = panelArea.X + PanelPad;
@@ -134,7 +235,7 @@ public static class CompanionManagerPanel
 
         if (entries.Count == 0)
         {
-            Utils.DrawBorderString(Main.spriteBatch, "当前没有幻影伙伴 · 左键书本可召唤",
+            Utils.DrawBorderString(Main.spriteBatch, T("ManagerEmpty"),
                 new Vector2(contentX + 8, contentY + 12), new Color(150, 164, 186) * op, 0.8f);
         }
 
@@ -177,7 +278,7 @@ public static class CompanionManagerPanel
             panelArea.Bottom - PanelPad - FooterHeight + 8,
             132, 28);
         bool dismissHovered = dismissAllButton.Intersects(mouseRect);
-        DrawButton(dismissAllButton, "全部解散", dismissHovered, entries.Count > 0, op);
+        DrawButton(dismissAllButton, T("DismissAll"), dismissHovered, entries.Count > 0, op);
         if (dismissHovered && interactive && leftClick && entries.Count > 0)
         {
             Main.mouseLeftRelease = false;
@@ -185,7 +286,7 @@ public static class CompanionManagerPanel
             StartClose();
         }
 
-        Utils.DrawBorderString(Main.spriteBatch, $"在线伙伴：{entries.Count}",
+        Utils.DrawBorderString(Main.spriteBatch, T("OnlineCount", entries.Count),
             new Vector2(panelArea.X + PanelPad + 2, dismissAllButton.Y + 4), new Color(150, 168, 192) * op, 0.78f);
 
         if (op > 0.6f)
@@ -205,6 +306,9 @@ public static class CompanionManagerPanel
             StartClose();
         }
     }
+
+    private static string T(string key, params object[] args) =>
+        Language.GetTextValue($"Mods.MoreAIPlayer.CompanionUI.{key}", args);
 
     private static List<CompanionInstance> CollectEntries()
     {
@@ -299,6 +403,37 @@ public static class CompanionManagerPanel
             using (new Main.CurrentPlayerOverride(preview))
             {
                 Main.PlayerRenderer.DrawPlayer(Main.Camera, preview, drawTopLeft + Main.screenPosition, 0f, Vector2.Zero, 0f, 1f);
+            }
+        }
+
+        spriteBatch.End();
+        spriteBatch.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend, null, null, null, null, Main.UIScaleMatrix);
+    }
+
+    private static void DrawQuickPreviews(List<(Rectangle Area, CompanionInstance Instance)> previewDraws)
+    {
+        if (previewDraws.Count == 0)
+            return;
+
+        SpriteBatch spriteBatch = Main.spriteBatch;
+        spriteBatch.End();
+        spriteBatch.Begin(SpriteSortMode.Immediate, BlendState.AlphaBlend, SamplerState.PointClamp,
+            DepthStencilState.None, RasterizerState.CullCounterClockwise, null, Main.UIScaleMatrix);
+
+        foreach ((Rectangle cell, CompanionInstance companion) in previewDraws)
+        {
+            if (!companion.TryGetContext(out Player owner, out CompanionProfile profile))
+                continue;
+
+            Player preview = GetOrPreparePreview(companion, owner, profile);
+            Vector2 drawTopLeft = new(
+                cell.Center.X - preview.width * 0.5f,
+                cell.Center.Y - preview.height * 0.5f - 1f);
+
+            using (new Main.CurrentPlayerOverride(preview))
+            {
+                Main.PlayerRenderer.DrawPlayer(Main.Camera, preview,
+                    drawTopLeft + Main.screenPosition, 0f, Vector2.Zero, 0f, 0.85f);
             }
         }
 

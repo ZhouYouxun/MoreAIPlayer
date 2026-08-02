@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using Microsoft.Xna.Framework;
 using Terraria;
 using Terraria.ID;
+using Terraria.ModLoader;
 
 namespace MoreAIPlayer.Companion.AI;
 
@@ -347,6 +348,13 @@ public static class CompanionPathfinder
         if (!WorldGen.InWorld(x, y, 2))
             return true;
         Tile tile = Main.tile[x, y];
+        // Plan through doors that the navigator can actually open. Locked vanilla doors keep
+        // OpenDoorID == -1 and remain solid, so the pathfinder will not run into them forever.
+        if (!tile.IsActuated &&
+            (TileLoader.OpenDoorID(tile) >= 0 || tile.TileType == TileID.TallGateClosed))
+        {
+            return false;
+        }
         return tile.HasTile && !tile.IsActuated && Main.tileSolid[tile.TileType] && !Main.tileSolidTop[tile.TileType];
     }
 

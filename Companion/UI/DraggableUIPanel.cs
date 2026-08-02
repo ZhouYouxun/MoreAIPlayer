@@ -10,6 +10,25 @@ public sealed class DraggableUIPanel : UIPanel
     private bool dragging;
     private Vector2 dragOffset;
 
+    /// <summary>Current UI-space top-left. This is read before a panel is rebuilt so reopening
+    /// the same UI does not put it back over the vanilla inventory.</summary>
+    public Vector2 Position
+    {
+        get
+        {
+            CalculatedStyle dimensions = GetDimensions();
+            return new Vector2(dimensions.X, dimensions.Y);
+        }
+    }
+
+    public void SetPosition(Vector2 position)
+    {
+        HAlign = 0f;
+        VAlign = 0f;
+        Left.Set(position.X, 0f);
+        Top.Set(position.Y, 0f);
+    }
+
     public override void LeftMouseDown(UIMouseEvent evt)
     {
         base.LeftMouseDown(evt);

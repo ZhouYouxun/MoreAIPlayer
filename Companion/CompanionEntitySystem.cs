@@ -151,15 +151,32 @@ public sealed class CompanionEntitySystem : ModSystem
         };
         BySlot[slot] = instance;
 
-        instance.BindProfile(owner, profile);
-        entity.Center = worldPosition;
-        entity.velocity = Vector2.Zero;
-        entity.fallStart = (int)(entity.position.Y / 16f);
-        entity.statLife = entity.statLifeMax;
-        entity.dead = false;
-        SpawnRecallDustBurst(entity.Center);
-        AnnounceJoin(entity.name);
-        return true;
+        try
+        {
+            instance.BindProfile(owner, profile);
+            // A freshly constructed Player has no gameplay direction until vanilla updates it.
+            // Give its very first frame a valid render/aim direction instead of allowing a
+            // zero-direction half-spawn to reach foreign player hooks.
+            entity.direction = owner.direction == 0 ? 1 : owner.direction;
+            entity.Center = worldPosition;
+            entity.velocity = Vector2.Zero;
+            entity.fallStart = (int)(entity.position.Y / 16f);
+            entity.statLife = entity.statLifeMax;
+            entity.dead = false;
+            SpawnRecallDustBurst(entity.Center);
+            AnnounceJoin(entity.name);
+            return true;
+        }
+        catch (Exception exception)
+        {
+            // A modded Player/Item hook can fail during the first bind. Never leave its partly
+            // initialized Player active in Main.player: that looks like an invisible, frozen
+            // companion and may keep replaying a held-item sound every update.
+            ModContent.GetInstance<MoreAIPlayer>().Logger.Error(
+                $"Failed to initialize synthetic player slot {slot}; rolling it back.", exception);
+            Release(slot);
+            return false;
+        }
     }
 
     // Identical to the multiplayer join/leave broadcasts in NetMessage.SyncOnePlayer:
@@ -185,12 +202,29 @@ public sealed class CompanionEntitySystem : ModSystem
 
     public static void Dismiss(int slot)
     {
-        if (!BySlot.ContainsKey(slot))
+        if (!BySlot.TryGetValue(slot, out CompanionInstance instance))
             return;
 
-        SpawnRecallDustBurst(Main.player[slot].Center);
-        AnnounceLeave(Main.player[slot].name);
-        Release(slot);
+        // Cosmetic work must never be allowed to strand an active synthetic Player. In
+        // particular, a projectile's Kill hook belongs to arbitrary mod code and may throw.
+        // Release owns the non-negotiable cleanup in a finally block; the effects are best-effort.
+        try
+        {
+            SpawnRecallDustBurst(instance.Entity.Center);
+            AnnounceLeave(instance.Entity.name);
+        }
+        catch (Exception exception)
+        {
+            // Keep a failed visual/chat callback local to this companion. DismissOwnedBy loops
+            // over this method, so letting it escape would make "dismiss all" appear to stop
+            // after the first member.
+            ModContent.GetInstance<MoreAIPlayer>().Logger.Error(
+                $"Failed to play dismissal feedback for synthetic player slot {slot}.", exception);
+        }
+        finally
+        {
+            Release(slot);
+        }
     }
 
     private static int FindFreeSlot()
@@ -221,10 +255,32 @@ public sealed class CompanionEntitySystem : ModSystem
         if (!BySlot.Remove(slot, out CompanionInstance instance))
             return;
 
-        KillOwnedProjectiles(slot);
-        instance.Entity.active = false;
-        if (Main.player[slot] == instance.Entity)
-            Main.player[slot] = instance.OriginalPlayer;
+        try
+        {
+            // Reservations and projectiles are independent cleanup responsibilities. Do not
+            // let a bad global-item hook prevent stale bullets from being removed, or vice
+            // versa; either failure must still reach the final player-slot restoration.
+            CompanionLootSystem.ReleaseReservations(slot);
+        }
+        catch (Exception exception)
+        {
+            ModContent.GetInstance<MoreAIPlayer>().Logger.Error(
+                $"Failed to release item reservations for synthetic player slot {slot}.", exception);
+        }
+
+        try
+        {
+            KillOwnedProjectiles(slot);
+        }
+        catch (Exception exception)
+        {
+            ModContent.GetInstance<MoreAIPlayer>().Logger.Error(
+                $"Failed to release projectiles for synthetic player slot {slot}.", exception);
+        }
+        finally
+        {
+            DeactivateAndRestoreSlot(slot, instance);
+        }
     }
 
     /// <summary>
@@ -248,24 +304,65 @@ public sealed class CompanionEntitySystem : ModSystem
             // Once the synthetic Player is removed there is no safe local-player identity under
             // which a leftover bullet can finish its damage update. Kill every owned projectile,
             // not only persistent summons, so a recycled slot can never inherit stale ordnance.
-            if (projectile.owner == slot)
+            if (projectile.owner != slot)
+                continue;
+
+            try
+            {
                 projectile.Kill();
+            }
+            catch (Exception exception)
+            {
+                // Foreign OnKill hooks are allowed to fail, but they may not leave an active
+                // projectile bound to a player slot that is about to be recycled.
+                projectile.active = false;
+                ModContent.GetInstance<MoreAIPlayer>().Logger.Error(
+                    $"Failed to kill projectile {projectile.whoAmI} owned by synthetic player slot {slot}; force-deactivated it.", exception);
+            }
         }
     }
 
     private static void ReleaseAll()
     {
-        if (Main.player is not null)
+        // Release mutates BySlot, so snapshot the keys. This deliberately routes world unload,
+        // multiplayer escape and mod unload through the same exception-safe cleanup as a normal
+        // dismissal; one bad foreign projectile must not leave the remaining companions behind.
+        List<int> slots = [.. BySlot.Keys];
+        foreach (int slot in slots)
         {
-            foreach ((int slot, CompanionInstance instance) in BySlot)
+            try
             {
-                KillOwnedProjectiles(slot);
-                instance.Entity.active = false;
-                if (slot >= 0 && slot < Main.player.Length && Main.player[slot] == instance.Entity)
-                    Main.player[slot] = instance.OriginalPlayer;
+                Release(slot);
+            }
+            catch (Exception exception)
+            {
+                // Release already isolates optional cleanup, but the bulk escape hatch must
+                // remain complete even if a third-party hook throws from an unexpected path.
+                ModContent.GetInstance<MoreAIPlayer>().Logger.Error(
+                    $"Failed to bulk-release synthetic player slot {slot}; continuing cleanup.", exception);
             }
         }
         BySlot.Clear();
+    }
+
+    /// <summary>
+    /// The only operation that removes a synthetic player from the live player array. It runs
+    /// even when optional projectile/loot cleanup fails. Never overwrite an unrelated player
+    /// that replaced this slot while the companion was being dismissed.
+    /// </summary>
+    private static void DeactivateAndRestoreSlot(int slot, CompanionInstance instance)
+    {
+        Player entity = instance.Entity;
+        entity.controlUseItem = false;
+        entity.controlUseTile = false;
+        entity.channel = false;
+        entity.active = false;
+
+        if (Main.player is not null && slot >= 0 && slot < Main.player.Length &&
+            ReferenceEquals(Main.player[slot], entity))
+        {
+            Main.player[slot] = instance.OriginalPlayer;
+        }
     }
 
     public override void PreUpdatePlayers()
@@ -285,6 +382,16 @@ public sealed class CompanionEntitySystem : ModSystem
         foreach ((int slot, CompanionInstance instance) in BySlot)
         {
             if (!instance.TryGetContext(out Player owner, out CompanionProfile profile))
+            {
+                (expired ??= []).Add(slot);
+                continue;
+            }
+
+            // This is deliberately resolved before any AI work. With the default enabled,
+            // companions stay in the world and the existing owner-dead Attack path lets them
+            // finish a boss fight. Turning it off is an explicit "dismiss on owner death"
+            // preference, so every companion bound to that owner is released this same update.
+            if (owner.dead && MoreAIPlayerClientConfig.Instance?.CompanionsFightAfterOwnerDeath == false)
             {
                 (expired ??= []).Add(slot);
                 continue;
@@ -319,11 +426,7 @@ public sealed class CompanionEntitySystem : ModSystem
         if (expired is not null)
         {
             foreach (int slot in expired)
-            {
-                if (BySlot.TryGetValue(slot, out CompanionInstance expiredInstance))
-                    AnnounceLeave(expiredInstance.Entity.name);
-                Release(slot);
-            }
+                Dismiss(slot);
         }
     }
 

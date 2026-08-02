@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using Microsoft.Xna.Framework;
 using Terraria;
 using Terraria.ID;
+using Terraria.Localization;
 using Terraria.ModLoader;
 using Terraria.ModLoader.IO;
 
@@ -64,6 +65,12 @@ public sealed class CompanionProfile
     /// <summary>The dedicated fishing-pole slot, same shape as <see cref="Net"/>.</summary>
     public Item[] Rod { get; private set; }
 
+    /// <summary>The dedicated quick-grapple slot. It is bound to Player.miscEquips[4].</summary>
+    public Item[] Hook { get; private set; }
+
+    /// <summary>The dedicated mount slot. It is bound to Player.miscEquips[3].</summary>
+    public Item[] Mount { get; private set; }
+
     /// <summary>
     /// Air items handed to the entity in place of accessories the world has not unlocked yet.
     /// A shared singleton would be dangerous — vanilla writes through equipped Item references
@@ -105,6 +112,8 @@ public sealed class CompanionProfile
         Backpack = CreateEmptyItems(CompanionPlayer.BackpackSize);
         Net = CreateEmptyItems(CompanionPlayer.NetSize);
         Rod = CreateEmptyItems(CompanionPlayer.RodSize);
+        Hook = CreateEmptyItems(CompanionPlayer.HookSize);
+        Mount = CreateEmptyItems(CompanionPlayer.MountSize);
         lockedAccessoryFiller = CreateEmptyItems(CompanionPlayer.AccessorySize);
     }
 
@@ -139,7 +148,9 @@ public sealed class CompanionProfile
         NPC probe = new();
         probe.SetDefaults(namePools[Main.rand.Next(namePools.Length)]);
         string name = probe.getNewNPCName();
-        return string.IsNullOrWhiteSpace(name) ? "幻影伙伴" : name;
+        return string.IsNullOrWhiteSpace(name)
+            ? Language.GetTextValue("Mods.MoreAIPlayer.CompanionUI.DefaultName")
+            : name;
     }
 
     public Item ActiveWeapon =>
@@ -156,6 +167,12 @@ public sealed class CompanionProfile
 
     /// <summary>The equipped fishing pole, or air when the rod slot is empty.</summary>
     public Item RodTool => Rod[0];
+
+    /// <summary>The equipped quick-grapple item, or air when the hook slot is empty.</summary>
+    public Item HookTool => Hook[0];
+
+    /// <summary>The equipped mount item, or air when the mount slot is empty.</summary>
+    public Item MountTool => Mount[0];
 
     /// <summary>The equipped pickaxe, or air when the pick slot is empty.</summary>
     public Item PickTool => Hotbar[PickSlot];
@@ -256,46 +273,6 @@ public sealed class CompanionProfile
         return null;
     }
 
-    public int GetVanillaExtraJumpCount()
-    {
-        bool cloud = false;
-        bool blizzard = false;
-        bool sandstorm = false;
-        bool fart = false;
-        bool tsunami = false;
-
-        foreach (Item item in Accessories)
-        {
-            switch (item.type)
-            {
-                case ItemID.BundleofBalloons:
-                    cloud = blizzard = sandstorm = true;
-                    break;
-                case ItemID.CloudinaBottle:
-                case ItemID.CloudinaBalloon:
-                    cloud = true;
-                    break;
-                case ItemID.BlizzardinaBottle:
-                case ItemID.BlizzardinaBalloon:
-                    blizzard = true;
-                    break;
-                case ItemID.SandstorminaBottle:
-                case ItemID.SandstorminaBalloon:
-                    sandstorm = true;
-                    break;
-                case ItemID.FartinaJar:
-                    fart = true;
-                    break;
-                case ItemID.TsunamiInABottle:
-                case ItemID.SharkronBalloon:
-                    tsunami = true;
-                    break;
-            }
-        }
-
-        return (cloud ? 1 : 0) + (blizzard ? 1 : 0) + (sandstorm ? 1 : 0) + (fart ? 1 : 0) + (tsunami ? 1 : 0);
-    }
-
     public bool TryAddToBackpack(Item incoming)
     {
         if (incoming.IsAir)
@@ -353,7 +330,9 @@ public sealed class CompanionProfile
             [nameof(Dyes)] = SaveItems(Dyes),
             [nameof(Backpack)] = SaveItems(Backpack),
             [nameof(Net)] = SaveItems(Net),
-            [nameof(Rod)] = SaveItems(Rod)
+            [nameof(Rod)] = SaveItems(Rod),
+            [nameof(Hook)] = SaveItems(Hook),
+            [nameof(Mount)] = SaveItems(Mount)
         };
     }
 
@@ -383,7 +362,9 @@ public sealed class CompanionProfile
             Dyes = LoadItems(tag, nameof(Dyes), CompanionPlayer.DyeSize),
             Backpack = LoadItems(tag, nameof(Backpack), CompanionPlayer.BackpackSize),
             Net = LoadItems(tag, nameof(Net), CompanionPlayer.NetSize),
-            Rod = LoadItems(tag, nameof(Rod), CompanionPlayer.RodSize)
+            Rod = LoadItems(tag, nameof(Rod), CompanionPlayer.RodSize),
+            Hook = LoadItems(tag, nameof(Hook), CompanionPlayer.HookSize),
+            Mount = LoadItems(tag, nameof(Mount), CompanionPlayer.MountSize)
         };
         profile.RogueStealthWait = !tag.ContainsKey(nameof(RogueStealthWait)) || tag.GetBool(nameof(RogueStealthWait));
         if (tag.ContainsKey(nameof(Mode)))
@@ -409,6 +390,8 @@ public sealed class CompanionProfile
         profile.Backpack = LoadItems(tag, nameof(Backpack), CompanionPlayer.BackpackSize);
         profile.Net = LoadItems(tag, nameof(Net), CompanionPlayer.NetSize);
         profile.Rod = LoadItems(tag, nameof(Rod), CompanionPlayer.RodSize);
+        profile.Hook = LoadItems(tag, nameof(Hook), CompanionPlayer.HookSize);
+        profile.Mount = LoadItems(tag, nameof(Mount), CompanionPlayer.MountSize);
         profile.MigrateReservedSlots();
         return profile;
     }

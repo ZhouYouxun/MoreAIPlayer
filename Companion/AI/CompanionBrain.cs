@@ -1,4 +1,6 @@
 using Microsoft.Xna.Framework;
+using MoreAIPlayer.Companion.Building;
+using MoreAIPlayer.Reflection.CalamityMod;
 using Terraria;
 using Terraria.ID;
 using Terraria.ModLoader;
@@ -69,6 +71,7 @@ public sealed class CompanionBrain
     private const float OwnerTeleportJump = 40f * 16f;
 
     private readonly CompanionNavigator navigator = new();
+    private readonly CompanionThreatAvoidance threatAvoidance = new();
 
     private int currentTarget = -1;
     private int retargetTimer;
@@ -136,6 +139,9 @@ public sealed class CompanionBrain
 
     /// <summary>Name of the weapon the brain settled on, for the same readout. Empty when none.</summary>
     public string ChosenWeaponName { get; private set; } = string.Empty;
+    public string AvoidanceStateText => threatAvoidance.StateText;
+    public float AvoidanceRisk => threatAvoidance.CurrentRisk;
+    public int VisibleThreats => threatAvoidance.VisibleThreats;
 
     public void Update(CompanionInstance instance, Player owner, CompanionProfile profile)
     {
@@ -163,15 +169,11 @@ public sealed class CompanionBrain
         ChosenWeaponName = string.Empty;
 
         if (HandleDeathAndRevive(instance, me, owner))
-            return; // still dead this tick — nothing else runs
-        me.statMana = me.statManaMax2;
-
-        if (owner.dead)
         {
-            navigator.Idle(me);
-            return;
+            threatAvoidance.Reset(me);
+            return; // still dead this tick — nothing else runs
         }
-
+        me.statMana = me.statManaMax2;
 
         // Summon upkeep comes before everything else that uses an item: the companion tops up
         // its summon slots first, and only then falls through to the next non-summon weapon
@@ -180,11 +182,17 @@ public sealed class CompanionBrain
         MaintainSummons(instance, me, profile);
 
         // Resolve mode transitions and the command-book waypoint into a hold anchor.
-        UpdateCommandState(instance, me, profile);
+        if (!owner.dead)
+            UpdateCommandState(instance, me, profile);
+        else
+        {
+            holdActive = false;
+            combatLeashActive = false;
+        }
 
         CompanionPlayer ownerData = owner.GetModPlayer<CompanionPlayer>();
         // Falls back to Attack when the mode's tool slot was emptied behind its back.
-        CompanionMode mode = CompanionModeRules.Effective(profile);
+        CompanionMode mode = owner.dead ? CompanionMode.Attack : CompanionModeRules.Effective(profile);
 
         // Critter protection is a property of Catch mode, not of owning a net: outside the mode
         // the companion fights normally and a net in the slot is just equipment. Set before
@@ -245,7 +253,7 @@ public sealed class CompanionBrain
             instance.AimWorld = target.Center;
         }
 
-        bool traveling = instance.Waypoint.HasValue;
+        bool traveling = !owner.dead && instance.Waypoint.HasValue;
 
         // A posted companion (garrison, or a reached waypoint) refuses to chase a target it
         // could not reach without abandoning its spot. It still fires at anything it can hit
@@ -283,10 +291,6 @@ public sealed class CompanionBrain
         {
             HoldAtAnchor(me, owner);
         }
-        else if (mode == CompanionMode.Escort)
-        {
-            FollowOwner(me, owner, EscortFollowSide, EscortIdleDistance);
-        }
         else if (mode == CompanionMode.Catch && TryCatchNearbyCritter(instance, me, profile))
         {
         }
@@ -299,10 +303,40 @@ public sealed class CompanionBrain
             // and matches the "stays put like Garrison" half of the mode's contract.
             navigator.Idle(me);
         }
-        else
+        else if (CompanionBuildingSystem.TryPerformBuildWork(instance, owner, profile, navigator))
+        {
+        }
+        // The public contract is that companions never take world drops on their own. More
+        // importantly, making every companion path to fresh loot turns a boss loot pile into
+        // several concurrent A* searches, which can stall the game. The backpack remains a
+        // manual storage surface: put items in, transfer them out, or use Drop All yourself.
+        else if (mode == CompanionMode.Escort)
+        {
+            FollowOwner(me, owner, EscortFollowSide, EscortIdleDistance);
+        }
+        else if (!owner.dead)
             FollowOwner(me, owner, 64f, IdleDistance * 0.5f);
+        else
+            navigator.Idle(me);
 
-        UpdateTeleportPolicy(instance, me, owner, ownerData, profile, holdActive || traveling);
+        // Calamity normally advances dashes only for Main.myPlayer. Continue a companion dash
+        // under its virtual-player context before avoidance possibly starts a new one.
+        CalamityModReflection.UpdateActiveDash(me, instance.AimWorld);
+
+        // Survival may temporarily override the movement chosen above, while ordinary combat
+        // and aiming continue unless a grapple needs the virtual cursor for this tick.
+        threatAvoidance.Update(instance, owner, profile);
+
+        // A settled garrison companion can brace against knockback by hooking straight down.
+        // Threat avoidance owns the hook as soon as danger is noticed.
+        bool settledAtGarrison = !owner.dead && mode == CompanionMode.Garrison &&
+            holdActive && !traveling &&
+            System.Math.Abs(me.Center.X - holdAnchor.X) <= HoldReturnDistance &&
+            System.Math.Abs(me.Center.Y - holdAnchor.Y) <= 96f;
+        threatAvoidance.UpdateGarrisonAnchor(instance, profile, settledAtGarrison);
+
+        if (!owner.dead)
+            UpdateTeleportPolicy(instance, me, owner, ownerData, profile, holdActive || traveling);
     }
 
     private static void ResetControls(Player me)
@@ -1090,6 +1124,12 @@ public sealed class CompanionBrain
     /// </summary>
     private static void CollectCaughtCritters(Player me, CompanionProfile profile)
     {
+        // This is still a world-item pickup path even though it is limited to critters caught
+        // by this companion. Keep it behind the same opt-in gate: when disabled, do not scan
+        // Main.ActiveItems or mutate a ground item at all.
+        if (!CompanionLootSystem.WorldItemCollectionEnabled)
+            return;
+
         foreach (Item drop in Main.ActiveItems)
         {
             if (drop.makeNPC <= 0 || drop.noGrabDelay > 0)

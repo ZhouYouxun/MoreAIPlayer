@@ -7,12 +7,32 @@ Mods: {
 	MoreAIPlayer: {
 		Configs: {
 			MoreAIPlayerClientConfig: {
-				// DisplayName: Phantom Companion Client Settings
-				// Headers.CompanionDiagnostics: Companion Diagnostics
+				DisplayName: Ustawienia klienta Widmowych Towarzyszy
+
+				Headers: {
+					CompanionDiagnostics: Diagnostyka towarzyszy
+					CompanionBalance: Balans i przetrwanie towarzyszy
+					CompanionPickup: Zbieranie przedmiotów świata przez towarzyszy
+				}
 
 				EnablePhantomPlayerDebugText: {
-					// Label: "[i:GoldenKey] Enable Phantom Player Debug Text"
-					// Tooltip: Shows the live development readout above phantom companions. Disabled by default.
+					Label: "[i:GoldenKey] Włącz tekst diagnostyczny widmowych graczy"
+					Tooltip: Wyświetla nad widmowymi towarzyszami bieżące informacje diagnostyczne. Domyślnie wyłączone.
+				}
+
+				CompanionsFightAfterOwnerDeath: {
+					Label: Towarzysze walczą po śmierci gracza
+					Tooltip: Domyślnie włączone. Gdy zginiesz podczas walki z bossem, związani towarzysze zostają i walczą dalej. Wyłącz, aby natychmiast ich rozproszyć po śmierci.
+				}
+
+				CompanionsTakeDamage: {
+					Label: Towarzysze otrzymują obrażenia
+					Tooltip: Domyślnie włączone. Towarzysze otrzymują obrażenia, mogą zginąć i odradzają się po zwykłym czasie oczekiwania. Wyłącz, aby uodpornić ich na wszystkie obrażenia.
+				}
+
+				CompanionsAutoCollectWorldItems: {
+					Label: Towarzysze automatycznie zbierają przedmioty świata
+					Tooltip: Domyślnie wyłączone. Gdy opcja jest wyłączona, towarzysze nie skanują, nie rezerwują, nie podchodzą ani nie zbierają przedmiotów świata. Włącz ją dopiero po sprawdzeniu zgodności z zapisem i innymi modami.
 				}
 			}
 		}
@@ -29,13 +49,14 @@ Mods: {
 			}
 
 			DevelopmentNotice: {
-				// DisplayName: Phantom Companion Development Notice
-				// Development: This mod is actively under development.
-				// SoloCreator: It is made and maintained by one creator.
-				// Updates: I will keep updating it, improving companions, and fixing problems reported by players.
-				// Compatibility: Popular weapons from large mods will receive one-to-one compatibility work over time.
-				// Complexity: Similar-looking weapons can use very different code internally; some therefore need much more time to support safely. Thank you for your patience.
-				// Tooltip: ""
+				DisplayName: Informacja o rozwoju Widmowych Towarzyszy
+				Development: Ten mod jest nadal aktywnie rozwijany.
+				SoloCreator: Jest tworzony i utrzymywany przez jedną osobę.
+				Updates: Będę go dalej aktualizować, ulepszać towarzyszy i naprawiać problemy zgłaszane przez graczy.
+				Compatibility: Popularne bronie z dużych modów będą z czasem otrzymywać dedykowaną zgodność.
+				Complexity: Bronie o podobnym wyglądzie mogą działać wewnętrznie zupełnie inaczej, więc część z nich wymaga znacznie więcej czasu na bezpieczną obsługę. Dziękuję za cierpliwość.
+				ConfigSuggestion: Warto zajrzeć do opcji konfiguracji.
+				Tooltip: Informacje o stanie rozwoju i opcjach konfiguracji.
 			}
 
 			CompanionDebugger: {
@@ -90,6 +111,143 @@ Mods: {
 					Pokonani łowcy wracają po 60 sekundach z nowym wyposażeniem.
 					'''
 			}
+
+			CompanionBuilderBook: {
+				DisplayName: Księga Budowniczego
+				Tooltip:
+					'''
+					Prawy przycisk: przełączaj pięć planów. Lewy przycisk: wykonaj wybrany plan. Dół + lewy przycisk: anuluj wszystkie prace.
+					· Inteligentna pomoc: włącza ciągłe wsparcie. Towarzysze uczą się stawianych bloków i ścian oraz przedłużają krótkie, wyraźne wzory.
+					· Most: buduje poziomy most z platform do 160 pól w stronę kursora.
+					· Schronienie: buduje ramę 11 × 7 z wejściem szerokim na trzy pola, a przy dostępnych materiałach dodaje ściany i światło.
+					· Arena: buduje trzy rzędy po 61 platform, oddalone o dziesięć pól, z dostępnym oświetleniem.
+					· Szyb linowy: układa pionowo do 120 pól liny i umieszcza światła tam, gdzie mają podparcie.
+					Najpierw zużywane są nieulubione materiały z plecaków aktywnych towarzyszy, potem z twojego ekwipunku. Brak materiałów bezpiecznie wstrzymuje prace.
+					Towarzysze nigdy nie kopią ani nie zastępują bloków. Walka, ratunek, punkty trasy i tryby specjalne zawsze mają pierwszeństwo. Tylko gra jednoosobowa.
+					'''
+			}
+
+			PlayerScaleBook: {
+				DisplayName: Księga Kryształowej Matrycy
+				Tooltip: "[Tylko dla zabawy] Prawy przycisk: otwórz matrycę i wybierz skalę. Lewy: zastosuj ją; kliknij ponownie, aby wrócić do 1×."
+			}
+		}
+
+		VanillaItemHints: {
+			LifeCrystal: "[Widmowy towarzysz] Nie musisz używać go na towarzyszu; jego maksymalne życie jest kopiowane bezpośrednio od gracza."
+			ManaCrystal: "[Widmowy towarzysz] Nie musisz używać go na towarzyszu; jego maksymalna mana jest kopiowana bezpośrednio od gracza."
+		}
+
+		CompanionUI: {
+			DefaultName: Widmowy towarzysz
+			InventoryTitle: "{0} · Wyposażenie i plecak"
+			Close: Zamknij
+			Armor: Pancerz
+			Vanity: Wygląd
+			Dye: Barwnik
+			Accessories: Akcesoria (postęp; bez Serca Demona)
+			HeadArmorOnly: Tylko pancerz głowy
+			BodyArmorOnly: Tylko pancerz tułowia
+			LegArmorOnly: Tylko pancerz nóg
+			HeadVanityOnly: Tylko wygląd głowy
+			BodyVanityOnly: Tylko wygląd tułowia
+			LegVanityOnly: Tylko wygląd nóg
+			DyeOnly: Tylko barwniki
+			AccessoryOnly: Tylko akcesoria
+			WeaponBar: Broń   Niebieski=obrona  Szary=kilof  Żółty=przyzwanie
+			WeaponPriority: 7 środkowych slotów to zwykła broń; priorytet od lewej → prawej
+			GuardWeaponOnly: Obrona: dowolna broń poza kilofem, siekierą i młotem
+			PickaxeOnly: Kilof: tylko zwykłe kilofy; bez narzędzi wielofunkcyjnych
+			SummonWeaponOnly: Przyzwanie: tylko kostury przyzwań lub strażników; bez biczów
+			WeaponOnly: Tylko broń, kilofy, siekiery lub młoty
+			RightClick: Prawy
+			LeftClick: Lewy
+			DecisionStealth: Decyzja: skradanie
+			DecisionNormal: Decyzja: zwykły atak
+			Ammo: Amunicja (pierwsze 4 sloty mają priorytet; ostatnie 2 są dodatkowe)
+			AmmoOnly: Tylko strzały, pociski i inna amunicja
+			Tools: Siatka / Wędka / Hak / Wierzchowiec
+			NetOnly: Tylko zwykła, lawoodporna lub złota siatka
+			RodOnly: Tylko wędki
+			HookOnly: Tylko haki
+			MountOnly: Tylko przedmioty przyzywające wierzchowce
+			Backpack: Plecak
+			WaitingForTarget: Oczekiwanie na cel
+			GuardSlotWeapon: Obrona · {0}
+			SummonSlotWeapon: Przyzwanie · {0}
+			NumberedSlotWeapon: Miejsce {0} · {1}
+			NoRotationWeapon: Uwaga: sloty 3–9 nie mają zwykłej broni; używany jest slot rezerwowy
+			ModeFallback: "{0} (powrót z {1}: {2})"
+			StatsMode: Tryb: {0}
+			StatsWeapon: Automatyczny wybór: {0}
+			StatsState: Stan: {0}
+			StatsAvoidance: Unik: {0}  Zagrożenia: {1}  Ryzyko: {2:0}
+			StatsLife: Życie: {0}/{1}  Obrona: {2}
+			StatsDamage: Wręcz: ×{0:0.00}  Dystans: ×{1:0.00}  Magia: ×{2:0.00}
+			AccessorySlotSixLocked: Miejsce 6: Ekspert po Ścianie Mięsa; domyślnie dostępny w Mistrzu
+			AccessorySlotSevenLocked: Miejsce 7: Mistrz po Ścianie Mięsa
+			AccessorySlotLocked: Ten slot akcesorium jest niedostępny w tym świecie
+			AttackNoTarget: Brak celu
+			AttackNoWeapon: Nie wybrano broni (sprawdź pasek)
+			AttackModeSuppressed: Obecny tryb nie walczy
+			AttackHoldLeashed: Utrzymuje pozycję; cel poza zasięgiem
+			AttackApproaching: Zbliża się do celu
+			AttackNoLineOfSight: Teren zasłania cel
+			AttackStealthCharging: Czeka na naładowanie skradania
+			AttackUseAlreadySpent: Inna akcja używa przedmiotu w tej klatce
+			AttackAnimationBusy: Poprzedni atak jeszcze się nie zakończył
+			AttackAttacking: Atakuje
+			ModeAttack: Atak
+			ModeEscort: Eskorta
+			ModeGarrison: Posterunek
+			ModeCatch: Łapanie
+			ModeFishing: Łowienie
+			ModeMining: Górnictwo
+			ModeAttackDescription: Porusza się swobodnie i szuka wrogów
+			ModeEscortDescription: Trzyma się blisko i reaguje na zagrożenia właściciela
+			ModeGarrisonDescription: Utrzymuje pozycję i wraca po odrzuceniu
+			ModeCatchDescription: Łapie stworzenia bez ranienia ich
+			ModeFishingDescription: Łowi w pobliżu, pozostając w miejscu
+			ModeMiningDescription: Kopie z tobą, wydobywa rudę i oświetla drogę
+			ModeCatchRequirement: Wymaga siatki w odpowiednim slocie
+			ModeFishingRequirement: Wymaga wędki w odpowiednim slocie
+			ModeMiningRequirement: Wymaga kilofa w slocie 2
+			AvoidNoThreat: Nie wykryto zagrożenia
+			AvoidReacting: Reaguje
+			AvoidHolding: Utrzymuje pozycję
+			AvoidGrappleRelease: Odpina hak z zachowaniem pędu
+			DirectionUp: w górę
+			DirectionDown: w dół
+			DirectionLeft: w lewo
+			DirectionRight: w prawo
+			AvoidRun: Biegnij {0}
+			AvoidJump: Skocz {0}
+			AvoidDrop: Opuść się {0}
+			AvoidDash: Doskok {0}
+			AvoidGrapple: Zaczep hak {0}
+			ManagerTitle: Zarządzanie widmowymi towarzyszami
+			ManagerInstructions: Lewy klik: plecak · Prawy klik: odeślij · Kliknij poza panelem: zamknij
+			ManagerEmpty: Brak widmowych towarzyszy · Kliknij księgę, aby przyzwać
+			DismissAll: Odeślij wszystkich
+			OnlineCount: Aktywni towarzysze: {0}
+			ModeUnavailable: "{0}: nie można przełączyć na {1} — {2}"
+			ModeChanged: Tryb widmowego towarzysza → {0} ({1})
+			BuildLoaded: "[MoreAIPlayer] Załadowano · Kompilacja {0}"
+			DiagnosticsItemCheckTaken: Kontrola przedmiotów przejęta ✓ ({0})
+			DiagnosticsItemCheckMissing: Kontrola przedmiotów nieprzejęta ✗ ({0})
+			DiagnosticsModeNone: Tryb —
+			DiagnosticsMode: Tryb {0}
+			DiagnosticsAim: Przesunięcie celowania {0},{1}
+			DiagnosticsPathOk: Autotest ścieżki poprawny
+			DiagnosticsRecovery: Kontrola przedmiotów odzyskana {0} · miejsce {1} · cel {2} · kolejne braki {3}
+			DiagnosticsOwnership: Naprawy właściciela pocisku {0} · wycieki kontekstu {1}
+			RightClickOpen: "{0} · Prawy klik otwiera wyposażenie i plecak"
+			HunterTrackerTitle: Gra łowcy · {0}
+			HunterTrackerPreparing: Łowcy zbierają się w oddali · {0}s
+			HunterTrackerNearest: Najbliższy łowca: {0} pól
+			HunterTrackerResting: Najbliższy łowca odpoczywa: {0} pól
+			HunterTrackerReviving: Najbliższy łowca przegrupowuje się: {0}s
+			HunterTrackerSearching: Szukanie sygnałów łowców...
 		}
 
 		CompanionCommand: {
@@ -100,15 +258,36 @@ Mods: {
 			NoCompanion: Nie masz przywołanych widmowych towarzyszy.
 			SingleplayerOnly: Widmowi towarzysze są na razie dostępni tylko w trybie jednoosobowym.
 			Reviving: "{0} wraca za {1}s"
+			QuickAccess: "{0} · Kliknij, aby otworzyć ekwipunek i plecak"
+			LootBrag: Zobacz, co udało mi się znaleźć!
+			DumpAll: Wyrzuć wszystko
+			TransferAll: Przenieś wszystko
 			NoFreeSlot: Brak wolnego slotu gracza dla widmowego towarzysza.
 			MinionSlotsFull: Za mało miejsc na sługi, aby przywołać widmowego towarzysza.
-			HunterModeEnabled: "[Tryb Polowania] włączony! Wrodzy łowcy tropią cię po śladach..."
-			HunterModeDisabled: "[Tryb Polowania] wyłączony. Alarm odwołany."
+			HunterNameAlpha: Łowca · Alfa
+			HunterNameBravo: Łowca · Bravo
+			HunterNameCharlie: Łowca · Charlie
+			HunterNameFallback: Łowca #{0}
+			HunterModeEnabled: "[Gra łowcy] rozpoczęta: {0}. Łowcy zbierają się w oddali..."
+			HunterModeDisabled: "[Gra łowcy] zakończona. Alarm odwołany."
+			HunterRestarting: "[Gra łowcy] Następna fala zbiera się w oddali..."
+			HunterRequiresBoss: Pokonaj dowolnego bossa przed Hardmode, aby odblokować Grę łowcy.
+			HunterUnavailablePostPlantera: Gra łowcy nie jest dostępna po Planterze.
+			HunterStageEndedHardmode: "[Gra łowcy] Ściana Ciała upadła. Ta rozgrywka przed Hardmode dobiegła końca."
+			HunterStageEndedPlantera: "[Gra łowcy] Plantera upadła. Ta rozgrywka dobiegła końca."
+			HunterStagePreHardmode: Polowanie przed Hardmode
+			HunterStageEarlyHardmode: Wczesne polowanie Hardmode
+			HunterStageUnavailable: Brak dostępnej fazy
+			HunterStageStatus: Faza gry: {0}
 			HunterSpawned: "[Ostrzeżenie] Wrogi gracz {0} zakradł się do twojego świata!"
 			HunterDefeated: "[Komunikat] Wrogi gracz {0} został pokonany! Wróci za 60 sekund z nowym wyposażeniem..."
 			HunterRespawned: "[Ostrzeżenie] Wrogi gracz {0} wrócił i wznawia pościg!"
 			HunterSingleplayerOnly: Tryb Polowania jest na razie dostępny tylko w trybie jednoosobowym.
-			Diagnostics: Diagnostyka widma: {0}  Build {1}
+			ScaleSingleplayerOnly: Matryca rozmiaru jest dostępna tylko w trybie jednoosobowym.
+			ScaleNoSpace: Brakuje tu miejsca na wybrany rozmiar.
+			ScalePanelTitle: ◆ Kryształowa matryca rozmiaru
+			ScalePanelCurrent: Wybrano: {0:0.##}×　Aktualnie: {1:0.##}×
+			Diagnostics: Diagnostyka widma: {0}  Kompilacja {1}
 			Enabled: Wł.
 			Disabled: Wył.
 			HunterResting: "[Alarm łowcy] {0} wycofuje się, by odpocząć i zebrać zapasy!"
@@ -126,8 +305,23 @@ Mods: {
 			HunterPanelHunting: · {0}: zbliża się, by cię zabić!
 			HunterRefresh: 🔄 Odtwórz i rozmieść oddział łowców
 			HunterRefreshed: Oddział łowców został odtworzony i rozmieszczony!
+			BuilderModeSmartAssist: Inteligentna pomoc
+			BuilderModeBridge: Most
+			BuilderModeShelter: Schronienie
+			BuilderModeArena: Arena walki
+			BuilderModeRopeShaft: Szyb linowy
+			BuilderModeChanged: Plan budowy → {0}
+			BuilderSmartEnabled: Inteligentna pomoc w budowie włączona. Stawiaj bloki normalnie, a towarzysze przedłużą wyraźne wzory.
+			BuilderSmartDisabled: Inteligentna pomoc w budowie wyłączona. Już zaplanowane prace pozostają w kolejce.
+			BuilderQueued: "{0}: zaplanowano {1} pól budowy. Towarzysze zaczną, gdy będzie bezpiecznie."
+			BuilderCancelled: Anulowano {0} pól budowy.
+			BuilderInvalidTarget: Cel znajduje się poza bezpiecznym obszarem świata.
+			BuilderNeedPlatforms: Ten plan wymaga nieulubionych platform w plecaku aktywnego towarzysza lub twoim ekwipunku.
+			BuilderNeedBlocks: Ten plan wymaga nieulubionych pełnych bloków budowlanych w plecaku aktywnego towarzysza lub twoim ekwipunku.
+			BuilderNeedRope: Ten plan wymaga nieulubionej liny w plecaku aktywnego towarzysza lub twoim ekwipunku.
+			BuilderNothingToBuild: Wszystkie pola są już zajęte lub zaplanowane; niczego nie zmieniono.
 		}
 
-		// NPCs.DamageTestDummyNPC.DisplayName: Damage Test Dummy N P C
+		NPCs.DamageTestDummyNPC.DisplayName: Manekin testowy obrażeń
 	}
 }

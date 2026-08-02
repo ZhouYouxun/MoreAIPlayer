@@ -9,6 +9,8 @@ public sealed class HunterInstance
     public Player Entity { get; init; }
     public Player OriginalPlayer { get; init; }
     public HunterBrain Brain { get; } = new();
+    public int HuntIndex { get; init; }
+    public HunterGearPool.HunterLoadout Loadout { get; private set; }
 
     public Vector2 AimWorld;
     public bool WantsUseItem;
@@ -21,7 +23,7 @@ public sealed class HunterInstance
     public long AimCorrections;
     public long SlotRepairs;
 
-    public void BindLoadout(Player playerTarget, string hunterName)
+    public void BindLoadout(Player playerTarget, string hunterName, HunterGameStage stage, int hunterCount)
     {
         Player me = Entity;
         me.active = true;
@@ -37,12 +39,12 @@ public sealed class HunterInstance
         me.ghost = false;
         me.immuneAlpha = 0;
 
-        // Scale max health with target player (at least 200)
+        // A hunter's health is derived from the target's life only; its explicit game-stage and
+        // group multiplier keeps three hunters from being three full-strength copies.
         int targetHp = playerTarget.statLifeMax2 > 0 ? playerTarget.statLifeMax2 : playerTarget.statLifeMax;
-        me.statLifeMax = System.Math.Max(200, targetHp);
+        Loadout = HunterGearPool.GenerateLoadout(stage, HuntIndex, hunterCount);
+        me.statLifeMax = System.Math.Max(140, (int)System.MathF.Round(targetHp * Loadout.LifeMultiplier));
         me.statLife = me.statLifeMax;
-
-        HunterGearPool.HunterLoadout loadout = HunterGearPool.GenerateLoadout(playerTarget);
-        HunterGearPool.ApplyLoadout(me, loadout);
+        HunterGearPool.ApplyLoadout(me, Loadout);
     }
 }

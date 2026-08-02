@@ -7,12 +7,32 @@ Mods: {
 	MoreAIPlayer: {
 		Configs: {
 			MoreAIPlayerClientConfig: {
-				// DisplayName: Phantom Companion Client Settings
-				// Headers.CompanionDiagnostics: Companion Diagnostics
+				DisplayName: Configuración de cliente de Compañeros Fantasma
+
+				Headers: {
+					CompanionDiagnostics: Diagnóstico de compañeros
+					CompanionBalance: Equilibrio y supervivencia de compañeros
+					CompanionPickup: Recogida de objetos del mundo por compañeros
+				}
 
 				EnablePhantomPlayerDebugText: {
-					// Label: "[i:GoldenKey] Enable Phantom Player Debug Text"
-					// Tooltip: Shows the live development readout above phantom companions. Disabled by default.
+					Label: "[i:GoldenKey] Activar texto de depuración de jugadores fantasma"
+					Tooltip: Muestra lecturas de desarrollo en tiempo real sobre los compañeros fantasma. Desactivado por defecto.
+				}
+
+				CompanionsFightAfterOwnerDeath: {
+					Label: Los compañeros luchan tras la muerte del jugador
+					Tooltip: Activado por defecto. Si mueres durante un jefe, los compañeros vinculados permanecen y siguen luchando. Desactívalo para disiparlos al morir.
+				}
+
+				CompanionsTakeDamage: {
+					Label: Los compañeros reciben daño
+					Tooltip: Activado por defecto. Los compañeros reciben daño, pueden morir y reviven tras la espera normal. Desactívalo para volverlos inmunes a todo daño.
+				}
+
+				CompanionsAutoCollectWorldItems: {
+					Label: Los compañeros recogen objetos del mundo automáticamente
+					Tooltip: Desactivado por defecto. Al estar apagado, los compañeros no escanean, reservan, persiguen ni recogen objetos del mundo. Actívalo solo tras comprobar la compatibilidad con tu partida y otros mods.
 				}
 			}
 		}
@@ -29,13 +49,14 @@ Mods: {
 			}
 
 			DevelopmentNotice: {
-				// DisplayName: Phantom Companion Development Notice
-				// Development: This mod is actively under development.
-				// SoloCreator: It is made and maintained by one creator.
-				// Updates: I will keep updating it, improving companions, and fixing problems reported by players.
-				// Compatibility: Popular weapons from large mods will receive one-to-one compatibility work over time.
-				// Complexity: Similar-looking weapons can use very different code internally; some therefore need much more time to support safely. Thank you for your patience.
-				// Tooltip: ""
+				DisplayName: Nota de desarrollo de Compañeros Fantasma
+				Development: Este mod sigue en desarrollo activo.
+				SoloCreator: Está creado y mantenido por una sola persona.
+				Updates: Seguiré actualizándolo, mejorando los compañeros y corrigiendo los problemas informados por los jugadores.
+				Compatibility: Las armas populares de mods grandes recibirán compatibilidad individual con el tiempo.
+				Complexity: Las armas de aspecto similar pueden usar mecanismos internos muy distintos; por eso algunas necesitan más tiempo para ser compatibles de forma segura. Gracias por tu paciencia.
+				ConfigSuggestion: Considera revisar las opciones de configuración.
+				Tooltip: Información sobre el desarrollo y las opciones de configuración.
 			}
 
 			CompanionDebugger: {
@@ -90,6 +111,143 @@ Mods: {
 					Los cazadores derrotados regresan con equipo nuevo tras 60 segundos.
 					'''
 			}
+
+			CompanionBuilderBook: {
+				DisplayName: Tomo del Arquitecto
+				Tooltip:
+					'''
+					Clic derecho: alterna entre cinco planes. Clic izquierdo: ejecuta el plan elegido. Abajo + clic izquierdo: cancela todos los trabajos.
+					· Asistencia inteligente: activa la ayuda continua. Los compañeros aprenden los bloques y paredes que colocas y prolongan patrones breves y claros.
+					· Puente: construye un puente horizontal de plataformas de hasta 160 casillas hacia el cursor.
+					· Refugio: construye un marco de 11 × 7 con una entrada de tres casillas; añade paredes y luces si hay materiales.
+					· Arena: construye tres filas de 61 plataformas separadas por diez casillas, con la iluminación disponible.
+					· Pozo de cuerda: coloca cuerda vertical hasta 120 casillas y luces donde haya soporte.
+					Usan primero materiales no marcados como favoritos de las mochilas de compañeros activos y después tu inventario. Sin materiales, la obra se pausa.
+					Nunca excavan ni reemplazan bloques. El combate, el rescate, los puntos de ruta y los modos especializados siempre tienen prioridad. Solo un jugador.
+					'''
+			}
+
+			PlayerScaleBook: {
+				DisplayName: Tomo de Matriz de Cristal
+				Tooltip: "[Solo por diversión] Clic derecho: abre la matriz y elige escala. Clic izquierdo: cambia tu tamaño; vuelve a pulsar para regresar a 1×."
+			}
+		}
+
+		VanillaItemHints: {
+			LifeCrystal: "[Compañero espectral] No hace falta usarlo en el compañero; su vida máxima se sincroniza directamente con la del jugador."
+			ManaCrystal: "[Compañero espectral] No hace falta usarlo en el compañero; su maná máximo se sincroniza directamente con el del jugador."
+		}
+
+		CompanionUI: {
+			DefaultName: Compañero espectral
+			InventoryTitle: "{0} · Equipo y mochila"
+			Close: Cerrar
+			Armor: Armadura
+			Vanity: Apariencia
+			Dye: Tinte
+			Accessories: Accesorios (por progreso; sin Corazón de demonio)
+			HeadArmorOnly: Solo armadura de cabeza
+			BodyArmorOnly: Solo armadura de torso
+			LegArmorOnly: Solo armadura de piernas
+			HeadVanityOnly: Solo apariencia de cabeza
+			BodyVanityOnly: Solo apariencia de torso
+			LegVanityOnly: Solo apariencia de piernas
+			DyeOnly: Solo tintes
+			AccessoryOnly: Solo accesorios
+			WeaponBar: Armas   Azul=defensa  Gris=pico  Amarillo=invocación
+			WeaponPriority: Los 7 huecos centrales son armas normales; prioridad izquierda → derecha
+			GuardWeaponOnly: Defensa: cualquier arma salvo picos, hachas y martillos
+			PickaxeOnly: Pico: solo picos puros; no admite herramientas múltiples
+			SummonWeaponOnly: Invocación: solo bastones de invocación o centinela; no látigos
+			WeaponOnly: Solo armas, picos, hachas o martillos
+			RightClick: Derecho
+			LeftClick: Izquierdo
+			DecisionStealth: Decisión: sigilo
+			DecisionNormal: Decisión: normal
+			Ammo: Munición (primeros 4 huecos prioritarios; últimos 2 ampliados)
+			AmmoOnly: Solo flechas, balas y otra munición
+			Tools: Red / Caña / Gancho / Montura
+			NetOnly: Solo redes para insectos normales, de lava o doradas
+			RodOnly: Solo cañas de pescar
+			HookOnly: Solo ganchos
+			MountOnly: Solo objetos para invocar monturas
+			Backpack: Mochila
+			WaitingForTarget: Esperando objetivo
+			GuardSlotWeapon: Defensa · {0}
+			SummonSlotWeapon: Invocación · {0}
+			NumberedSlotWeapon: Hueco {0} · {1}
+			NoRotationWeapon: Aviso: los huecos 3–9 no tienen arma normal; se usa un hueco reservado
+			ModeFallback: "{0} (vuelta desde {1}: {2})"
+			StatsMode: Modo: {0}
+			StatsWeapon: Selección automática: {0}
+			StatsState: Estado: {0}
+			StatsAvoidance: Evasión: {0}  Amenazas: {1}  Riesgo: {2:0}
+			StatsLife: Vida: {0}/{1}  Defensa: {2}
+			StatsDamage: Cuerpo a cuerpo: ×{0:0.00}  Distancia: ×{1:0.00}  Magia: ×{2:0.00}
+			AccessorySlotSixLocked: Hueco 6: Experto tras el Muro de carne; disponible por defecto en Maestro
+			AccessorySlotSevenLocked: Hueco 7: Maestro tras el Muro de carne
+			AccessorySlotLocked: Este hueco de accesorio no está disponible en este mundo
+			AttackNoTarget: Sin objetivo
+			AttackNoWeapon: Sin arma seleccionada (revisa la barra)
+			AttackModeSuppressed: El modo actual no combate
+			AttackHoldLeashed: Mantiene posición; objetivo fuera del alcance
+			AttackApproaching: Acercándose al objetivo
+			AttackNoLineOfSight: El terreno bloquea la visión
+			AttackStealthCharging: Esperando a recargar el sigilo
+			AttackUseAlreadySpent: Otra acción usó el objeto en este fotograma
+			AttackAnimationBusy: El ataque anterior aún no terminó
+			AttackAttacking: Atacando
+			ModeAttack: Ataque
+			ModeEscort: Escolta
+			ModeGarrison: Guardia
+			ModeCatch: Captura
+			ModeFishing: Pesca
+			ModeMining: Minería
+			ModeAttackDescription: Se mueve libremente y busca enemigos
+			ModeEscortDescription: Se mantiene cerca y responde a amenazas próximas
+			ModeGarrisonDescription: Mantiene la posición y vuelve si lo desplazan
+			ModeCatchDescription: Prioriza capturar criaturas sin dañarlas
+			ModeFishingDescription: Pesca cerca sin abandonar el sitio
+			ModeMiningDescription: Excava contigo, extrae minerales e ilumina
+			ModeCatchRequirement: Requiere una red en su hueco
+			ModeFishingRequirement: Requiere una caña en su hueco
+			ModeMiningRequirement: Requiere un pico en el hueco 2
+			AvoidNoThreat: Sin amenazas
+			AvoidReacting: Reaccionando
+			AvoidHolding: Manteniendo posición
+			AvoidGrappleRelease: Suelta el gancho con impulso
+			DirectionUp: arriba
+			DirectionDown: abajo
+			DirectionLeft: a la izquierda
+			DirectionRight: a la derecha
+			AvoidRun: Correr {0}
+			AvoidJump: Saltar {0}
+			AvoidDrop: Bajar {0}
+			AvoidDash: Embestir {0}
+			AvoidGrapple: Enganchar {0}
+			ManagerTitle: Gestión de compañeros espectrales
+			ManagerInstructions: Clic izq.: mochila · Clic der.: retirar · Clic fuera: cerrar
+			ManagerEmpty: No hay compañeros espectrales · Usa el libro para invocar
+			DismissAll: Retirar a todos
+			OnlineCount: Compañeros activos: {0}
+			ModeUnavailable: "{0}: no puede cambiar a {1} — {2}"
+			ModeChanged: Modo del compañero espectral → {0} ({1})
+			BuildLoaded: "[MoreAIPlayer] Cargado · Compilación {0}"
+			DiagnosticsItemCheckTaken: Comprobación de objetos controlada ✓ ({0})
+			DiagnosticsItemCheckMissing: Comprobación de objetos sin controlar ✗ ({0})
+			DiagnosticsModeNone: Modo —
+			DiagnosticsMode: Modo {0}
+			DiagnosticsAim: Desfase de mira {0},{1}
+			DiagnosticsPathOk: Autocomprobación de ruta correcta
+			DiagnosticsRecovery: Comprobación de objetos recuperada {0} · hueco {1} · mira {2} · fallos seguidos {3}
+			DiagnosticsOwnership: Propiedad de proyectil corregida {0} · fugas de contexto {1}
+			RightClickOpen: "{0} · Clic derecho para abrir equipo y mochila"
+			HunterTrackerTitle: Juego del Cazador · {0}
+			HunterTrackerPreparing: Los cazadores se reúnen a lo lejos · {0}s
+			HunterTrackerNearest: Cazador más cercano: {0} casillas
+			HunterTrackerResting: Cazador más cercano descansando: {0} casillas
+			HunterTrackerReviving: Cazador más cercano reagrupándose: {0}s
+			HunterTrackerSearching: Buscando señales de cazadores...
 		}
 
 		CompanionCommand: {
@@ -100,14 +258,35 @@ Mods: {
 			NoCompanion: No tienes compañeros espectrales invocados.
 			SingleplayerOnly: Los compañeros espectrales por ahora solo funcionan en un jugador.
 			Reviving: "{0} revive en {1}s"
+			QuickAccess: "{0} · Haz clic para abrir el equipo y la mochila"
+			LootBrag: ¡Mira lo que he encontrado!
+			DumpAll: Soltar todo
+			TransferAll: Transferir todo
 			NoFreeSlot: No hay un hueco de jugador libre para un compañero espectral.
 			MinionSlotsFull: No hay suficientes espacios de esbirros para invocar a un compañero espectral.
-			HunterModeEnabled: "[Modo Cacería] activado. Los cazadores hostiles siguen tu rastro..."
-			HunterModeDisabled: "[Modo Cacería] desactivado. La alerta ha terminado."
+			HunterNameAlpha: Cazador · Alfa
+			HunterNameBravo: Cazador · Bravo
+			HunterNameCharlie: Cazador · Charlie
+			HunterNameFallback: Cazador #{0}
+			HunterModeEnabled: "[Juego del Cazador] {0} iniciado. Los cazadores se reúnen a lo lejos..."
+			HunterModeDisabled: "[Juego del Cazador] terminado. La alerta ha terminado."
+			HunterRestarting: "[Juego del Cazador] La siguiente oleada se reúne a lo lejos..."
+			HunterRequiresBoss: Derrota a cualquier jefe antes del Modo difícil para desbloquear el Juego del Cazador.
+			HunterUnavailablePostPlantera: El Juego del Cazador ya no está disponible después de Plantera.
+			HunterStageEndedHardmode: "[Juego del Cazador] El Muro de Carne ha caído. Esta partida previa al Modo difícil ha terminado."
+			HunterStageEndedPlantera: "[Juego del Cazador] Plantera ha caído. Esta partida ha terminado."
+			HunterStagePreHardmode: Cacería previa al Modo difícil
+			HunterStageEarlyHardmode: Cacería de Modo difícil inicial
+			HunterStageUnavailable: No hay una fase disponible
+			HunterStageStatus: Fase de juego: {0}
 			HunterSpawned: "[Advertencia] ¡El jugador hostil {0} se ha infiltrado en tu mundo!"
 			HunterDefeated: "[Aviso] ¡El jugador hostil {0} fue derrotado! Regresará con equipo nuevo en 60 segundos..."
 			HunterRespawned: "[Advertencia] ¡El jugador hostil {0} ha regresado y reanuda la persecución!"
 			HunterSingleplayerOnly: El modo Cacería por ahora solo funciona en un jugador.
+			ScaleSingleplayerOnly: La matriz de tamaño por ahora solo funciona en un jugador.
+			ScaleNoSpace: No hay espacio suficiente aquí para el tamaño elegido.
+			ScalePanelTitle: ◆ Matriz de tamaño de cristal
+			ScalePanelCurrent: Elegido: {0:0.##}×　Actual: {1:0.##}×
 			Diagnostics: Diagnóstico espectral: {0}  Compilación {1}
 			Enabled: Activado
 			Disabled: Desactivado
@@ -126,8 +305,23 @@ Mods: {
 			HunterPanelHunting: · {0}: ¡se acerca para rematarte!
 			HunterRefresh: 🔄 Reconstruir y desplegar al escuadrón de cazadores
 			HunterRefreshed: ¡El escuadrón de cazadores fue reconstruido y desplegado!
+			BuilderModeSmartAssist: Asistencia inteligente
+			BuilderModeBridge: Puente
+			BuilderModeShelter: Refugio
+			BuilderModeArena: Arena de combate
+			BuilderModeRopeShaft: Pozo de cuerda
+			BuilderModeChanged: Plan de construcción → {0}
+			BuilderSmartEnabled: Asistencia de construcción activada. Coloca bloques normalmente y tus compañeros prolongarán patrones claros.
+			BuilderSmartDisabled: Asistencia de construcción desactivada. Los trabajos ya programados no se cancelan.
+			BuilderQueued: "{0}: se programaron {1} casillas. Los compañeros construirán cuando sea seguro."
+			BuilderCancelled: Se cancelaron {0} casillas de construcción.
+			BuilderInvalidTarget: Ese objetivo está fuera del área segura del mundo.
+			BuilderNeedPlatforms: Este plan necesita plataformas no favoritas en la mochila de un compañero activo o en tu inventario.
+			BuilderNeedBlocks: Este plan necesita bloques sólidos no favoritos en la mochila de un compañero activo o en tu inventario.
+			BuilderNeedRope: Este plan necesita cuerda no favorita en la mochila de un compañero activo o en tu inventario.
+			BuilderNothingToBuild: Todas las casillas ya están ocupadas o programadas; no se cambió nada.
 		}
 
-		// NPCs.DamageTestDummyNPC.DisplayName: Damage Test Dummy N P C
+		NPCs.DamageTestDummyNPC.DisplayName: Muñeco de prueba de daño
 	}
 }

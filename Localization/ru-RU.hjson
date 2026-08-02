@@ -7,12 +7,32 @@ Mods: {
 	MoreAIPlayer: {
 		Configs: {
 			MoreAIPlayerClientConfig: {
-				// DisplayName: Phantom Companion Client Settings
-				// Headers.CompanionDiagnostics: Companion Diagnostics
+				DisplayName: Клиентские настройки призрачных спутников
+
+				Headers: {
+					CompanionDiagnostics: Диагностика спутников
+					CompanionBalance: Баланс и выживание спутников
+					CompanionPickup: Сбор предметов мира спутниками
+				}
 
 				EnablePhantomPlayerDebugText: {
-					// Label: "[i:GoldenKey] Enable Phantom Player Debug Text"
-					// Tooltip: Shows the live development readout above phantom companions. Disabled by default.
+					Label: "[i:GoldenKey] Включить отладочный текст призрачных игроков"
+					Tooltip: Показывает над призрачными спутниками текущие данные разработки. По умолчанию выключено.
+				}
+
+				CompanionsFightAfterOwnerDeath: {
+					Label: Спутники сражаются после смерти игрока
+					Tooltip: Включено по умолчанию. Если вы погибнете во время битвы с боссом, связанные спутники останутся и продолжат сражаться. Отключите, чтобы сразу распустить их после смерти.
+				}
+
+				CompanionsTakeDamage: {
+					Label: Спутники получают урон
+					Tooltip: Включено по умолчанию. Спутники получают урон, могут погибнуть и возрождаются после обычной задержки. Отключите, чтобы сделать их неуязвимыми.
+				}
+
+				CompanionsAutoCollectWorldItems: {
+					Label: Спутники автоматически собирают предметы мира
+					Tooltip: По умолчанию выключено. Пока опция выключена, спутники не ищут, не резервируют, не преследуют и не собирают предметы мира. Включайте её только после проверки совместимости с сохранением и другими модами.
 				}
 			}
 		}
@@ -29,13 +49,14 @@ Mods: {
 			}
 
 			DevelopmentNotice: {
-				// DisplayName: Phantom Companion Development Notice
-				// Development: This mod is actively under development.
-				// SoloCreator: It is made and maintained by one creator.
-				// Updates: I will keep updating it, improving companions, and fixing problems reported by players.
-				// Compatibility: Popular weapons from large mods will receive one-to-one compatibility work over time.
-				// Complexity: Similar-looking weapons can use very different code internally; some therefore need much more time to support safely. Thank you for your patience.
-				// Tooltip: ""
+				DisplayName: Сведения о разработке призрачных спутников
+				Development: Этот мод находится в активной разработке.
+				SoloCreator: Он создаётся и поддерживается одним человеком.
+				Updates: Я буду продолжать обновлять его, улучшать спутников и исправлять проблемы, о которых сообщают игроки.
+				Compatibility: Популярное оружие из крупных модов со временем получит отдельную поддержку совместимости.
+				Complexity: Похожее оружие может иметь совершенно разные внутренние механики, поэтому некоторым экземплярам требуется гораздо больше времени для безопасной поддержки. Спасибо за терпение.
+				ConfigSuggestion: Загляните в параметры конфигурации.
+				Tooltip: Сведения о разработке и параметрах конфигурации.
 			}
 
 			CompanionDebugger: {
@@ -90,6 +111,143 @@ Mods: {
 					Побеждённые охотники возвращаются через 60 секунд с новым снаряжением.
 					'''
 			}
+
+			CompanionBuilderBook: {
+				DisplayName: Книга зодчего
+				Tooltip:
+					'''
+					ПКМ: переключать пять чертежей. ЛКМ: выполнить выбранный. Вниз + ЛКМ: отменить все работы.
+					· Умная помощь: включает постоянную поддержку. Спутники запоминают поставленные блоки и стены и продолжают короткие, понятные узоры.
+					· Мост: строит горизонтальный мост из платформ длиной до 160 клеток к курсору.
+					· Укрытие: строит каркас 11 × 7 с проёмом в три клетки и при наличии материалов добавляет стены и свет.
+					· Арена: строит три ряда по 61 платформе с промежутком в десять клеток и доступным освещением.
+					· Верёвочная шахта: прокладывает до 120 клеток верёвки по вертикали и ставит свет там, где есть опора.
+					Сначала расходуются неизбранные материалы из рюкзаков активных спутников, затем из вашего инвентаря. Без материалов работа безопасно приостанавливается.
+					Спутники никогда не добывают и не заменяют блоки. Бой, спасение, путевые точки и специальные режимы всегда важнее. Только одиночная игра.
+					'''
+			}
+
+			PlayerScaleBook: {
+				DisplayName: Книга кристальной матрицы
+				Tooltip: "[Только для веселья] ПКМ: открыть матрицу и выбрать масштаб. ЛКМ: применить его; нажмите снова, чтобы вернуться к 1×."
+			}
+		}
+
+		VanillaItemHints: {
+			LifeCrystal: "[Призрачный спутник] Не нужно использовать на спутнике: его максимальное здоровье напрямую повторяет здоровье игрока."
+			ManaCrystal: "[Призрачный спутник] Не нужно использовать на спутнике: его максимальная мана напрямую повторяет ману игрока."
+		}
+
+		CompanionUI: {
+			DefaultName: Призрачный спутник
+			InventoryTitle: "{0} · Снаряжение и рюкзак"
+			Close: Закрыть
+			Armor: Броня
+			Vanity: Стиль
+			Dye: Краситель
+			Accessories: Аксессуары (прогресс; без Сердца демона)
+			HeadArmorOnly: Только броня для головы
+			BodyArmorOnly: Только броня для тела
+			LegArmorOnly: Только броня для ног
+			HeadVanityOnly: Только стиль для головы
+			BodyVanityOnly: Только стиль для тела
+			LegVanityOnly: Только стиль для ног
+			DyeOnly: Только красители
+			AccessoryOnly: Только аксессуары
+			WeaponBar: Оружие   Синий=защита  Серый=кирка  Жёлтый=призыв
+			WeaponPriority: 7 средних ячеек — обычное оружие; приоритет слева → направо
+			GuardWeaponOnly: Защита: любое оружие, кроме кирок, топоров и молотов
+			PickaxeOnly: Кирка: только обычные кирки; комбинированные инструменты не подходят
+			SummonWeaponOnly: Призыв: только посохи призыва или турелей; хлысты не подходят
+			WeaponOnly: Только оружие, кирки, топоры или молоты
+			RightClick: ПКМ
+			LeftClick: ЛКМ
+			DecisionStealth: Решение: скрытность
+			DecisionNormal: Решение: обычная атака
+			Ammo: Боеприпасы (первые 4 важнее; последние 2 дополнительные)
+			AmmoOnly: Только стрелы, пули и другие боеприпасы
+			Tools: Сачок / Удочка / Крюк / Транспорт
+			NetOnly: Только обычный, лавостойкий или золотой сачок
+			RodOnly: Только удочки
+			HookOnly: Только крюки
+			MountOnly: Только предметы призыва транспорта
+			Backpack: Рюкзак
+			WaitingForTarget: Ожидание цели
+			GuardSlotWeapon: Защита · {0}
+			SummonSlotWeapon: Призыв · {0}
+			NumberedSlotWeapon: Ячейка {0} · {1}
+			NoRotationWeapon: Внимание: в ячейках 3–9 нет обычного оружия; используется резерв
+			ModeFallback: "{0} (возврат из {1}: {2})"
+			StatsMode: Режим: {0}
+			StatsWeapon: Автовыбор: {0}
+			StatsState: Состояние: {0}
+			StatsAvoidance: Уклонение: {0}  Угрозы: {1}  Риск: {2:0}
+			StatsLife: Здоровье: {0}/{1}  Защита: {2}
+			StatsDamage: Ближний: ×{0:0.00}  Дальний: ×{1:0.00}  Магия: ×{2:0.00}
+			AccessorySlotSixLocked: Ячейка 6: Эксперт после Стены плоти; в Мастере доступна сразу
+			AccessorySlotSevenLocked: Ячейка 7: Мастер после Стены плоти
+			AccessorySlotLocked: Эта ячейка аксессуара недоступна в текущем мире
+			AttackNoTarget: Нет цели
+			AttackNoWeapon: Оружие не выбрано (проверьте панель)
+			AttackModeSuppressed: Текущий режим не сражается
+			AttackHoldLeashed: Удерживает позицию; цель за пределами зоны
+			AttackApproaching: Приближается к цели
+			AttackNoLineOfSight: Местность закрывает обзор
+			AttackStealthCharging: Ждёт восстановления скрытности
+			AttackUseAlreadySpent: Другое действие использовало предмет в этом кадре
+			AttackAnimationBusy: Предыдущая атака ещё не завершена
+			AttackAttacking: Атакует
+			ModeAttack: Атака
+			ModeEscort: Сопровождение
+			ModeGarrison: Пост
+			ModeCatch: Ловля
+			ModeFishing: Рыбалка
+			ModeMining: Добыча
+			ModeAttackDescription: Свободно перемещается и ищет врагов
+			ModeEscortDescription: Держится рядом и отвечает на угрозы возле хозяина
+			ModeGarrisonDescription: Удерживает позицию и возвращается после отбрасывания
+			ModeCatchDescription: Ловит существ, не причиняя им вреда
+			ModeFishingDescription: Рыбачит рядом, оставаясь на месте
+			ModeMiningDescription: Копает вместе с вами, добывает руду и освещает путь
+			ModeCatchRequirement: Нужен сачок в ячейке сачка
+			ModeFishingRequirement: Нужна удочка в ячейке удочки
+			ModeMiningRequirement: Нужна кирка в ячейке 2
+			AvoidNoThreat: Угроз не обнаружено
+			AvoidReacting: Реагирует
+			AvoidHolding: Удерживает позицию
+			AvoidGrappleRelease: Отпускает крюк с сохранением импульса
+			DirectionUp: вверх
+			DirectionDown: вниз
+			DirectionLeft: влево
+			DirectionRight: вправо
+			AvoidRun: Бежать {0}
+			AvoidJump: Прыгать {0}
+			AvoidDrop: Спускаться {0}
+			AvoidDash: Рывок {0}
+			AvoidGrapple: Зацепиться {0}
+			ManagerTitle: Управление призрачными спутниками
+			ManagerInstructions: ЛКМ: рюкзак · ПКМ: отозвать · Щелчок снаружи: закрыть
+			ManagerEmpty: Нет призрачных спутников · Нажмите ЛКМ по книге для призыва
+			DismissAll: Отозвать всех
+			OnlineCount: Активных спутников: {0}
+			ModeUnavailable: "{0}: нельзя переключиться на {1} — {2}"
+			ModeChanged: Режим призрачного спутника → {0} ({1})
+			BuildLoaded: "[MoreAIPlayer] Загружен · Сборка {0}"
+			DiagnosticsItemCheckTaken: Проверка предмета перехвачена ✓ ({0})
+			DiagnosticsItemCheckMissing: Проверка предмета не перехвачена ✗ ({0})
+			DiagnosticsModeNone: Режим —
+			DiagnosticsMode: Режим {0}
+			DiagnosticsAim: Смещение прицела {0},{1}
+			DiagnosticsPathOk: Самопроверка пути пройдена
+			DiagnosticsRecovery: Проверка предмета восстановлена {0} · ячейка {1} · прицел {2} · пропуски подряд {3}
+			DiagnosticsOwnership: Владение снарядами исправлено {0} · утечки контекста {1}
+			RightClickOpen: "{0} · ПКМ открывает снаряжение и рюкзак"
+			HunterTrackerTitle: Игра охотника · {0}
+			HunterTrackerPreparing: Охотники собираются вдали · {0}с
+			HunterTrackerNearest: Ближайший охотник: {0} клеток
+			HunterTrackerResting: Ближайший охотник отдыхает: {0} клеток
+			HunterTrackerReviving: Ближайший охотник собирается: {0}с
+			HunterTrackerSearching: Поиск сигналов охотника...
 		}
 
 		CompanionCommand: {
@@ -100,14 +258,35 @@ Mods: {
 			NoCompanion: У вас нет призванных призрачных спутников.
 			SingleplayerOnly: Призрачные спутники пока доступны только в одиночной игре.
 			Reviving: "{0} возрождается через {1}с"
+			QuickAccess: "{0} · Нажмите, чтобы открыть снаряжение и рюкзак"
+			LootBrag: Смотри, что мне попалось!
+			DumpAll: Выложить всё
+			TransferAll: Перенести всё
 			NoFreeSlot: Нет свободного слота игрока для призрачного спутника.
 			MinionSlotsFull: Недостаточно слотов прислужников для призыва призрачного спутника.
-			HunterModeEnabled: "[Режим Охоты] включён! Враждебные охотники идут по вашему следу..."
-			HunterModeDisabled: "[Режим Охоты] выключен. Тревога отменена."
+			HunterNameAlpha: Охотник · Альфа
+			HunterNameBravo: Охотник · Браво
+			HunterNameCharlie: Охотник · Чарли
+			HunterNameFallback: Охотник #{0}
+			HunterModeEnabled: "[Игра охотника] начата: {0}. Охотники собираются вдали..."
+			HunterModeDisabled: "[Игра охотника] завершена. Тревога отменена."
+			HunterRestarting: "[Игра охотника] Следующая волна собирается вдали..."
+			HunterRequiresBoss: Победите любого босса до сложного режима, чтобы открыть Игру охотника.
+			HunterUnavailablePostPlantera: После Плантеры Игра охотника недоступна.
+			HunterStageEndedHardmode: "[Игра охотника] Стена плоти повержена. Этот раунд до сложного режима завершён."
+			HunterStageEndedPlantera: "[Игра охотника] Плантера повержена. Этот раунд завершён."
+			HunterStagePreHardmode: Охота до сложного режима
+			HunterStageEarlyHardmode: Ранняя охота сложного режима
+			HunterStageUnavailable: Нет доступной фазы
+			HunterStageStatus: Фаза игры: {0}
 			HunterSpawned: "[Предупреждение] Враждебный игрок {0} проник в ваш мир!"
 			HunterDefeated: "[Объявление] Враждебный игрок {0} побеждён! Он вернётся с новым снаряжением через 60 секунд..."
 			HunterRespawned: "[Предупреждение] Враждебный игрок {0} вернулся и возобновляет погоню!"
 			HunterSingleplayerOnly: Режим Охоты пока доступен только в одиночной игре.
+			ScaleSingleplayerOnly: Матрица размера пока доступна только в одиночной игре.
+			ScaleNoSpace: Здесь недостаточно места для выбранного размера.
+			ScalePanelTitle: ◆ Кристальная матрица размера
+			ScalePanelCurrent: Выбрано: {0:0.##}×　Сейчас: {1:0.##}×
 			Diagnostics: Диагностика спутника: {0}  Сборка {1}
 			Enabled: Вкл.
 			Disabled: Выкл.
@@ -126,8 +305,23 @@ Mods: {
 			HunterPanelHunting: · {0}: приближается, чтобы убить вас!
 			HunterRefresh: 🔄 Пересобрать и отправить отряд охотников
 			HunterRefreshed: Отряд охотников пересобран и отправлен!
+			BuilderModeSmartAssist: Умная помощь
+			BuilderModeBridge: Мост
+			BuilderModeShelter: Укрытие
+			BuilderModeArena: Боевая арена
+			BuilderModeRopeShaft: Верёвочная шахта
+			BuilderModeChanged: Чертёж → {0}
+			BuilderSmartEnabled: Умная помощь включена. Ставьте блоки как обычно, и спутники продолжат понятные узоры.
+			BuilderSmartDisabled: Умная помощь выключена. Уже запланированные работы сохранены.
+			BuilderQueued: "{0}: запланировано клеток — {1}. Спутники начнут строить, когда станет безопасно."
+			BuilderCancelled: Отменено клеток строительства: {0}.
+			BuilderInvalidTarget: Цель находится за пределами безопасной области мира.
+			BuilderNeedPlatforms: Для этого плана нужны неизбранные платформы в рюкзаке активного спутника или вашем инвентаре.
+			BuilderNeedBlocks: Для этого плана нужны неизбранные цельные строительные блоки в рюкзаке активного спутника или вашем инвентаре.
+			BuilderNeedRope: Для этого плана нужна неизбранная верёвка в рюкзаке активного спутника или вашем инвентаре.
+			BuilderNothingToBuild: Все клетки уже заняты или запланированы; мир не изменён.
 		}
 
-		// NPCs.DamageTestDummyNPC.DisplayName: Damage Test Dummy N P C
+		NPCs.DamageTestDummyNPC.DisplayName: Манекен для проверки урона
 	}
 }

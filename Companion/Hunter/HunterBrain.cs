@@ -96,23 +96,25 @@ public sealed class HunterBrain
     {
         float distance = Vector2.Distance(me.Center, targetPlayer.Center);
 
-        // Catch-up teleport if player is too far (e.g. Magic Mirror / Teleport > 2000px)
-        if (distance > 2000f)
+        // Hunters deliberately enter from well beyond the screen. Only a true long-distance
+        // relocation (mirror, pylon, teleporter) snaps them back into the pursuit.
+        if (distance > HunterSystem.CatchUpTeleportDistance)
         {
-            Vector2 spawnOffset = new(Main.rand.NextBool() ? -800f : 800f, Main.rand.NextFloat(-100f, 100f));
-            me.Center = targetPlayer.Center + spawnOffset;
+            me.Center = HunterSystem.FindRemoteSpawnPosition(targetPlayer);
             me.velocity = Vector2.Zero;
             CompanionEntitySystem.SpawnRecallDustBurst(me.Center);
             distance = Vector2.Distance(me.Center, targetPlayer.Center);
         }
 
-        // Select best weapon slot (0 or 1)
-        int selectedSlot = 0;
-        Item weapon = me.inventory[0];
+        // Every kit has a ranged/throwing pressure weapon and a close-range fallback. This is
+        // an actual choice now, rather than an unreachable secondary inventory slot.
+        bool useFallback = distance <= 92f;
+        int selectedSlot = useFallback ? 1 : 0;
+        Item weapon = me.inventory[selectedSlot];
         if (weapon is null || weapon.IsAir || weapon.damage <= 0)
         {
-            weapon = me.inventory[1];
-            selectedSlot = 1;
+            selectedSlot = useFallback ? 0 : 1;
+            weapon = me.inventory[selectedSlot];
         }
 
         // Aiming with slight jitter (makes it balanced and dodgeable)
@@ -132,18 +134,23 @@ public sealed class HunterBrain
             }
         }
 
-        // Movement towards player
-        if (distance > 120f)
+        // Ranged hunters create pressure from their kit's intended range; at melee distance
+        // they draw the fallback weapon instead of continually trying to flee through terrain.
+        float preferredRange = instance.Loadout.PreferredRange;
+        if (!useFallback && distance > preferredRange + 48f)
         {
             navigator.Navigate(me, targetPlayer.Center);
         }
-        else if (distance < 60f)
+        else if (!useFallback && distance < preferredRange - 48f)
         {
-            // Back up slightly if too close
             if (targetPlayer.Center.X < me.Center.X)
                 me.controlRight = true;
             else
                 me.controlLeft = true;
+        }
+        else if (useFallback && distance > 72f)
+        {
+            navigator.Navigate(me, targetPlayer.Center);
         }
 
         // Jump if stuck or target is higher

@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using Microsoft.Xna.Framework;
+using MoreAIPlayer.Companion.Building;
 using Terraria;
 using Terraria.DataStructures;
 using Terraria.ID;
@@ -23,12 +24,18 @@ public sealed class CompanionPlayer : ModPlayer
 
     /// <summary>The dedicated fishing-pole slot.</summary>
     public const int RodSize = 1;
+    /// <summary>The dedicated quick-grapple equipment slot.</summary>
+    public const int HookSize = 1;
+    /// <summary>The dedicated mount equipment slot.</summary>
+    public const int MountSize = 1;
     public const int VanitySize = 3;
     public const int DyeSize = 3;
     public const int BackpackSize = 40;
     private const int RescueSignalWindow = 10;
 
     public List<CompanionProfile> Profiles { get; private set; } = [];
+    public CompanionBuildMode BuildMode = CompanionBuildMode.SmartAssist;
+    public bool SmartBuildEnabled;
     public int RequestedTarget = -1;
     public int CombatRequestTime;
 
@@ -68,7 +75,23 @@ public sealed class CompanionPlayer : ModPlayer
     private int recentTreesChopped;
     private int treeStreakTime;
 
-    public override void Initialize() => Profiles = [];
+    private bool buildSnapshotValid;
+    private Point buildSnapshotPoint;
+    private int buildSnapshotItemType;
+    private int buildSnapshotCreateTile;
+    private int buildSnapshotCreateWall;
+    private int buildSnapshotStyle;
+    private bool buildSnapshotHadTile;
+    private ushort buildSnapshotTileType;
+    private ushort buildSnapshotWallType;
+
+    public override void Initialize()
+    {
+        Profiles = [];
+        BuildMode = CompanionBuildMode.SmartAssist;
+        SmartBuildEnabled = false;
+        buildSnapshotValid = false;
+    }
 
     public CompanionProfile CreateProfile(bool mirrorOwner)
     {
@@ -96,11 +119,18 @@ public sealed class CompanionPlayer : ModPlayer
         foreach (CompanionProfile profile in Profiles)
             savedProfiles.Add(profile.Save());
         tag[nameof(Profiles)] = savedProfiles;
+        tag[nameof(BuildMode)] = (int)BuildMode;
+        tag[nameof(SmartBuildEnabled)] = SmartBuildEnabled;
     }
 
     public override void LoadData(TagCompound tag)
     {
         Profiles = [];
+        int savedMode = tag.ContainsKey(nameof(BuildMode)) ? tag.GetInt(nameof(BuildMode)) : 0;
+        BuildMode = System.Enum.IsDefined(typeof(CompanionBuildMode), savedMode)
+            ? (CompanionBuildMode)savedMode
+            : CompanionBuildMode.SmartAssist;
+        SmartBuildEnabled = tag.ContainsKey(nameof(SmartBuildEnabled)) && tag.GetBool(nameof(SmartBuildEnabled));
         if (!tag.ContainsKey(nameof(Profiles)))
         {
             if (tag.ContainsKey(nameof(CompanionProfile.Hotbar)))
@@ -127,7 +157,6 @@ public sealed class CompanionPlayer : ModPlayer
             // it yet. Without this the 6th accessory silently did nothing.
             Player.extraAccessory = CompanionSlotRules.UnlockedAccessorySlots() >= 6;
 
-            Player.statDefense.AdditiveBonus += 20f;
             Player.ClearBuff(BuffID.ManaSickness);
 
             if (WhipBuffTimer > 0)
@@ -154,22 +183,68 @@ public sealed class CompanionPlayer : ModPlayer
 
     public override void PostUpdateRunSpeeds()
     {
-        // Companion movement speed is pinned to 95% of the owner's CURRENT effective speed.
-        // This runs after vanilla computed speeds from the companion's own gear, so mobility
-        // accessories on the companion cannot raise (or lower) it — a direct set, not a base.
+        // Preserve the movement speed produced by the companion's own armor and accessories.
+        // The old owner-speed pin erased boots and other mobility equipment, which made giving
+        // the companion movement gear meaningless.
         CompanionInstance instance = CompanionEntitySystem.GetBySlot(Player.whoAmI);
         if (instance is null || !ReferenceEquals(instance.Entity, Player))
             return;
+        if (WhipBuffTimer > 0)
+        {
+            Player.maxRunSpeed *= 1.20f;
+            Player.accRunSpeed *= 1.20f;
+            Player.runAcceleration *= 1.20f;
+        }
+    }
 
-        Player owner = instance.Owner;
-        if (!owner.active)
+    public override bool PreItemCheck()
+    {
+        buildSnapshotValid = false;
+        if (Main.netMode != NetmodeID.SinglePlayer || Player.whoAmI != Main.myPlayer ||
+            !Player.active || CompanionEntitySystem.IsCompanion(Player))
+            return true;
+
+        Item held = Player.HeldItem;
+        if ((held.createTile == -1 && held.createWall <= WallID.None) ||
+            !WorldGen.InWorld(Player.tileTargetX, Player.tileTargetY, 5))
+            return true;
+
+        buildSnapshotPoint = new Point(Player.tileTargetX, Player.tileTargetY);
+        buildSnapshotItemType = held.type;
+        buildSnapshotCreateTile = held.createTile;
+        buildSnapshotCreateWall = held.createWall;
+        buildSnapshotStyle = held.placeStyle;
+        Tile before = Main.tile[buildSnapshotPoint.X, buildSnapshotPoint.Y];
+        buildSnapshotHadTile = before.HasTile;
+        buildSnapshotTileType = before.TileType;
+        buildSnapshotWallType = before.WallType;
+        buildSnapshotValid = true;
+        return true;
+    }
+
+    public override void PostItemCheck()
+    {
+        if (!buildSnapshotValid)
+            return;
+        buildSnapshotValid = false;
+
+        Tile after = Main.tile[buildSnapshotPoint.X, buildSnapshotPoint.Y];
+        bool placedTile = buildSnapshotCreateTile >= 0 && after.HasTile &&
+            after.TileType == buildSnapshotCreateTile &&
+            (!buildSnapshotHadTile || buildSnapshotTileType != after.TileType);
+        bool placedWall = buildSnapshotCreateWall > WallID.None &&
+            after.WallType == buildSnapshotCreateWall && buildSnapshotWallType != after.WallType;
+        if (!placedTile && !placedWall)
             return;
 
-        float speedMultiplier = WhipBuffTimer > 0 ? 1.20f : 1.0f;
-        float speed = System.Math.Max(1f, System.Math.Max(owner.maxRunSpeed, owner.accRunSpeed) * 0.95f * speedMultiplier);
-        Player.maxRunSpeed = speed;
-        Player.accRunSpeed = speed;
-        Player.runAcceleration = System.Math.Max(0.05f, owner.runAcceleration * 0.95f * speedMultiplier);
+        CompanionBuildingSystem.ObserveOwnerPlacement(
+            Player,
+            this,
+            buildSnapshotPoint,
+            buildSnapshotItemType,
+            placedTile ? buildSnapshotCreateTile : -1,
+            placedWall ? buildSnapshotCreateWall : -1,
+            buildSnapshotStyle);
     }
 
     public override void PostUpdate()
@@ -245,50 +320,21 @@ public sealed class CompanionPlayer : ModPlayer
 
     public override bool CanBeHitByProjectile(Projectile proj)
     {
-        if (CompanionEntitySystem.IsCompanion(Player))
-        {
-            if (IsWhipProjectile(proj) && proj.owner != Player.whoAmI)
-                return true;
-
-            if (IsExplosiveOrTrapProjectile(proj))
-                return false;
-        }
+        if (CompanionEntitySystem.IsCompanion(Player) &&
+            IsWhipProjectile(proj) && proj.owner != Player.whoAmI)
+            return true;
         return base.CanBeHitByProjectile(proj);
     }
 
-    public override void ModifyHurt(ref Player.HurtModifiers modifiers)
-    {
-        if (!CompanionEntitySystem.IsCompanion(Player))
-            return;
-
-        // Block Spike tile damage or trap/explosive projectile damage
-        if (modifiers.DamageSource.SourceOtherIndex == 3)
-        {
-            modifiers.Cancel();
-            return;
-        }
-
-        int projIndex = modifiers.DamageSource.SourceProjectileLocalIndex;
-        if (projIndex >= 0 && projIndex < Main.maxProjectiles)
-        {
-            Projectile proj = Main.projectile[projIndex];
-            if (IsExplosiveOrTrapProjectile(proj))
-            {
-                modifiers.Cancel();
-                return;
-            }
-
-            if (IsWhipProjectile(proj) && proj.owner != Player.whoAmI)
-            {
-                // Force whip hit damage to exactly 1 point
-                modifiers.SetMaxDamage(1);
-                return;
-            }
-        }
-
-        // 20% damage reduction for all other damage
-        modifiers.FinalDamage *= 0.8f;
-    }
+    /// <summary>
+    /// When survival is disabled, use a free dodge instead of only reducing damage: tML keeps a
+    /// minimum of one damage after damage modifiers, while a dodge cleanly covers NPC attacks,
+    /// projectiles, fall damage and environmental damage. The default remains false here, so
+    /// companions normally take real damage and use the brain's existing death/revive flow.
+    /// </summary>
+    public override bool FreeDodge(Player.HurtInfo info) =>
+        CompanionEntitySystem.IsCompanion(Player) &&
+        MoreAIPlayerClientConfig.Instance?.CompanionsTakeDamage == false;
 
     public override void OnHurt(Player.HurtInfo info)
     {
@@ -339,32 +385,6 @@ public sealed class CompanionPlayer : ModPlayer
             return true;
         if (proj.aiStyle == ProjAIStyleID.Whip)
             return true;
-        return false;
-    }
-
-    private static bool IsExplosiveOrTrapProjectile(Projectile proj)
-    {
-        if (proj is null || !proj.active)
-            return false;
-        if (proj.trap)
-            return true;
-
-        int type = proj.type;
-        if (type == ProjectileID.Boulder || type == ProjectileID.RollingCactus ||
-            type == ProjectileID.GeyserTrap || type == ProjectileID.SpearTrap ||
-            type == ProjectileID.SpikyBallTrap || type == ProjectileID.FlamesTrap ||
-            type == ProjectileID.PoisonDart)
-            return true;
-
-        if (proj.aiStyle == ProjAIStyleID.Explosive ||
-            type == ProjectileID.Grenade || type == ProjectileID.StickyGrenade || type == ProjectileID.BouncyGrenade ||
-            type == ProjectileID.Bomb || type == ProjectileID.StickyBomb || type == ProjectileID.BouncyBomb ||
-            type == ProjectileID.Dynamite || type == ProjectileID.StickyDynamite || type == ProjectileID.BouncyDynamite ||
-            type == ProjectileID.Explosives || type == ProjectileID.Landmine || type == ProjectileID.BombFish ||
-            type == ProjectileID.DryBomb || type == ProjectileID.WetBomb || type == ProjectileID.LavaBomb || type == ProjectileID.HoneyBomb ||
-            type == ProjectileID.DirtBomb || type == ProjectileID.ScarabBomb)
-            return true;
-
         return false;
     }
 

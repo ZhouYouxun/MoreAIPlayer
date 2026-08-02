@@ -1,3 +1,5 @@
+using Terraria.Localization;
+
 namespace MoreAIPlayer.Companion.AI;
 
 /// <summary>
@@ -45,17 +47,20 @@ public enum CompanionAttackState
 
 public static class CompanionAttackStateText
 {
-    public static string Describe(CompanionAttackState state) => state switch
+    public static string Describe(CompanionAttackState state) => Text(state switch
     {
-        CompanionAttackState.NoTarget => "无目标",
-        CompanionAttackState.NoWeapon => "未选中武器（检查武器栏）",
-        CompanionAttackState.ModeSuppressed => "当前模式暂不作战",
-        CompanionAttackState.HoldLeashed => "驻守中，目标超出警戒范围",
-        CompanionAttackState.Approaching => "接近目标中",
-        CompanionAttackState.NoLineOfSight => "视线被地形阻挡",
-        CompanionAttackState.StealthCharging => "潜伏中，等待隐身充能",
-        CompanionAttackState.UseAlreadySpent => "本帧攻击被其他动作占用",
-        CompanionAttackState.AnimationBusy => "上一次挥动尚未结束",
-        _ => "攻击中"
-    };
+        CompanionAttackState.NoTarget => "AttackNoTarget",
+        CompanionAttackState.NoWeapon => "AttackNoWeapon",
+        CompanionAttackState.ModeSuppressed => "AttackModeSuppressed",
+        CompanionAttackState.HoldLeashed => "AttackHoldLeashed",
+        CompanionAttackState.Approaching => "AttackApproaching",
+        CompanionAttackState.NoLineOfSight => "AttackNoLineOfSight",
+        CompanionAttackState.StealthCharging => "AttackStealthCharging",
+        CompanionAttackState.UseAlreadySpent => "AttackUseAlreadySpent",
+        CompanionAttackState.AnimationBusy => "AttackAnimationBusy",
+        _ => "AttackAttacking"
+    });
+
+    private static string Text(string key) =>
+        Language.GetTextValue($"Mods.MoreAIPlayer.CompanionUI.{key}");
 }

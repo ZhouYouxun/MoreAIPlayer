@@ -1,6 +1,7 @@
 using Microsoft.Xna.Framework;
 using MoreAIPlayer.Companion.AI;
 using Terraria;
+using Terraria.Localization;
 
 namespace MoreAIPlayer.Companion;
 
@@ -78,6 +79,29 @@ public sealed class CompanionInstance
     /// <summary>Ticks left before a dead companion revives at the owner's side. 0 means alive.
     /// Read by the UI to draw the revive countdown over the owner's head.</summary>
     public int ReviveTicksLeft;
+
+    /// <summary>World item currently reserved for this companion's backpack pickup.</summary>
+    public int LootTargetItemIndex = -1;
+
+    /// <summary>Small scan throttle; world-item selection does not need to run every frame.</summary>
+    public int LootScanCooldown;
+
+    /// <summary>
+    /// Reservation lease for the current world item. Combat and higher-priority work can
+    /// interrupt collection; expiry lets another companion take over instead of locking the
+    /// item forever.
+    /// </summary>
+    public int LootReservationTimeLeft;
+
+    /// <summary>Ticks until the next "look what I found" overhead line.</summary>
+    public int LootBragCooldown = 300;
+
+    /// <summary>The construction cell currently reserved by this companion.</summary>
+    public int BuildJobId = -1;
+
+    /// <summary>Short delay between successful placements so construction remains readable
+    /// and multiple builders can visibly divide the work.</summary>
+    public int BuildActionCooldown;
 
     /// <summary>
     /// Item.type that started the currently-running itemAnimation cycle. Self-sustaining
@@ -157,7 +181,9 @@ public sealed class CompanionInstance
         Player me = Entity;
         me.active = true;
         me.whoAmI = Slot;
-        me.name = string.IsNullOrWhiteSpace(profile.Name) ? "幻影伙伴" : profile.Name;
+        me.name = string.IsNullOrWhiteSpace(profile.Name)
+            ? Language.GetTextValue("Mods.MoreAIPlayer.CompanionUI.DefaultName")
+            : profile.Name;
         me.team = owner.team;
         me.hostile = false;
         me.difficulty = 0;
@@ -175,6 +201,8 @@ public sealed class CompanionInstance
             AssignIfChanged(me.inventory, AmmoInventoryIndex(i), profile.Ammo[i]);
         AssignIfChanged(me.inventory, NetInventoryIndex, profile.NetTool);
         AssignIfChanged(me.inventory, RodInventoryIndex, profile.RodTool);
+        AssignIfChanged(me.miscEquips, 4, profile.HookTool);
+        AssignIfChanged(me.miscEquips, 3, profile.MountTool);
 
         for (int i = 0; i < CompanionPlayer.ArmorSize; i++)
         {
@@ -196,6 +224,13 @@ public sealed class CompanionInstance
             me.statLife = me.statLifeMax;
         if (me.statLife < 1 && !me.dead)
             me.statLife = me.statLifeMax;
+
+        // Mana Crystal progression belongs to the owner just like Life Crystal progression.
+        // The brain already keeps a companion's current mana full; copying the owner's maximum
+        // here is what makes the new tooltip truthful instead of merely descriptive.
+        me.statManaMax = System.Math.Max(20, owner.statManaMax2);
+        if (me.statMana > me.statManaMax)
+            me.statMana = me.statManaMax;
     }
 
     /// <summary>Maps a profile hotbar/backpack position to the entity's inventory index.</summary>

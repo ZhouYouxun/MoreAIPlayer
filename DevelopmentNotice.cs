@@ -50,6 +50,10 @@ public sealed class DevelopmentNotice : ModItem
         {
             OverrideColor = new Color(205, 180, 255)
         });
+        tooltips.Add(new TooltipLine(Mod, "ConfigSuggestion", GetText("ConfigSuggestion"))
+        {
+            OverrideColor = new Color(145, 225, 255)
+        });
     }
 
     private string GetText(string key) =>

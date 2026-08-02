@@ -7,12 +7,32 @@ Mods: {
 	MoreAIPlayer: {
 		Configs: {
 			MoreAIPlayerClientConfig: {
-				// DisplayName: Phantom Companion Client Settings
-				// Headers.CompanionDiagnostics: Companion Diagnostics
+				DisplayName: Phantom-Begleiter Client-Einstellungen
+
+				Headers: {
+					CompanionDiagnostics: Begleiter-Diagnose
+					CompanionBalance: Begleiter-Balance und Überleben
+					CompanionPickup: Weltgegenstände der Begleiter
+				}
 
 				EnablePhantomPlayerDebugText: {
-					// Label: "[i:GoldenKey] Enable Phantom Player Debug Text"
-					// Tooltip: Shows the live development readout above phantom companions. Disabled by default.
+					Label: "[i:GoldenKey] Debug-Text für Phantomspieler aktivieren"
+					Tooltip: Zeigt über Phantom-Begleitern eine Live-Entwicklungsanzeige. Standardmäßig deaktiviert.
+				}
+
+				CompanionsFightAfterOwnerDeath: {
+					Label: Begleiter kämpfen nach dem Tod weiter
+					Tooltip: Standardmäßig aktiviert. Bei deinem Tod im Bosskampf bleiben gebundene Begleiter und kämpfen weiter. Deaktivieren, um sie beim Tod sofort aufzulösen.
+				}
+
+				CompanionsTakeDamage: {
+					Label: Begleiter erleiden Schaden
+					Tooltip: Standardmäßig aktiviert. Begleiter können Schaden erleiden, sterben und nach ihrer normalen Wartezeit wiederbelebt werden. Deaktivieren macht sie gegen allen Schaden immun.
+				}
+
+				CompanionsAutoCollectWorldItems: {
+					Label: Begleiter sammeln Weltgegenstände automatisch ein
+					Tooltip: Standardmäßig deaktiviert. Ist die Option aus, scannen, reservieren, verfolgen und sammeln Begleiter keine Weltgegenstände. Erst nach einer Kompatibilitätsprüfung mit Spielstand und Mods aktivieren.
 				}
 			}
 		}
@@ -29,13 +49,14 @@ Mods: {
 			}
 
 			DevelopmentNotice: {
-				// DisplayName: Phantom Companion Development Notice
-				// Development: This mod is actively under development.
-				// SoloCreator: It is made and maintained by one creator.
-				// Updates: I will keep updating it, improving companions, and fixing problems reported by players.
-				// Compatibility: Popular weapons from large mods will receive one-to-one compatibility work over time.
-				// Complexity: Similar-looking weapons can use very different code internally; some therefore need much more time to support safely. Thank you for your patience.
-				// Tooltip: ""
+				DisplayName: Entwicklungsnotiz zu Phantom-Begleitern
+				Development: Dieser Mod befindet sich weiterhin in aktiver Entwicklung.
+				SoloCreator: Er wird von einer Person erstellt und gepflegt.
+				Updates: Ich werde ihn weiter aktualisieren, die Begleiter verbessern und von Spielern gemeldete Probleme beheben.
+				Compatibility: Beliebte Waffen großer Mods erhalten nach und nach individuelle Kompatibilitätsarbeit.
+				Complexity: Ähnlich aussehende Waffen können intern sehr unterschiedlich funktionieren; einige benötigen daher deutlich mehr Zeit, um sicher unterstützt zu werden. Danke für eure Geduld.
+				ConfigSuggestion: Schau auch in die Konfigurationsoptionen.
+				Tooltip: Hinweis zum Entwicklungsstand und zu Konfigurationsoptionen.
 			}
 
 			CompanionDebugger: {
@@ -90,6 +111,143 @@ Mods: {
 					Besiegte Jäger kehren nach 60 Sekunden mit neuer Ausrüstung zurück.
 					'''
 			}
+
+			CompanionBuilderBook: {
+				DisplayName: Baumeisterbuch
+				Tooltip:
+					'''
+					Rechtsklick: zwischen fünf Bauplänen wechseln. Linksklick: gewählten Plan ausführen. Unten + Linksklick: alle Aufträge abbrechen.
+					· Intelligente Hilfe: fortlaufende Hilfe umschalten. Gefährten lernen deine gesetzten Blöcke und Wände und verlängern klare, kurze Muster.
+					· Brücke: eine waagerechte Plattformbrücke von bis zu 160 Feldern zum Mauszeiger bauen.
+					· Schutzhaus: einen 11 × 7 großen Rahmen mit drei Feldern Türöffnung bauen; Wände und Licht werden bei vorhandenen Vorräten ergänzt.
+					· Kampfarena: drei 61 Felder lange Plattformreihen mit zehn Feldern Abstand und verfügbarer Beleuchtung bauen.
+					· Seilschacht: bis zu 120 Felder Seil senkrecht verlegen und an geeigneten Stellen Licht setzen.
+					Nicht favorisierte Materialien werden zuerst aus Rucksäcken aktiver Gefährten, dann aus deinem Inventar genommen. Ohne Material pausiert der Bau sicher.
+					Gefährten graben oder ersetzen niemals Blöcke. Kampf, Rettung, Wegpunkte und Spezialmodi haben immer Vorrang. Nur Einzelspieler.
+					'''
+			}
+
+			PlayerScaleBook: {
+				DisplayName: Kristallmatrix-Buch
+				Tooltip: "[Nur zum Spaß] Rechtsklick: Matrix öffnen und Größe wählen. Linksklick: eigene Figur auf diese Größe ändern; erneut klicken, um zu 1× zurückzukehren."
+			}
+		}
+
+		VanillaItemHints: {
+			LifeCrystal: "[Phantomgefährte] Muss nicht für den Gefährten benutzt werden; sein maximales Leben entspricht direkt dem des Spielers."
+			ManaCrystal: "[Phantomgefährte] Muss nicht für den Gefährten benutzt werden; sein maximales Mana entspricht direkt dem des Spielers."
+		}
+
+		CompanionUI: {
+			DefaultName: Phantomgefährte
+			InventoryTitle: "{0} · Ausrüstung & Rucksack"
+			Close: Schließen
+			Armor: Rüstung
+			Vanity: Kosmetik
+			Dye: Farbe
+			Accessories: Zubehör (Fortschritt; kein Dämonenherz nötig)
+			HeadArmorOnly: Nur Kopfrüstung
+			BodyArmorOnly: Nur Körperrüstung
+			LegArmorOnly: Nur Beinrüstung
+			HeadVanityOnly: Nur kosmetische Kopfteile
+			BodyVanityOnly: Nur kosmetische Körperteile
+			LegVanityOnly: Nur kosmetische Beinteile
+			DyeOnly: Nur Farbstoffe
+			AccessoryOnly: Nur Zubehör
+			WeaponBar: Waffenleiste   Blau=Schutz  Grau=Spitzhacke  Gelb=Beschwörung
+			WeaponPriority: Die mittleren 7 Plätze sind normale Waffen; Priorität links → rechts
+			GuardWeaponOnly: Schutzplatz: jede Waffe außer Spitzhacke, Axt und Hammer
+			PickaxeOnly: Spitzhackenplatz: nur reine Spitzhacken, keine Multifunktionswerkzeuge
+			SummonWeaponOnly: Beschwörungsplatz: nur Beschwörungs- oder Wächterstäbe, keine Peitschen
+			WeaponOnly: Nur Waffen, Spitzhacken, Äxte oder Hämmer
+			RightClick: Rechts
+			LeftClick: Links
+			DecisionStealth: Entscheidung: Tarnung
+			DecisionNormal: Entscheidung: Normal
+			Ammo: Munition (erste 4 Plätze bevorzugt; letzte 2 erweitert)
+			AmmoOnly: Nur Pfeile, Kugeln und andere Munition
+			Tools: Netz / Angel / Haken / Reittier
+			NetOnly: Nur Insektennetz, lavabestes Netz oder goldenes Netz
+			RodOnly: Nur Angeln
+			HookOnly: Nur Greifhaken
+			MountOnly: Nur Reittier-Beschwörungen
+			Backpack: Rucksack
+			WaitingForTarget: Warte auf Ziel
+			GuardSlotWeapon: Schutz · {0}
+			SummonSlotWeapon: Beschwörung · {0}
+			NumberedSlotWeapon: Platz {0} · {1}
+			NoRotationWeapon: Warnung: Plätze 3–9 enthalten keine normale Waffe; Reserveplatz wird genutzt
+			ModeFallback: "{0} (Rückfall von {1}: {2})"
+			StatsMode: Modus: {0}
+			StatsWeapon: Automatisch gewählt: {0}
+			StatsState: Status: {0}
+			StatsAvoidance: Ausweichen: {0}  Gefahren: {1}  Risiko: {2:0}
+			StatsLife: Leben: {0}/{1}  Verteidigung: {2}
+			StatsDamage: Nahkampf: ×{0:0.00}  Fernkampf: ×{1:0.00}  Magie: ×{2:0.00}
+			AccessorySlotSixLocked: Platz 6: Experte nach Fleischwand; in Meister standardmäßig verfügbar
+			AccessorySlotSevenLocked: Platz 7: Meister nach Fleischwand
+			AccessorySlotLocked: Dieser Zubehörplatz ist in dieser Welt nicht verfügbar
+			AttackNoTarget: Kein Ziel
+			AttackNoWeapon: Keine Waffe gewählt (Waffenleiste prüfen)
+			AttackModeSuppressed: Aktueller Modus kämpft nicht
+			AttackHoldLeashed: Position halten; Ziel außerhalb der Wachweite
+			AttackApproaching: Nähere mich dem Ziel
+			AttackNoLineOfSight: Gelände blockiert die Sicht
+			AttackStealthCharging: Warte auf volle Tarnung
+			AttackUseAlreadySpent: Eine andere Aktion nutzt den Gegenstand in diesem Tick
+			AttackAnimationBusy: Vorheriger Angriff ist noch nicht beendet
+			AttackAttacking: Greift an
+			ModeAttack: Angriff
+			ModeEscort: Begleiten
+			ModeGarrison: Stellung
+			ModeCatch: Fangen
+			ModeFishing: Angeln
+			ModeMining: Bergbau
+			ModeAttackDescription: Frei bewegen und Gegner suchen
+			ModeEscortDescription: Nah bleiben und Gefahren beim Besitzer abwehren
+			ModeGarrisonDescription: Position halten und nach Rückstoß zurückkehren
+			ModeCatchDescription: Tiere bevorzugt fangen, ohne sie zu verletzen
+			ModeFishingDescription: In der Nähe angeln und stehen bleiben
+			ModeMiningDescription: Mit dem Besitzer graben, Erz abbauen und Licht geben
+			ModeCatchRequirement: Benötigt ein Netz im Netzplatz
+			ModeFishingRequirement: Benötigt eine Angel im Angelplatz
+			ModeMiningRequirement: Benötigt eine Spitzhacke in Platz 2
+			AvoidNoThreat: Keine Gefahr erkannt
+			AvoidReacting: Reagiert
+			AvoidHolding: Hält Position
+			AvoidGrappleRelease: Löst Haken mit Schwung
+			DirectionUp: nach oben
+			DirectionDown: nach unten
+			DirectionLeft: nach links
+			DirectionRight: nach rechts
+			AvoidRun: Laufen {0}
+			AvoidJump: Springen {0}
+			AvoidDrop: Fallen {0}
+			AvoidDash: Sprinten {0}
+			AvoidGrapple: Haken {0}
+			ManagerTitle: Phantomgefährten-Verwaltung
+			ManagerInstructions: Linksklick: Rucksack · Rechtsklick: entlassen · Außerhalb klicken: schließen
+			ManagerEmpty: Keine Phantomgefährten · Buch linksklicken zum Beschwören
+			DismissAll: Alle entlassen
+			OnlineCount: Gefährten online: {0}
+			ModeUnavailable: "{0}: Wechsel zu {1} nicht möglich — {2}"
+			ModeChanged: Phantomgefährten-Modus → {0} ({1})
+			BuildLoaded: "[MoreAIPlayer] Geladen · Version {0}"
+			DiagnosticsItemCheckTaken: Gegenstandsprüfung übernommen ✓ ({0})
+			DiagnosticsItemCheckMissing: Gegenstandsprüfung nicht übernommen ✗ ({0})
+			DiagnosticsModeNone: Modus —
+			DiagnosticsMode: Modus {0}
+			DiagnosticsAim: Zielversatz {0},{1}
+			DiagnosticsPathOk: Pfad-Selbsttest OK
+			DiagnosticsRecovery: Gegenstandsprüfung gerettet {0} · Platz {1} · Ziel {2} · Fehlframes {3}
+			DiagnosticsOwnership: Projektilbesitz korrigiert {0} · Kontextlecks korrigiert {1}
+			RightClickOpen: "{0} · Rechtsklick für Ausrüstung und Rucksack"
+			HunterTrackerTitle: Jägerspiel · {0}
+			HunterTrackerPreparing: Jäger sammeln sich in der Ferne · {0}s
+			HunterTrackerNearest: Nächster Jäger: {0} Felder
+			HunterTrackerResting: Nächster Jäger ruht: {0} Felder
+			HunterTrackerReviving: Nächster Jäger formiert sich: {0}s
+			HunterTrackerSearching: Suche nach Jägersignalen...
 		}
 
 		CompanionCommand: {
@@ -100,15 +258,36 @@ Mods: {
 			NoCompanion: Du hast keine Phantomgefährten beschworen.
 			SingleplayerOnly: Phantomgefährten sind derzeit nur im Einzelspieler verfügbar.
 			Reviving: "{0} wird in {1}s wiederbelebt"
+			QuickAccess: "{0} · Klicken, um Ausrüstung und Rucksack zu öffnen"
+			LootBrag: Schau mal, was ich Tolles gefunden habe!
+			DumpAll: Alles ablegen
+			TransferAll: Alles übertragen
 			NoFreeSlot: Kein freier Spielerslot für einen Phantomgefährten verfügbar.
 			MinionSlotsFull: Nicht genug Dienerplätze, um einen Phantomgefährten zu beschwören.
-			HunterModeEnabled: "[Jagdmodus] aktiviert! Feindliche Jäger verfolgen deine Spur..."
-			HunterModeDisabled: "[Jagdmodus] deaktiviert. Die Warnung ist aufgehoben."
+			HunterNameAlpha: Jäger · Alpha
+			HunterNameBravo: Jäger · Bravo
+			HunterNameCharlie: Jäger · Charlie
+			HunterNameFallback: Jäger #{0}
+			HunterModeEnabled: "[Jägerspiel] {0} gestartet. Die Jäger sammeln sich in der Ferne..."
+			HunterModeDisabled: "[Jägerspiel] beendet. Die Warnung ist aufgehoben."
+			HunterRestarting: "[Jägerspiel] Die nächste Welle sammelt sich in der Ferne..."
+			HunterRequiresBoss: Besiege im Vor-Hardmode einen beliebigen Boss, um das Jägerspiel freizuschalten.
+			HunterUnavailablePostPlantera: Nach Plantera ist das Jägerspiel nicht mehr verfügbar.
+			HunterStageEndedHardmode: "[Jägerspiel] Die Fleischwand ist gefallen. Dieses Vor-Hardmode-Spiel ist beendet."
+			HunterStageEndedPlantera: "[Jägerspiel] Plantera ist gefallen. Dieses Spiel ist beendet."
+			HunterStagePreHardmode: Vor-Hardmode-Jagd
+			HunterStageEarlyHardmode: Frühe Hardmode-Jagd
+			HunterStageUnavailable: Keine verfügbare Phase
+			HunterStageStatus: Spielphase: {0}
 			HunterSpawned: "[Warnung] Der feindliche Spieler {0} ist in deine Welt eingedrungen!"
 			HunterDefeated: "[Durchsage] Der feindliche Spieler {0} wurde besiegt! Er kehrt in 60 Sekunden mit neuer Ausrüstung zurück..."
 			HunterRespawned: "[Warnung] Der feindliche Spieler {0} ist zurück und nimmt die Jagd wieder auf!"
 			HunterSingleplayerOnly: Der Jagdmodus ist derzeit nur im Einzelspieler verfügbar.
-			Diagnostics: Phantomdiagnose: {0}  Build {1}
+			ScaleSingleplayerOnly: Die Größenmatrix ist derzeit nur im Einzelspieler verfügbar.
+			ScaleNoSpace: Hier ist nicht genug Platz für die gewählte Größe.
+			ScalePanelTitle: ◆ Kristallgrößenmatrix
+			ScalePanelCurrent: Gewählt: {0:0.##}×　Aktuell: {1:0.##}×
+			Diagnostics: Phantomdiagnose: {0}  Version {1}
 			Enabled: An
 			Disabled: Aus
 			HunterResting: "[Jägerwarnung] {0} zieht sich zurück, um sich auszuruhen und Vorräte zu sammeln!"
@@ -126,8 +305,23 @@ Mods: {
 			HunterPanelHunting: · {0}: setzt zur Jagd an!
 			HunterRefresh: 🔄 Jägertrupp neu erstellen und entsenden
 			HunterRefreshed: Jägertrupp wurde neu erstellt und entsandt!
+			BuilderModeSmartAssist: Intelligente Hilfe
+			BuilderModeBridge: Brücke
+			BuilderModeShelter: Schutzhaus
+			BuilderModeArena: Kampfarena
+			BuilderModeRopeShaft: Seilschacht
+			BuilderModeChanged: Bauplan → {0}
+			BuilderSmartEnabled: Intelligente Bauhilfe aktiviert. Baue normal, und deine Gefährten verlängern klare Muster.
+			BuilderSmartDisabled: Intelligente Bauhilfe deaktiviert. Bereits geplante Aufträge bleiben bestehen.
+			BuilderQueued: "{0}: {1} Baufelder eingeplant. Die Gefährten bauen, sobald es sicher ist."
+			BuilderCancelled: "{0} Baufelder abgebrochen."
+			BuilderInvalidTarget: Dieses Bauziel liegt außerhalb des sicheren Weltbereichs.
+			BuilderNeedPlatforms: Dieser Plan benötigt nicht favorisierte Plattformen im Rucksack eines aktiven Gefährten oder in deinem Inventar.
+			BuilderNeedBlocks: Dieser Plan benötigt nicht favorisierte massive Baublöcke im Rucksack eines aktiven Gefährten oder in deinem Inventar.
+			BuilderNeedRope: Dieser Plan benötigt nicht favorisierte Seile im Rucksack eines aktiven Gefährten oder in deinem Inventar.
+			BuilderNothingToBuild: Alle Zielfelder sind bereits belegt oder eingeplant; nichts wurde verändert.
 		}
 
-		// NPCs.DamageTestDummyNPC.DisplayName: Damage Test Dummy N P C
+		NPCs.DamageTestDummyNPC.DisplayName: Schadens-Testpuppe
 	}
 }

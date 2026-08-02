@@ -18,4 +18,17 @@ public sealed class MoreAIPlayerClientConfig : ModConfig
     [BackgroundColor(42, 255, 126, 220)]
     [DefaultValue(false)]
     public bool EnablePhantomPlayerDebugText;
+
+    [Header("CompanionBalance")]
+    [BackgroundColor(210, 125, 58, 220)]
+    [DefaultValue(true)]
+    public bool CompanionsFightAfterOwnerDeath;
+
+    [DefaultValue(true)]
+    public bool CompanionsTakeDamage;
+
+    [Header("CompanionPickup")]
+    [BackgroundColor(70, 135, 210, 220)]
+    [DefaultValue(false)]
+    public bool CompanionsAutoCollectWorldItems;
 }

@@ -1,4 +1,5 @@
 using Microsoft.Xna.Framework;
+using Terraria.Localization;
 
 namespace MoreAIPlayer.Companion;
 
@@ -20,25 +21,25 @@ public static class CompanionModeRules
         CompanionMode.Mining
     ];
 
-    public static string Name(CompanionMode mode) => mode switch
+    public static string Name(CompanionMode mode) => Text(mode switch
     {
-        CompanionMode.Escort => "护卫",
-        CompanionMode.Garrison => "镇守",
-        CompanionMode.Catch => "捕捉",
-        CompanionMode.Fishing => "钓鱼",
-        CompanionMode.Mining => "挖矿",
-        _ => "综合进攻"
-    };
+        CompanionMode.Escort => "ModeEscort",
+        CompanionMode.Garrison => "ModeGarrison",
+        CompanionMode.Catch => "ModeCatch",
+        CompanionMode.Fishing => "ModeFishing",
+        CompanionMode.Mining => "ModeMining",
+        _ => "ModeAttack"
+    });
 
-    public static string Description(CompanionMode mode) => mode switch
+    public static string Description(CompanionMode mode) => Text(mode switch
     {
-        CompanionMode.Escort => "贴身跟随，只应对靠近主人的威胁",
-        CompanionMode.Garrison => "钉在当前位置，被打走会走回来",
-        CompanionMode.Catch => "优先用捕虫网抓小动物，不再误伤它们",
-        CompanionMode.Fishing => "在附近水域自动钓鱼，原地不动",
-        CompanionMode.Mining => "跟着主人挖掘，顺路采矿并照明",
-        _ => "自由行动，主动索敌"
-    };
+        CompanionMode.Escort => "ModeEscortDescription",
+        CompanionMode.Garrison => "ModeGarrisonDescription",
+        CompanionMode.Catch => "ModeCatchDescription",
+        CompanionMode.Fishing => "ModeFishingDescription",
+        CompanionMode.Mining => "ModeMiningDescription",
+        _ => "ModeAttackDescription"
+    });
 
     public static Color Tint(CompanionMode mode) => mode switch
     {
@@ -53,11 +54,14 @@ public static class CompanionModeRules
     /// <summary>The equipment a mode needs before it can be picked, or null when it needs none.</summary>
     public static string RequirementText(CompanionMode mode) => mode switch
     {
-        CompanionMode.Catch => "需要捕虫网槽内有网",
-        CompanionMode.Fishing => "需要鱼竿槽内有钓竿",
-        CompanionMode.Mining => "需要镐位（2 号格）内有镐",
+        CompanionMode.Catch => Text("ModeCatchRequirement"),
+        CompanionMode.Fishing => Text("ModeFishingRequirement"),
+        CompanionMode.Mining => Text("ModeMiningRequirement"),
         _ => null
     };
+
+    private static string Text(string key) =>
+        Language.GetTextValue($"Mods.MoreAIPlayer.CompanionUI.{key}");
 
     /// <summary>
     /// Whether this companion is equipped for the mode. Selection is refused for unavailable

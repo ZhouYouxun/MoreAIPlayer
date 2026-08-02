@@ -7,12 +7,32 @@ Mods: {
 	MoreAIPlayer: {
 		Configs: {
 			MoreAIPlayerClientConfig: {
-				// DisplayName: Phantom Companion Client Settings
-				// Headers.CompanionDiagnostics: Companion Diagnostics
+				DisplayName: Paramètres client des compagnons fantômes
+
+				Headers: {
+					CompanionDiagnostics: Diagnostic des compagnons
+					CompanionBalance: Équilibre et survie des compagnons
+					CompanionPickup: Ramassage des objets du monde par les compagnons
+				}
 
 				EnablePhantomPlayerDebugText: {
-					// Label: "[i:GoldenKey] Enable Phantom Player Debug Text"
-					// Tooltip: Shows the live development readout above phantom companions. Disabled by default.
+					Label: "[i:GoldenKey] Activer le texte de débogage des joueurs fantômes"
+					Tooltip: Affiche des informations de développement en direct au-dessus des compagnons fantômes. Désactivé par défaut.
+				}
+
+				CompanionsFightAfterOwnerDeath: {
+					Label: Les compagnons combattent après votre mort
+					Tooltip: Activé par défaut. Si vous mourez durant un boss, vos compagnons liés restent et continuent de combattre. Désactivez-le pour les dissiper immédiatement.
+				}
+
+				CompanionsTakeDamage: {
+					Label: Les compagnons subissent des dégâts
+					Tooltip: Activé par défaut. Les compagnons subissent des dégâts, peuvent mourir et reviennent après leur délai normal. Désactivez-le pour les rendre immunisés à tous les dégâts.
+				}
+
+				CompanionsAutoCollectWorldItems: {
+					Label: Les compagnons ramassent automatiquement les objets du monde
+					Tooltip: Désactivé par défaut. Lorsqu'elle est désactivée, les compagnons ne cherchent, ne réservent, ne poursuivent et ne ramassent aucun objet du monde. Activez-la seulement après avoir vérifié la compatibilité avec votre sauvegarde et vos mods.
 				}
 			}
 		}
@@ -29,13 +49,14 @@ Mods: {
 			}
 
 			DevelopmentNotice: {
-				// DisplayName: Phantom Companion Development Notice
-				// Development: This mod is actively under development.
-				// SoloCreator: It is made and maintained by one creator.
-				// Updates: I will keep updating it, improving companions, and fixing problems reported by players.
-				// Compatibility: Popular weapons from large mods will receive one-to-one compatibility work over time.
-				// Complexity: Similar-looking weapons can use very different code internally; some therefore need much more time to support safely. Thank you for your patience.
-				// Tooltip: ""
+				DisplayName: Note de développement des compagnons fantômes
+				Development: Ce mod est toujours en développement actif.
+				SoloCreator: Il est créé et maintenu par une seule personne.
+				Updates: Je continuerai de le mettre à jour, d'améliorer les compagnons et de corriger les problèmes signalés par les joueurs.
+				Compatibility: Les armes populaires des grands mods recevront progressivement une prise en charge dédiée.
+				Complexity: Des armes d'apparence similaire peuvent fonctionner très différemment en interne ; certaines demandent donc beaucoup plus de temps pour être prises en charge de manière fiable. Merci de votre patience.
+				ConfigSuggestion: Pensez à consulter les options de configuration.
+				Tooltip: Informations sur le développement et les options de configuration.
 			}
 
 			CompanionDebugger: {
@@ -90,6 +111,143 @@ Mods: {
 					Les chasseurs vaincus reviennent après 60 secondes avec un nouvel équipement.
 					'''
 			}
+
+			CompanionBuilderBook: {
+				DisplayName: Grimoire de l'architecte
+				Tooltip:
+					'''
+					Clic droit : alterner entre cinq plans. Clic gauche : exécuter le plan choisi. Bas + clic gauche : annuler tous les travaux.
+					· Assistance intelligente : active l'aide continue. Les compagnons apprennent les blocs et murs que vous posez et prolongent les motifs courts et clairs.
+					· Pont : construit un pont horizontal de plateformes jusqu'à 160 cases vers le curseur.
+					· Abri : construit une structure de 11 × 7 avec une ouverture de trois cases, puis ajoute murs et éclairage si les matériaux sont disponibles.
+					· Arène : construit trois rangées de 61 plateformes espacées de dix cases, avec l'éclairage disponible.
+					· Puits de corde : pose jusqu'à 120 cases de corde verticale et des lumières là où elles ont un support.
+					Les matériaux non favoris sont pris d'abord dans les sacs des compagnons actifs, puis dans votre inventaire. Le chantier se met en pause sans matériaux.
+					Les compagnons ne minent ni ne remplacent jamais de blocs. Combat, secours, balises et modes spécialisés restent prioritaires. Uniquement en solo.
+					'''
+			}
+
+			PlayerScaleBook: {
+				DisplayName: Grimoire de matrice cristalline
+				Tooltip: "[Pour le plaisir] Clic droit : ouvrir la matrice et choisir une taille. Clic gauche : appliquer la taille ; cliquer encore pour revenir à 1×."
+			}
+		}
+
+		VanillaItemHints: {
+			LifeCrystal: "[Compagnon fantôme] Inutile de l'utiliser sur le compagnon : sa vie maximale reprend directement celle du joueur."
+			ManaCrystal: "[Compagnon fantôme] Inutile de l'utiliser sur le compagnon : son mana maximal reprend directement celui du joueur."
+		}
+
+		CompanionUI: {
+			DefaultName: Compagnon fantôme
+			InventoryTitle: "{0} · Équipement et sac"
+			Close: Fermer
+			Armor: Armure
+			Vanity: Apparence
+			Dye: Teinture
+			Accessories: Accessoires (progression ; sans Cœur de démon)
+			HeadArmorOnly: Armure de tête uniquement
+			BodyArmorOnly: Armure de torse uniquement
+			LegArmorOnly: Armure de jambes uniquement
+			HeadVanityOnly: Apparence de tête uniquement
+			BodyVanityOnly: Apparence de torse uniquement
+			LegVanityOnly: Apparence de jambes uniquement
+			DyeOnly: Teintures uniquement
+			AccessoryOnly: Accessoires uniquement
+			WeaponBar: Armes   Bleu=défense  Gris=pioche  Jaune=invocation
+			WeaponPriority: Les 7 emplacements centraux sont prioritaires de gauche à droite
+			GuardWeaponOnly: Défense : toute arme sauf pioche, hache ou marteau
+			PickaxeOnly: Pioche : pioches seules, sans outils multifonctions
+			SummonWeaponOnly: Invocation : bâtons d'invocation ou de sentinelle, sans fouets
+			WeaponOnly: Armes, pioches, haches ou marteaux uniquement
+			RightClick: Droit
+			LeftClick: Gauche
+			DecisionStealth: Décision : furtivité
+			DecisionNormal: Décision : normale
+			Ammo: Munitions (4 premiers prioritaires, 2 derniers supplémentaires)
+			AmmoOnly: Flèches, balles et autres munitions uniquement
+			Tools: Filet / Canne / Grappin / Monture
+			NetOnly: Filet à insectes normal, résistant à la lave ou doré uniquement
+			RodOnly: Cannes à pêche uniquement
+			HookOnly: Grappins uniquement
+			MountOnly: Objets d'invocation de monture uniquement
+			Backpack: Sac
+			WaitingForTarget: En attente d'une cible
+			GuardSlotWeapon: Défense · {0}
+			SummonSlotWeapon: Invocation · {0}
+			NumberedSlotWeapon: Emplacement {0} · {1}
+			NoRotationWeapon: Attention : les emplacements 3–9 n'ont aucune arme normale ; recours à une réserve
+			ModeFallback: "{0} (repli depuis {1} : {2})"
+			StatsMode: Mode : {0}
+			StatsWeapon: Sélection auto : {0}
+			StatsState: État : {0}
+			StatsAvoidance: Esquive : {0}  Menaces : {1}  Risque : {2:0}
+			StatsLife: Vie : {0}/{1}  Défense : {2}
+			StatsDamage: Mêlée : ×{0:0.00}  Distance : ×{1:0.00}  Magie : ×{2:0.00}
+			AccessorySlotSixLocked: Emplacement 6 : Expert après le Mur de chair ; disponible par défaut en Maître
+			AccessorySlotSevenLocked: Emplacement 7 : Maître après le Mur de chair
+			AccessorySlotLocked: Cet emplacement d'accessoire est indisponible dans ce monde
+			AttackNoTarget: Aucune cible
+			AttackNoWeapon: Aucune arme sélectionnée (vérifiez la barre)
+			AttackModeSuppressed: Le mode actuel ne combat pas
+			AttackHoldLeashed: Tient sa position ; cible hors de portée
+			AttackApproaching: Approche de la cible
+			AttackNoLineOfSight: Le terrain bloque la ligne de vue
+			AttackStealthCharging: Attend la recharge de furtivité
+			AttackUseAlreadySpent: Une autre action utilise l'objet cette image
+			AttackAnimationBusy: L'attaque précédente n'est pas terminée
+			AttackAttacking: Attaque
+			ModeAttack: Attaque
+			ModeEscort: Escorte
+			ModeGarrison: Garnison
+			ModeCatch: Capture
+			ModeFishing: Pêche
+			ModeMining: Minage
+			ModeAttackDescription: Se déplace librement et cherche les ennemis
+			ModeEscortDescription: Reste proche et répond aux menaces voisines
+			ModeGarrisonDescription: Tient la position et revient après une projection
+			ModeCatchDescription: Capture les créatures sans les blesser
+			ModeFishingDescription: Pêche à proximité sans bouger
+			ModeMiningDescription: Creuse avec vous, mine et éclaire
+			ModeCatchRequirement: Nécessite un filet dans son emplacement
+			ModeFishingRequirement: Nécessite une canne dans son emplacement
+			ModeMiningRequirement: Nécessite une pioche à l'emplacement 2
+			AvoidNoThreat: Aucune menace détectée
+			AvoidReacting: Réagit
+			AvoidHolding: Tient sa position
+			AvoidGrappleRelease: Lâche le grappin avec son élan
+			DirectionUp: vers le haut
+			DirectionDown: vers le bas
+			DirectionLeft: vers la gauche
+			DirectionRight: vers la droite
+			AvoidRun: Courir {0}
+			AvoidJump: Sauter {0}
+			AvoidDrop: Descendre {0}
+			AvoidDash: Foncer {0}
+			AvoidGrapple: S'agripper {0}
+			ManagerTitle: Gestion des compagnons fantômes
+			ManagerInstructions: Clic gauche : sac · Clic droit : renvoyer · Clic extérieur : fermer
+			ManagerEmpty: Aucun compagnon fantôme · Cliquez sur le livre pour en invoquer
+			DismissAll: Tout renvoyer
+			OnlineCount: Compagnons actifs : {0}
+			ModeUnavailable: "{0} : impossible de passer à {1} — {2}"
+			ModeChanged: Mode du compagnon fantôme → {0} ({1})
+			BuildLoaded: "[MoreAIPlayer] Chargé · Version {0}"
+			DiagnosticsItemCheckTaken: Vérification d'objet prise en charge ✓ ({0})
+			DiagnosticsItemCheckMissing: Vérification d'objet non prise en charge ✗ ({0})
+			DiagnosticsModeNone: Mode —
+			DiagnosticsMode: Mode {0}
+			DiagnosticsAim: Décalage de visée {0},{1}
+			DiagnosticsPathOk: Autotest du chemin correct
+			DiagnosticsRecovery: Vérification d'objet récupérée {0} · emplacement {1} · visée {2} · ratés consécutifs {3}
+			DiagnosticsOwnership: Propriété des projectiles corrigée {0} · fuites de contexte {1}
+			RightClickOpen: "{0} · Clic droit pour ouvrir équipement et sac"
+			HunterTrackerTitle: Jeu du chasseur · {0}
+			HunterTrackerPreparing: Les chasseurs se rassemblent au loin · {0}s
+			HunterTrackerNearest: Chasseur le plus proche : {0} cases
+			HunterTrackerResting: Chasseur le plus proche au repos : {0} cases
+			HunterTrackerReviving: Chasseur le plus proche se regroupe : {0}s
+			HunterTrackerSearching: Recherche des signaux de chasseurs...
 		}
 
 		CompanionCommand: {
@@ -100,15 +258,36 @@ Mods: {
 			NoCompanion: Vous n'avez aucun compagnon fantôme invoqué.
 			SingleplayerOnly: Les compagnons fantômes ne sont disponibles qu'en solo pour le moment.
 			Reviving: "{0} revient dans {1}s"
+			QuickAccess: "{0} · Cliquez pour ouvrir l'équipement et le sac"
+			LootBrag: Regarde ce que j'ai trouvé !
+			DumpAll: Tout déposer
+			TransferAll: Tout transférer
 			NoFreeSlot: Aucun emplacement de joueur libre n'est disponible pour un compagnon fantôme.
 			MinionSlotsFull: Pas assez d'emplacements de serviteurs pour invoquer un compagnon fantôme.
-			HunterModeEnabled: "[Mode Traque] activé ! Des chasseurs hostiles suivent votre piste..."
-			HunterModeDisabled: "[Mode Traque] désactivé. L'alerte est levée."
+			HunterNameAlpha: Chasseur · Alpha
+			HunterNameBravo: Chasseur · Bravo
+			HunterNameCharlie: Chasseur · Charlie
+			HunterNameFallback: Chasseur #{0}
+			HunterModeEnabled: "[Jeu du chasseur] {0} commencé. Les chasseurs se rassemblent au loin..."
+			HunterModeDisabled: "[Jeu du chasseur] terminé. L'alerte est levée."
+			HunterRestarting: "[Jeu du chasseur] La prochaine vague se rassemble au loin..."
+			HunterRequiresBoss: Battez n'importe quel boss avant le Hardmode pour déverrouiller le Jeu du chasseur.
+			HunterUnavailablePostPlantera: Le Jeu du chasseur n'est plus disponible après Plantera.
+			HunterStageEndedHardmode: "[Jeu du chasseur] Le Mur de chair est tombé. Cette partie pré-Hardmode est terminée."
+			HunterStageEndedPlantera: "[Jeu du chasseur] Plantera est tombée. Cette partie est terminée."
+			HunterStagePreHardmode: Traque pré-Hardmode
+			HunterStageEarlyHardmode: Traque Hardmode initiale
+			HunterStageUnavailable: Aucune phase disponible
+			HunterStageStatus: Phase de jeu : {0}
 			HunterSpawned: "[Avertissement] Le joueur hostile {0} s'est infiltré dans votre monde !"
 			HunterDefeated: "[Annonce] Le joueur hostile {0} a été vaincu ! Il reviendra dans 60 secondes avec un nouvel équipement..."
 			HunterRespawned: "[Avertissement] Le joueur hostile {0} est revenu et reprend la traque !"
 			HunterSingleplayerOnly: Le mode Traque n'est disponible qu'en solo pour le moment.
-			Diagnostics: Diagnostic fantôme : {0}  Build {1}
+			ScaleSingleplayerOnly: La matrice de taille n'est disponible qu'en solo pour le moment.
+			ScaleNoSpace: Il n'y a pas assez de place ici pour la taille choisie.
+			ScalePanelTitle: ◆ Matrice de taille cristalline
+			ScalePanelCurrent: Choisi : {0:0.##}×　Actuel : {1:0.##}×
+			Diagnostics: Diagnostic fantôme : {0}  Version {1}
 			Enabled: Activé
 			Disabled: Désactivé
 			HunterResting: "[Alerte de traque] {0} se retire pour se reposer et réunir des provisions !"
@@ -126,8 +305,23 @@ Mods: {
 			HunterPanelHunting: · {0} : se rapproche pour vous abattre !
 			HunterRefresh: 🔄 Reconstruire et déployer l'escouade de chasseurs
 			HunterRefreshed: L'escouade de chasseurs a été reconstruite et redéployée !
+			BuilderModeSmartAssist: Assistance intelligente
+			BuilderModeBridge: Pont
+			BuilderModeShelter: Abri
+			BuilderModeArena: Arène de combat
+			BuilderModeRopeShaft: Puits de corde
+			BuilderModeChanged: Plan de construction → {0}
+			BuilderSmartEnabled: Assistance de construction activée. Posez normalement vos blocs et les compagnons prolongeront les motifs clairs.
+			BuilderSmartDisabled: Assistance de construction désactivée. Les travaux déjà planifiés sont conservés.
+			BuilderQueued: "{0} : {1} cases de construction planifiées. Les compagnons bâtiront dès que la zone sera sûre."
+			BuilderCancelled: "{0} cases de construction annulées."
+			BuilderInvalidTarget: Cette cible se trouve hors de la zone sûre du monde.
+			BuilderNeedPlatforms: Ce plan exige des plateformes non favorites dans le sac d'un compagnon actif ou votre inventaire.
+			BuilderNeedBlocks: Ce plan exige des blocs de construction solides non favoris dans le sac d'un compagnon actif ou votre inventaire.
+			BuilderNeedRope: Ce plan exige de la corde non favorite dans le sac d'un compagnon actif ou votre inventaire.
+			BuilderNothingToBuild: Toutes les cases sont déjà occupées ou planifiées ; rien n'a été modifié.
 		}
 
-		// NPCs.DamageTestDummyNPC.DisplayName: Damage Test Dummy N P C
+		NPCs.DamageTestDummyNPC.DisplayName: Mannequin de test de dégâts
 	}
 }

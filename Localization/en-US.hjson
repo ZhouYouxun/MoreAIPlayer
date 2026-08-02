@@ -8,11 +8,31 @@ Mods: {
 		Configs: {
 			MoreAIPlayerClientConfig: {
 				DisplayName: Phantom Companion Client Settings
-				Headers.CompanionDiagnostics: Companion Diagnostics
+
+				Headers: {
+					CompanionDiagnostics: Companion Diagnostics
+					CompanionBalance: Companion Balance & Survival
+					CompanionPickup: Companion World-Item Pickup
+				}
 
 				EnablePhantomPlayerDebugText: {
 					Label: "[i:GoldenKey] Enable Phantom Player Debug Text"
 					Tooltip: Shows the live development readout above phantom companions. Disabled by default.
+				}
+
+				CompanionsFightAfterOwnerDeath: {
+					Label: Companions fight after owner death
+					Tooltip: Enabled by default. If you die during a boss fight, your bound companions remain and keep fighting. Disable to dismiss all bound companions immediately when you die.
+				}
+
+				CompanionsTakeDamage: {
+					Label: Companions take damage
+					Tooltip: Enabled by default. Companions take normal damage and can die, then revive after their normal delay. Disable to make companions immune to all damage.
+				}
+
+				CompanionsAutoCollectWorldItems: {
+					Label: Companions automatically collect world items
+					Tooltip: Disabled by default. When off, companions do not scan, reserve, approach, or collect world drops. Enable only after confirming compatibility with your save and other mods.
 				}
 			}
 		}
@@ -35,7 +55,8 @@ Mods: {
 				Updates: I will keep updating it, improving companions, and fixing problems reported by players.
 				Compatibility: Popular weapons from large mods will receive one-to-one compatibility work over time.
 				Complexity: Similar-looking weapons can use very different code internally; some therefore need much more time to support safely. Thank you for your patience.
-				Tooltip: ""
+				ConfigSuggestion: Consider checking the configuration options.
+				Tooltip: Development status and configuration options.
 			}
 
 			CompanionDebugger: {
@@ -82,14 +103,156 @@ Mods: {
 				DisplayName: Hunter Book
 				Tooltip:
 					'''
-					Note: this item is still being tested and may have issues.
-					Left click: toggle Manhunt Mode. Hostile hunters will track you down.
-					Right click: open the Manhunt settings and choose 1 to 3 hunters.
-					Hunter gear scales with your world progression and defense. Manhunt Mode enables PvP while it is active.
-					Hunters pursue you for 2 minutes, then rest for 45 seconds before resuming the hunt.
-					Defeated hunters return with fresh gear after 60 seconds.
+					Left click: start or end Hunter Game. Hunters first assemble far away, then begin the pursuit.
+					Right click: choose 1 to 3 hunters and review the game state.
+					Available after any pre-Hardmode boss until the Wall of Flesh, or from Hardmode until Plantera. Defeating the Wall of Flesh or Plantera ends the current game.
+					Hunter kits are curated for the current stage only; they never scale from your defence. More hunters means weaker individuals.
+					A tracker near your character shows the approaching countdown and the nearest hunter's distance.
 					'''
 			}
+
+			CompanionBuilderBook: {
+				DisplayName: Architect's Tome
+				Tooltip:
+					'''
+					Right click: cycle through five construction plans. Left click: use the selected plan. Down + left click: cancel all queued work.
+					· Smart Assist: toggle continuous assistance. Companions learn your real blocks and walls, then extend short, clear patterns.
+					· Bridge: extend a continuous platform bridge from the ground or platform at your feet, up to 160 tiles toward the cursor.
+					· Shelter: build an 11 × 7 frame on the nearest ground below the cursor, with a three-tile doorway, walls and lights when supplies are available.
+					· Arena: build three 61-tile platform rows upward from the ground below the cursor, spaced ten tiles apart, with available lighting.
+					· Rope Shaft: run rope downward from your feet for up to 120 tiles and place supported lights along the route.
+					Builders take non-favourited materials from active companion backpacks first, then your inventory. Work pauses safely if supplies run out.
+					Companions never mine or replace blocks. Combat, rescue calls, waypoints and specialist modes always take priority. Single-player only.
+					'''
+			}
+
+			PlayerScaleBook: {
+				DisplayName: Crystal Matrix Tome
+				Tooltip:
+					'''
+					[For fun only. Do not take this seriously.]
+					Right-click to open the matrix and choose a scale.
+					After choosing, left-click to enlarge or shrink your player to that scale.
+					You can return to the original scale at any time.
+					'''
+			}
+		}
+
+		VanillaItemHints: {
+			LifeCrystal: "[Phantom Companion] No need to use this on a companion; companions directly mirror the player's maximum life."
+			ManaCrystal: "[Phantom Companion] No need to use this on a companion; companions directly mirror the player's maximum mana."
+		}
+
+		CompanionUI: {
+			DefaultName: Phantom Companion
+			InventoryTitle: "{0} · Equipment & Backpack"
+			Close: Close
+			Armor: Armor
+			Vanity: Vanity
+			Dye: Dye
+			Accessories: Accessories (progress-based; no Demon Heart needed)
+			HeadArmorOnly: Head armor only
+			BodyArmorOnly: Body armor only
+			LegArmorOnly: Leg armor only
+			HeadVanityOnly: Head vanity only
+			BodyVanityOnly: Body vanity only
+			LegVanityOnly: Leg vanity only
+			DyeOnly: Dyes only
+			AccessoryOnly: Accessories only
+			WeaponBar: Weapon bar   Blue=guard  Gray=pickaxe  Yellow=summon
+			WeaponPriority: The middle 7 slots are regular weapons; priority is left → right
+			GuardWeaponOnly: Guard slot: any weapon except pickaxes, axes, and hammers
+			PickaxeOnly: Pickaxe slot: pure pickaxes only; multi-tools are not accepted
+			SummonWeaponOnly: Summon slot: summon or sentry staffs only; whips do not count
+			WeaponOnly: Weapons (including summon weapons), pickaxes, axes, or hammers only
+			RightClick: Right
+			LeftClick: Left
+			DecisionStealth: Decision: Stealth
+			DecisionNormal: Decision: Normal
+			Ammo: Ammo (first 4 slots take priority; last 2 are extensions)
+			AmmoOnly: Arrows, bullets, and other ammunition only
+			Tools: Net / Rod / Hook / Mount
+			NetOnly: Bug Net, Lavaproof Bug Net, or Golden Bug Net only
+			RodOnly: Fishing rods only
+			HookOnly: Grappling hooks only
+			MountOnly: Mount-summoning items only
+			Backpack: Backpack
+			WaitingForTarget: Waiting for target
+			GuardSlotWeapon: Guard · {0}
+			SummonSlotWeapon: Summon · {0}
+			NumberedSlotWeapon: Slot {0} · {1}
+			NoRotationWeapon: Warning: slots 3–9 have no regular weapon; using a reserved slot as fallback
+			ModeFallback: "{0} (fell back from {1}: {2})"
+			StatsMode: Mode: {0}
+			StatsWeapon: Auto-selected: {0}
+			StatsState: State: {0}
+			StatsAvoidance: Avoidance: {0}  Threats: {1}  Risk: {2:0}
+			StatsLife: Life: {0}/{1}  Defense: {2}
+			StatsDamage: Melee: ×{0:0.00}  Ranged: ×{1:0.00}  Magic: ×{2:0.00}
+			AccessorySlotSixLocked: Slot 6: unlocks after Wall of Flesh in Expert; available by default in Master
+			AccessorySlotSevenLocked: Slot 7: unlocks after Wall of Flesh in Master
+			AccessorySlotLocked: This accessory slot is unavailable in the current world
+			AttackNoTarget: No target
+			AttackNoWeapon: No weapon selected (check the weapon bar)
+			AttackModeSuppressed: Current mode is not fighting
+			AttackHoldLeashed: Holding position; target is beyond guard range
+			AttackApproaching: Approaching target
+			AttackNoLineOfSight: Terrain blocks line of sight
+			AttackStealthCharging: Waiting for stealth to recharge
+			AttackUseAlreadySpent: Another action used this frame's item use
+			AttackAnimationBusy: Previous swing has not finished
+			AttackAttacking: Attacking
+			ModeAttack: Attack
+			ModeEscort: Escort
+			ModeGarrison: Garrison
+			ModeCatch: Catching
+			ModeFishing: Fishing
+			ModeMining: Mining
+			ModeAttackDescription: Roam freely and seek enemies
+			ModeEscortDescription: Stay close and answer threats near the owner
+			ModeGarrisonDescription: Hold this position and return if knocked away
+			ModeCatchDescription: Prioritize catching critters without hurting them
+			ModeFishingDescription: Fish nearby while staying in place
+			ModeMiningDescription: Dig with the owner, mine ore, and provide light
+			ModeCatchRequirement: Requires a net in the net slot
+			ModeFishingRequirement: Requires a fishing rod in the rod slot
+			ModeMiningRequirement: Requires a pickaxe in slot 2
+			AvoidNoThreat: No threat detected
+			AvoidReacting: Reacting
+			AvoidHolding: Holding position
+			AvoidGrappleRelease: Releasing grapple with momentum
+			DirectionUp: above
+			DirectionDown: below
+			DirectionLeft: left
+			DirectionRight: right
+			AvoidRun: Run {0}
+			AvoidJump: Jump {0}
+			AvoidDrop: Drop {0}
+			AvoidDash: Dash {0}
+			AvoidGrapple: Grapple {0}
+			ManagerTitle: Phantom Companion Manager
+			ManagerInstructions: Left-click card: open backpack · Right-click: dismiss · Click outside to close
+			ManagerEmpty: No phantom companions · Left-click the book to summon one
+			DismissAll: Dismiss All
+			OnlineCount: Online companions: {0}
+			ModeUnavailable: "{0}: cannot switch to {1} — {2}"
+			ModeChanged: Phantom companion mode → {0} ({1})
+			BuildLoaded: "[MoreAIPlayer] Loaded · Build {0}"
+			DiagnosticsItemCheckTaken: ItemCheck takeover ✓ ({0})
+			DiagnosticsItemCheckMissing: ItemCheck not taken over ✗ ({0})
+			DiagnosticsModeNone: Mode —
+			DiagnosticsMode: Mode {0}
+			DiagnosticsAim: Aim offset {0},{1}
+			DiagnosticsPathOk: Path self-check OK
+			DiagnosticsRecovery: Recovered ItemCheck {0} · slot {1} · aim {2} · consecutive misses {3}
+			DiagnosticsOwnership: Projectile ownership fixes {0} · context leak fixes {1}
+			RightClickOpen: "{0} · Right-click to open equipment and backpack"
+			HunterTrackerTitle: Hunter Game · {0}
+			HunterTrackerPreparing: Hunters assembling in the distance · {0}s
+			HunterTrackerNearest: Nearest hunter: {0} tiles
+			HunterTrackerResting: Nearest hunter resting: {0} tiles
+			HunterTrackerReviving: Nearest hunter regrouping: {0}s
+			HunterTrackerSearching: Searching for hunter signals...
 		}
 
 		CompanionCommand: {
@@ -100,14 +263,35 @@ Mods: {
 			NoCompanion: You have no companions summoned.
 			SingleplayerOnly: Phantom companions are single-player only for now.
 			Reviving: "{0} reviving {1}s"
+			QuickAccess: "{0} · Click to open equipment and backpack"
+			LootBrag: Look what I found!
+			DumpAll: Drop All
+			TransferAll: Transfer All
 			NoFreeSlot: No free player slot is available for a phantom companion.
 			MinionSlotsFull: Not enough minion slots to summon a phantom companion.
-			HunterModeEnabled: "[Manhunt Mode] enabled! Hostile hunters are tracking your trail..."
-			HunterModeDisabled: "[Manhunt Mode] disabled. The alert is over."
+			HunterNameAlpha: Hunter · Alpha
+			HunterNameBravo: Hunter · Bravo
+			HunterNameCharlie: Hunter · Charlie
+			HunterNameFallback: Hunter #{0}
+			HunterModeEnabled: "[Hunter Game] {0} started. Hunters are assembling in the distance..."
+			HunterModeDisabled: "[Hunter Game] ended. The alert is over."
+			HunterRestarting: "[Hunter Game] The next wave is assembling in the distance..."
+			HunterRequiresBoss: Hunter Game is locked until you defeat any boss in pre-Hardmode.
+			HunterUnavailablePostPlantera: Hunter Game ends after Plantera and cannot be started in this world stage.
+			HunterStageEndedHardmode: "[Hunter Game] The Wall of Flesh has fallen. This pre-Hardmode game has ended."
+			HunterStageEndedPlantera: "[Hunter Game] Plantera has fallen. This game has ended."
+			HunterStagePreHardmode: Pre-Hardmode Hunt
+			HunterStageEarlyHardmode: Early Hardmode Hunt
+			HunterStageUnavailable: No eligible stage
+			HunterStageStatus: Game stage: {0}
 			HunterSpawned: "[Warning] Hostile player {0} has infiltrated your world!"
 			HunterDefeated: "[Broadcast] Hostile player {0} was defeated! They will return with a fresh loadout in 60 seconds..."
 			HunterRespawned: "[Warning] Hostile player {0} has returned and resumed the chase!"
 			HunterSingleplayerOnly: Manhunt Mode is single-player only for now.
+			ScaleSingleplayerOnly: The size matrix is single-player only for now.
+			ScaleNoSpace: There is not enough room here for the selected size.
+			ScalePanelTitle: ◆ Crystal Size Matrix
+			ScalePanelCurrent: Selected: {0:0.##}×  Current: {1:0.##}×
 			Diagnostics: Phantom diagnostics: {0}  Build {1}
 			Enabled: On
 			Disabled: Off
@@ -126,6 +310,21 @@ Mods: {
 			HunterPanelHunting: · {0}: closing in for the kill!
 			HunterRefresh: 🔄 Rebuild and deploy the hunter squad
 			HunterRefreshed: Hunter squad rebuilt and redeployed!
+			BuilderModeSmartAssist: Smart Assist
+			BuilderModeBridge: Bridge
+			BuilderModeShelter: Shelter
+			BuilderModeArena: Battle Arena
+			BuilderModeRopeShaft: Rope Shaft
+			BuilderModeChanged: Construction plan → {0}
+			BuilderSmartEnabled: Smart construction assistance enabled. Place blocks normally and your companions will extend clear patterns.
+			BuilderSmartDisabled: Smart construction assistance disabled. Existing queued work is unchanged.
+			BuilderQueued: "{0}: {1} construction cells queued. Companions will build when it is safe."
+			BuilderCancelled: Cancelled {0} queued construction cells.
+			BuilderInvalidTarget: That construction target is outside the safe world area.
+			BuilderNeedPlatforms: This plan needs non-favourited platforms in an active companion backpack or your inventory.
+			BuilderNeedBlocks: This plan needs non-favourited solid building blocks in an active companion backpack or your inventory.
+			BuilderNeedRope: This plan needs non-favourited rope in an active companion backpack or your inventory.
+			BuilderNothingToBuild: Every target cell is already occupied or already queued; nothing was changed.
 		}
 
 		NPCs.DamageTestDummyNPC.DisplayName: Damage Test Dummy N P C

@@ -1,6 +1,8 @@
 using System.Collections.Generic;
 using Microsoft.Xna.Framework;
 using Terraria;
+using Terraria.ID;
+using Terraria.ModLoader;
 
 namespace MoreAIPlayer.Companion.AI;
 
@@ -48,6 +50,8 @@ public sealed class CompanionNavigator
     public void Navigate(Player me, Vector2 goalWorld)
     {
         Vector2 toGoal = goalWorld - me.Center;
+        if (System.Math.Abs(toGoal.X) > 12f)
+            TryOpenDoorAhead(me, System.Math.Sign(toGoal.X));
 
         // Close targets never need a path.
         if (System.Math.Abs(toGoal.X) < 48f && System.Math.Abs(toGoal.Y) < 56f)
@@ -151,6 +155,7 @@ public sealed class CompanionNavigator
         }
 
         ApplyJumpControls(me, needUp);
+        TryOpenDoorForCurrentMovement(me);
     }
 
     private void DirectSteer(Player me, Vector2 goalWorld)
@@ -176,6 +181,96 @@ public sealed class CompanionNavigator
         }
 
         ApplyJumpControls(me, needUp);
+        TryOpenDoorForCurrentMovement(me);
+    }
+
+    private static void TryOpenDoorForCurrentMovement(Player me)
+    {
+        int direction = me.controlRight && !me.controlLeft ? 1
+            : me.controlLeft && !me.controlRight ? -1
+            : 0;
+        if (direction != 0)
+            TryOpenDoorAhead(me, direction);
+    }
+
+    /// <summary>
+    /// Opens only doors immediately in the companion's walking corridor. Trying the movement
+    /// direction first makes the door swing away from the companion; the opposite direction
+    /// is the vanilla fallback when furniture or another entity blocks that side.
+    /// </summary>
+    private static bool TryOpenDoorAhead(Player me, int direction)
+    {
+        // Never let a multiplayer client change tiles optimistically. Companions are currently
+        // singleplayer-only, but keeping the mutation authority-safe here prevents this helper
+        // becoming a desync source if server-hosted companions are added later.
+        if (direction == 0 || Main.netMode == NetmodeID.MultiplayerClient)
+            return false;
+
+        float frontX = direction > 0 ? me.Right.X : me.Left.X;
+        int topRow = (int)((me.Top.Y + 2f) / 16f);
+        int bottomRow = (int)((me.Bottom.Y - 2f) / 16f);
+
+        // Three tiles is close enough to feel like ordinary player auto-door opening, while
+        // preventing a companion from opening every door merely visible along its route.
+        for (int tileDistance = 0; tileDistance <= 2; tileDistance++)
+        {
+            int tileX = (int)((frontX + direction * (4f + tileDistance * 16f)) / 16f);
+            for (int tileY = topRow; tileY <= bottomRow; tileY++)
+            {
+                if (!WorldGen.InWorld(tileX, tileY, 2))
+                    continue;
+
+                Tile tile = Main.tile[tileX, tileY];
+                if (!tile.HasTile || tile.IsActuated)
+                    continue;
+
+                if (TileLoader.OpenDoorID(tile) >= 0)
+                {
+                    int openedDirection = direction;
+                    bool opened = WorldGen.OpenDoor(tileX, tileY, openedDirection);
+                    if (!opened)
+                    {
+                        openedDirection = -direction;
+                        opened = WorldGen.OpenDoor(tileX, tileY, openedDirection);
+                    }
+
+                    if (opened)
+                    {
+                        if (Main.netMode == NetmodeID.Server)
+                        {
+                            NetMessage.SendData(
+                                MessageID.ToggleDoorState,
+                                -1,
+                                -1,
+                                null,
+                                0,
+                                tileX,
+                                tileY,
+                                openedDirection);
+                        }
+                        return true;
+                    }
+                }
+                else if (tile.TileType == TileID.TallGateClosed &&
+                    WorldGen.ShiftTallGate(tileX, tileY, closing: false))
+                {
+                    if (Main.netMode == NetmodeID.Server)
+                    {
+                        NetMessage.SendData(
+                            MessageID.ToggleDoorState,
+                            -1,
+                            -1,
+                            null,
+                            4,
+                            tileX,
+                            tileY);
+                    }
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 
     private void ApplyJumpControls(Player me, bool needUp)

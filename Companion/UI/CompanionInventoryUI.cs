@@ -1,6 +1,9 @@
 using Microsoft.Xna.Framework;
 using Terraria;
+using Terraria.Audio;
 using Terraria.GameContent.UI.Elements;
+using Terraria.ID;
+using Terraria.Localization;
 using Terraria.ModLoader;
 using Terraria.UI;
 
@@ -13,38 +16,45 @@ public sealed class CompanionInventoryUI : UIState
     // separated by GroupGap, which is what actually communicates the structure.
     private const float SlotStep = 56f;
     private const float Margin = 18f;
-    private const float LabelGap = 20f;   // label baseline to the top of the slots it names
-    private const float GroupGap = 28f;   // bottom of a group to the next group's label
+    private const float LabelGap = 18f;   // label baseline to the top of the slots it names
+    private const float GroupGap = 18f;   // bottom of a group to the next group's label
     private const float ColumnTwo = 210f; // right-hand column, clear of the 3-wide equip block
 
     private readonly CompanionProfile data;
     private readonly int companionSlot;
+    private readonly Vector2? initialPanelPosition;
+    private DraggableUIPanel panel = null!;
     private UIText statsText = null!;
 
-    public CompanionInventoryUI(CompanionProfile data, int companionSlot)
+    public CompanionInventoryUI(CompanionProfile data, int companionSlot, Vector2? initialPanelPosition = null)
     {
         this.data = data;
         this.companionSlot = companionSlot;
+        this.initialPanelPosition = initialPanelPosition;
     }
+
+    public Vector2? PanelPosition => panel is null ? null : panel.Position;
 
     public override void OnInitialize()
     {
-        DraggableUIPanel panel = new();
+        panel = new DraggableUIPanel();
         panel.Width.Set(630f, 0f);
         panel.Height.Set(752f, 0f);
         panel.HAlign = 0.5f;
         panel.VAlign = 0.5f;
+        if (initialPanelPosition is Vector2 position)
+            panel.SetPosition(position);
         panel.BackgroundColor = new Color(23, 31, 54, 238);
         panel.BorderColor = new Color(86, 162, 210, 255);
         Append(panel);
 
-        string companionName = string.IsNullOrWhiteSpace(data.Name) ? "幻影伙伴" : data.Name;
-        UIText title = new($"{companionName} · 装备与背包", 1.05f, true);
+        string companionName = string.IsNullOrWhiteSpace(data.Name) ? T("DefaultName") : data.Name;
+        UIText title = new(T("InventoryTitle", companionName), 1.05f, true);
         title.Left.Set(18f, 0f);
         title.Top.Set(12f, 0f);
         panel.Append(title);
 
-        UITextPanel<string> closeButton = new("关闭", 0.8f, false);
+        UITextPanel<string> closeButton = new(T("Close"), 0.8f, false);
         closeButton.Width.Set(64f, 0f);
         closeButton.Height.Set(30f, 0f);
         closeButton.Left.Set(-76f, 1f);
@@ -56,38 +66,40 @@ public sealed class CompanionInventoryUI : UIState
         const float equipLabelY = 50f;
         const float equipTopY = equipLabelY + LabelGap;
 
-        AddLabel(panel, "盔甲", Margin, equipLabelY);
+        AddLabel(panel, T("Armor"), Margin, equipLabelY);
         AddVerticalSlots(panel, data.Armor, Margin, equipTopY,
-            (CompanionSlotRules.IsHeadArmor, "这里只能放头部盔甲"),
-            (CompanionSlotRules.IsBodyArmor, "这里只能放身体盔甲"),
-            (CompanionSlotRules.IsLegArmor, "这里只能放腿部盔甲"));
+            (CompanionSlotRules.IsHeadArmor, T("HeadArmorOnly")),
+            (CompanionSlotRules.IsBodyArmor, T("BodyArmorOnly")),
+            (CompanionSlotRules.IsLegArmor, T("LegArmorOnly")));
 
-        AddLabel(panel, "时装", Margin + SlotStep, equipLabelY);
+        AddLabel(panel, T("Vanity"), Margin + SlotStep, equipLabelY);
         AddVerticalSlots(panel, data.Vanity, Margin + SlotStep, equipTopY,
-            (CompanionSlotRules.IsHeadArmor, "这里只能放头部时装"),
-            (CompanionSlotRules.IsBodyArmor, "这里只能放身体时装"),
-            (CompanionSlotRules.IsLegArmor, "这里只能放腿部时装"));
+            (CompanionSlotRules.IsHeadArmor, T("HeadVanityOnly")),
+            (CompanionSlotRules.IsBodyArmor, T("BodyVanityOnly")),
+            (CompanionSlotRules.IsLegArmor, T("LegVanityOnly")));
 
-        AddLabel(panel, "染料", Margin + SlotStep * 2f, equipLabelY);
+        AddLabel(panel, T("Dye"), Margin + SlotStep * 2f, equipLabelY);
         for (int i = 0; i < data.Dyes.Length; i++)
         {
-            panel.Append(CreateSlot(data.Dyes, i, CompanionSlotRules.IsDye, "这里只能放染料",
+            panel.Append(CreateSlot(data.Dyes, i, CompanionSlotRules.IsDye, T("DyeOnly"),
                 Margin + SlotStep * 2f, equipTopY + i * SlotStep));
         }
 
-        AddLabel(panel, "饰品（栏位随难度与肉山进度自动解锁，无需恶魔之心）", ColumnTwo, equipLabelY);
+        AddLabel(panel, T("Accessories"), ColumnTwo, equipLabelY);
         for (int i = 0; i < data.Accessories.Length; i++)
         {
             int capturedIndex = i;
             panel.Append(CreateSlot(
-                data.Accessories, i, CompanionSlotRules.IsAccessory, "这里只能放饰品",
+                data.Accessories, i, CompanionSlotRules.IsAccessory, T("AccessoryOnly"),
                 ColumnTwo + i * SlotStep, equipTopY,
                 isLocked: () => capturedIndex >= CompanionSlotRules.UnlockedAccessorySlots(),
                 lockedText: AccessoryLockReason(capturedIndex)));
         }
 
         // Tucked under the accessory row, filling the space beside the three equip columns.
-        statsText = new UIText(string.Empty, 0.82f);
+        // Non-Chinese status labels are naturally wider; this scale keeps the six live rows
+        // inside the accessory-side column without changing the panel's low-resolution fit.
+        statsText = new UIText(string.Empty, 0.76f);
         statsText.Left.Set(ColumnTwo, 0f);
         statsText.Top.Set(equipTopY + SlotStep + 12f, 0f);
         panel.Append(statsText);
@@ -97,8 +109,8 @@ public sealed class CompanionInventoryUI : UIState
         const float weaponLabelY = equipBottomY + GroupGap;
         const float weaponTopY = weaponLabelY + LabelGap + 18f; // two label lines
 
-        AddLabel(panel, "武器栏　　蓝＝防身位　灰＝镐位　黄＝召唤位", Margin, weaponLabelY);
-        AddLabel(panel, "中间 7 格为普通武器，优先级：左 → 右", Margin, weaponLabelY + 18f);
+        AddLabel(panel, T("WeaponBar"), Margin, weaponLabelY);
+        AddLabel(panel, T("WeaponPriority"), Margin, weaponLabelY + 18f);
         for (int i = 0; i < CompanionPlayer.HotbarSize; i++)
         {
             int capturedIndex = i;
@@ -110,10 +122,10 @@ public sealed class CompanionInventoryUI : UIState
                 : isPickSlot ? CompanionSlotRules.IsPickaxe
                 : isSummonSlot ? CompanionSlotRules.IsSummonWeapon
                 : CompanionSlotRules.IsAllowedWeapon;
-            string rejection = isGuardSlot ? "防身位：可放任意武器（镐、斧、锤除外）"
-                : isPickSlot ? "镐位：只能放镐（兼具斧或锤的多功能工具不收）"
-                : isSummonSlot ? "召唤位：只能放召唤杖或哨兵杖（鞭子不算）"
-                : "这里可放武器（含召唤武器）、镐、斧或锤";
+            string rejection = isGuardSlot ? T("GuardWeaponOnly")
+                : isPickSlot ? T("PickaxeOnly")
+                : isSummonSlot ? T("SummonWeaponOnly")
+                : T("WeaponOnly");
             Color? accent = isGuardSlot ? CompanionItemSlot.GuardAccent
                 : isPickSlot ? CompanionItemSlot.PickAccent
                 : isSummonSlot ? CompanionItemSlot.SummonAccent
@@ -134,7 +146,7 @@ public sealed class CompanionInventoryUI : UIState
             // both a left and a right click and is not covered by a scripted special case.
             CompanionToggleButton altToggle = new(
                 isVisible: () => CompanionWeaponOverrides.HasConfigurableAltUse(data.Hotbar[capturedIndex]),
-                getLabel: () => data.PrefersAltUse(data.Hotbar[capturedIndex]) ? "右键" : "左键",
+                getLabel: () => data.PrefersAltUse(data.Hotbar[capturedIndex]) ? T("RightClick") : T("LeftClick"),
                 onToggle: () => data.TogglePrefersAltUse(data.Hotbar[capturedIndex]),
                 width: CompanionItemSlot.SlotSize,
                 height: 22f,
@@ -152,7 +164,7 @@ public sealed class CompanionInventoryUI : UIState
                 return companion is not null &&
                        CompanionModBridge.TryGetRogueStealth(companion.Entity, out _, out float max) && max > 0f;
             },
-            getLabel: () => data.RogueStealthWait ? "决策：潜伏" : "决策：普攻",
+            getLabel: () => data.RogueStealthWait ? T("DecisionStealth") : T("DecisionNormal"),
             onToggle: () => data.RogueStealthWait = !data.RogueStealthWait,
             width: 132f,
             height: 30f,
@@ -167,27 +179,31 @@ public sealed class CompanionInventoryUI : UIState
         const float ammoLabelY = weaponBottomY + GroupGap;
         const float ammoTopY = ammoLabelY + LabelGap;
 
-        AddLabel(panel, "弹药（前 4 格优先，后 2 格为扩展位）", Margin, ammoLabelY);
+        AddLabel(panel, T("Ammo"), Margin, ammoLabelY);
         for (int i = 0; i < data.Ammo.Length; i++)
         {
             panel.Append(CreateSlot(data.Ammo, i, CompanionSlotRules.IsAmmo,
-                "这里只能放箭、子弹等弹药", Margin + i * SlotStep, ammoTopY));
+                T("AmmoOnly"), Margin + i * SlotStep, ammoTopY));
         }
 
-        // Set apart from the ammo row by a full slot of empty space: these are tool slots that
-        // gate whole modes, not more ammo.
-        float toolColumn = Margin + (data.Ammo.Length + 1) * SlotStep;
-        AddLabel(panel, "捕虫网 / 鱼竿", toolColumn, ammoLabelY);
+        // A half-slot seam separates tools from ammo while leaving room for all four dedicated
+        // mobility/utility slots inside the panel.
+        float toolColumn = Margin + (data.Ammo.Length + 0.5f) * SlotStep;
+        AddLabel(panel, T("Tools"), toolColumn, ammoLabelY);
         panel.Append(CreateSlot(data.Net, 0, CompanionSlotRules.IsCatchingTool,
-            "这里只能放捕虫网、地狱捕虫网或金虫网", toolColumn, ammoTopY));
+            T("NetOnly"), toolColumn, ammoTopY));
         panel.Append(CreateSlot(data.Rod, 0, CompanionSlotRules.IsFishingPole,
-            "这里只能放钓鱼竿", toolColumn + SlotStep, ammoTopY));
+            T("RodOnly"), toolColumn + SlotStep, ammoTopY));
+        panel.Append(CreateSlot(data.Hook, 0, CompanionSlotRules.IsGrapplingHook,
+            T("HookOnly"), toolColumn + SlotStep * 2f, ammoTopY));
+        panel.Append(CreateSlot(data.Mount, 0, CompanionSlotRules.IsMount,
+            T("MountOnly"), toolColumn + SlotStep * 3f, ammoTopY));
 
         // ── Group 4: backpack ────────────────────────────────────────────────────────────
         const float backpackLabelY = ammoTopY + CompanionItemSlot.SlotSize + GroupGap;
         const float backpackTopY = backpackLabelY + LabelGap;
 
-        AddLabel(panel, "背包", Margin, backpackLabelY);
+        AddLabel(panel, T("Backpack"), Margin, backpackLabelY);
         for (int i = 0; i < data.Backpack.Length; i++)
         {
             int column = i % 10;
@@ -195,26 +211,66 @@ public sealed class CompanionInventoryUI : UIState
             panel.Append(CreateSlot(data.Backpack, i, CompanionSlotRules.AcceptAnything, string.Empty,
                 Margin + column * SlotStep, backpackTopY + row * SlotStep));
         }
+
+        const float actionWidth = 126f;
+        const float actionHeight = 28f;
+        const float actionGap = 8f;
+        const float backpackRows = 4f;
+        const float actionTopY = backpackTopY + backpackRows * SlotStep + 4f;
+
+        UITextPanel<string> dumpButton = new(
+            Language.GetTextValue("Mods.MoreAIPlayer.CompanionCommand.DumpAll"), 0.74f, false);
+        dumpButton.Width.Set(actionWidth, 0f);
+        dumpButton.Height.Set(actionHeight, 0f);
+        dumpButton.Left.Set(-Margin - actionWidth * 2f - actionGap, 1f);
+        dumpButton.Top.Set(actionTopY, 0f);
+        dumpButton.OnLeftClick += (_, _) =>
+        {
+            if (CompanionLootSystem.DumpBackpack(companionSlot, Main.LocalPlayer) > 0)
+                SoundEngine.PlaySound(SoundID.Grab);
+        };
+        panel.Append(dumpButton);
+
+        UITextPanel<string> transferButton = new(
+            Language.GetTextValue("Mods.MoreAIPlayer.CompanionCommand.TransferAll"), 0.74f, false);
+        transferButton.Width.Set(actionWidth, 0f);
+        transferButton.Height.Set(actionHeight, 0f);
+        transferButton.Left.Set(-Margin - actionWidth, 1f);
+        transferButton.Top.Set(actionTopY, 0f);
+        transferButton.OnLeftClick += (_, _) =>
+        {
+            if (CompanionLootSystem.TransferBackpack(companionSlot, Main.LocalPlayer) > 0)
+                SoundEngine.PlaySound(SoundID.Grab);
+        };
+        panel.Append(transferButton);
     }
 
     public override void Update(GameTime gameTime)
     {
+        // UserInterface.Update runs before vanilla's inventory layers are drawn. The panel must
+        // claim normal UI focus before those layers so a click cannot be used in the world or on
+        // a vanilla control behind it. Do not set Main.blockMouse here: it is a broader global
+        // input gate, and keeping it live over this whole panel makes vanilla skip its item-hover
+        // and transfer-feedback paths for an unpredictable number of later frames.
+        if (panel is not null && panel.ContainsPoint(Main.MouseScreen))
+            Main.LocalPlayer.mouseInterface = true;
+
         base.Update(gameTime);
 
         Item activeWeapon = data.ActiveWeapon;
         string weaponName = activeWeapon.IsAir
-            ? "等待目标"
+            ? T("WaitingForTarget")
             : data.ActiveWeaponSlot switch
             {
-                CompanionProfile.GuardSlot => $"防身位 · {activeWeapon.Name}",
-                CompanionProfile.SummonSlot => $"召唤位 · {activeWeapon.Name}",
-                _ => $"{data.ActiveWeaponSlot + 1} 号位 · {activeWeapon.Name}"
+                CompanionProfile.GuardSlot => T("GuardSlotWeapon", activeWeapon.Name),
+                CompanionProfile.SummonSlot => T("SummonSlotWeapon", activeWeapon.Name),
+                _ => T("NumberedSlotWeapon", data.ActiveWeaponSlot + 1, activeWeapon.Name)
             };
 
         // Surfaces the failure this panel used to hide: with every weapon parked in a reserved
         // slot the companion still fights (SelectWeapon falls back), but at the wrong priority.
         // Silence here is what let that state go unnoticed for so long.
-        string warning = HasRotationWeapon() ? string.Empty : "\n注意：3–9 号位没有普通武器，正在动用保留位应急";
+        string warning = HasRotationWeapon() ? string.Empty : "\n" + T("NoRotationWeapon");
 
         // The companion is a real player entity, so its stats come straight from the
         // vanilla equipment pipeline instead of a hand-rolled approximation.
@@ -233,19 +289,27 @@ public sealed class CompanionInventoryUI : UIState
             CompanionMode effective = CompanionModeRules.Effective(data);
             string modeLine = effective == data.Mode
                 ? CompanionModeRules.Name(effective)
-                : $"{CompanionModeRules.Name(effective)}（已从「{CompanionModeRules.Name(data.Mode)}」回退：{CompanionModeRules.RequirementText(data.Mode)}）";
+                : T("ModeFallback",
+                    CompanionModeRules.Name(effective),
+                    CompanionModeRules.Name(data.Mode),
+                    CompanionModeRules.RequirementText(data.Mode));
 
             statsText.SetText(
-                $"模式：{modeLine}\n" +
-                $"当前自动选择：{weaponName}\n" +
-                $"状态：{state}\n" +
-                $"生命：{entity.statLife}/{entity.statLifeMax2}  防御：{(int)entity.statDefense}\n" +
-                $"近战：×{entity.GetTotalDamage(DamageClass.Melee).ApplyTo(1f):0.00}  远程：×{entity.GetTotalDamage(DamageClass.Ranged).ApplyTo(1f):0.00}  魔法：×{entity.GetTotalDamage(DamageClass.Magic).ApplyTo(1f):0.00}" +
+                T("StatsMode", modeLine) + "\n" +
+                T("StatsWeapon", weaponName) + "\n" +
+                T("StatsState", state) + "\n" +
+                T("StatsAvoidance", companion.Brain.AvoidanceStateText,
+                    companion.Brain.VisibleThreats, companion.Brain.AvoidanceRisk) + "\n" +
+                T("StatsLife", entity.statLife, entity.statLifeMax2, (int)entity.statDefense) + "\n" +
+                T("StatsDamage",
+                    entity.GetTotalDamage(DamageClass.Melee).ApplyTo(1f),
+                    entity.GetTotalDamage(DamageClass.Ranged).ApplyTo(1f),
+                    entity.GetTotalDamage(DamageClass.Magic).ApplyTo(1f)) +
                 warning);
         }
         else
         {
-            statsText.SetText($"当前自动选择：{weaponName}{warning}");
+            statsText.SetText(T("StatsWeapon", weaponName) + warning);
         }
     }
 
@@ -264,10 +328,13 @@ public sealed class CompanionInventoryUI : UIState
     /// <summary>Explains why a given accessory slot is greyed out, in terms of what would unlock it.</summary>
     private static string AccessoryLockReason(int index) => index switch
     {
-        5 => "第 6 格：专家模式击败肉山后解锁；大师模式默认开启",
-        6 => "第 7 格：大师模式击败肉山后解锁",
-        _ => "该饰品位在当前世界不可用"
+        5 => T("AccessorySlotSixLocked"),
+        6 => T("AccessorySlotSevenLocked"),
+        _ => T("AccessorySlotLocked")
     };
+
+    private static string T(string key, params object[] args) =>
+        Language.GetTextValue($"Mods.MoreAIPlayer.CompanionUI.{key}", args);
 
     private static CompanionItemSlot CreateSlot(Item[] items, int index, System.Func<Item, bool> rule, string rejectionText, float left, float top,
         System.Func<bool> isHighlighted = null, Color? accentColor = null, System.Func<bool> isLocked = null, string lockedText = null)

@@ -5,6 +5,7 @@ using Terraria;
 using Terraria.Audio;
 using Terraria.GameContent;
 using Terraria.ID;
+using Terraria.Localization;
 using MoreAIPlayer.Companion.Content;
 
 namespace MoreAIPlayer.Companion.UI;
@@ -133,7 +134,10 @@ public static class CompanionModeWheel
             if (!CompanionModeRules.IsAvailable(chosen, profile))
             {
                 Main.NewText(
-                    $"{profile.Name}：无法切换到「{CompanionModeRules.Name(chosen)}」——{CompanionModeRules.RequirementText(chosen)}",
+                    T("ModeUnavailable",
+                        profile.Name,
+                        CompanionModeRules.Name(chosen),
+                        CompanionModeRules.RequirementText(chosen)),
                     255, 160, 120);
                 continue;
             }
@@ -147,9 +151,14 @@ public static class CompanionModeWheel
         // Also written to chat: the floating text is gone in a second, and a mode change that
         // leaves no record is one the player cannot later rule out as the cause of odd behaviour.
         Color tint = CompanionModeRules.Tint(chosen);
-        Main.NewText($"幻影伙伴模式 → {CompanionModeRules.Name(chosen)}（{CompanionModeRules.Description(chosen)}）", tint.R, tint.G, tint.B);
+        Main.NewText(T("ModeChanged",
+            CompanionModeRules.Name(chosen),
+            CompanionModeRules.Description(chosen)), tint.R, tint.G, tint.B);
         SoundEngine.PlaySound(SoundID.Item37 with { Volume = 0.6f });
     }
+
+    private static string T(string key, params object[] args) =>
+        Language.GetTextValue($"Mods.MoreAIPlayer.CompanionUI.{key}", args);
 
     private static int HoveredIndex()
     {
