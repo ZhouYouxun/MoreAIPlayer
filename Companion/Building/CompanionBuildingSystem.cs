@@ -82,7 +82,10 @@ public sealed class CompanionBuildingSystem : ModSystem
 
     public override void Unload() => States.Clear();
 
-    public override void PostUpdateWorld()
+    public override void PostUpdateWorld() =>
+        CompanionFaultGuard.Run("companion construction upkeep", PostUpdateWorldCore);
+
+    private static void PostUpdateWorldCore()
     {
         if (Main.netMode != NetmodeID.SinglePlayer)
         {

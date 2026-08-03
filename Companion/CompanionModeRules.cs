@@ -14,6 +14,7 @@ public static class CompanionModeRules
     public static readonly CompanionMode[] WheelOrder =
     [
         CompanionMode.Attack,
+        CompanionMode.FreeRoam,
         CompanionMode.Escort,
         CompanionMode.Garrison,
         CompanionMode.Catch,
@@ -23,6 +24,7 @@ public static class CompanionModeRules
 
     public static string Name(CompanionMode mode) => Text(mode switch
     {
+        CompanionMode.FreeRoam => "ModeFreeRoam",
         CompanionMode.Escort => "ModeEscort",
         CompanionMode.Garrison => "ModeGarrison",
         CompanionMode.Catch => "ModeCatch",
@@ -33,6 +35,7 @@ public static class CompanionModeRules
 
     public static string Description(CompanionMode mode) => Text(mode switch
     {
+        CompanionMode.FreeRoam => "ModeFreeRoamDescription",
         CompanionMode.Escort => "ModeEscortDescription",
         CompanionMode.Garrison => "ModeGarrisonDescription",
         CompanionMode.Catch => "ModeCatchDescription",
@@ -43,6 +46,7 @@ public static class CompanionModeRules
 
     public static Color Tint(CompanionMode mode) => mode switch
     {
+        CompanionMode.FreeRoam => new Color(180, 150, 255),
         CompanionMode.Escort => new Color(120, 190, 255),
         CompanionMode.Garrison => new Color(255, 215, 110),
         CompanionMode.Catch => new Color(140, 235, 150),

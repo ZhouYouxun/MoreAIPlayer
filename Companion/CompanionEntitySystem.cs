@@ -79,6 +79,23 @@ public sealed class CompanionEntitySystem : ModSystem
         return count;
     }
 
+    /// <summary>
+    /// This companion's stable position within its owner's squad (0-based), counting only active
+    /// squadmates in a lower slot. Together with <see cref="CountActiveOwnedBy"/> this lets the
+    /// follow behaviour fan companions out around the owner instead of stacking them on one point.
+    /// Stable because slots are stable; cheap because a squad is only ever a handful of entries.
+    /// </summary>
+    public static int SquadOrdinal(CompanionInstance self)
+    {
+        int ordinal = 0;
+        foreach (CompanionInstance instance in BySlot.Values)
+        {
+            if (instance.OwnerWhoAmI == self.OwnerWhoAmI && instance.Entity.active && instance.Slot < self.Slot)
+                ordinal++;
+        }
+        return ordinal;
+    }
+
     public override void Load()
     {
         // A dedicated server never hosts a companion (Summon is singleplayer-only), so the
@@ -416,18 +433,52 @@ public sealed class CompanionEntitySystem : ModSystem
             if (instance.TicksSinceItemCheck < int.MaxValue / 2)
                 instance.TicksSinceItemCheck++;
 
-            instance.BindProfile(owner, profile);
-            instance.Brain.Update(instance, owner, profile);
-            instance.AimWorld = SanitizeAim(instance.Entity, instance.AimWorld, instance);
-            CompanionModBridge.FeedMouseState(instance.Entity, instance.AimWorld, instance.WantsAltUse);
-            instance.ItemCheckPreparedFrame = Main.GameUpdateCount;
+            bool updated = CompanionFaultGuard.Run($"companion update #{slot}", () =>
+            {
+                instance.BindProfile(owner, profile);
+                instance.Brain.Update(instance, owner, profile);
+                instance.AimWorld = SanitizeAim(instance.Entity, instance.AimWorld, instance);
+                CompanionModBridge.FeedMouseState(instance.Entity, instance.AimWorld, instance.WantsAltUse);
+                instance.ItemCheckPreparedFrame = Main.GameUpdateCount;
+            });
+
+            if (updated)
+            {
+                instance.FaultStreak = 0;
+                continue;
+            }
+
+            // Do not let a faulting decision leave its last held input alive for another tick.
+            // Five isolated failures retire only this companion; the rest of the squad and the
+            // real player continue as normal.
+            HaltSyntheticInput(instance.Entity);
+            instance.FaultStreak++;
+            if (instance.FaultStreak >= CompanionInstance.MaxFaultStreak)
+                (expired ??= []).Add(slot);
         }
 
         if (expired is not null)
         {
             foreach (int slot in expired)
+            {
+                if (BySlot.TryGetValue(slot, out CompanionInstance retiring) &&
+                    retiring.FaultStreak >= CompanionInstance.MaxFaultStreak)
+                {
+                    CompanionFaultGuard.AnnounceRetired("CompanionDisabled");
+                }
                 Dismiss(slot);
+            }
         }
+    }
+
+    private static void HaltSyntheticInput(Player player)
+    {
+        player.controlUseItem = false;
+        player.controlUseTile = false;
+        player.controlHook = false;
+        player.channel = false;
+        player.releaseUseItem = true;
+        player.releaseUseTile = true;
     }
 
     public override void PostUpdatePlayers()
@@ -496,6 +547,12 @@ public sealed class CompanionEntitySystem : ModSystem
                 hitbox.Inflate(18, 12);
                 if (!hitbox.Contains(Main.MouseWorld.ToPoint()))
                     continue;
+
+                // Right-click open is opt-in. When disabled the backpack is reachable only
+                // through the top-of-screen matrix panel, and hovering a companion advertises
+                // nothing clickable.
+                if (MoreAIPlayerClientConfig.Instance?.AllowRightClickOpenBackpack != true)
+                    break;
 
                 HoveredSlot = slot;
                 if (freshRightPress || Main.mouseRight && Main.mouseRightRelease)
@@ -578,9 +635,27 @@ public sealed class CompanionEntitySystem : ModSystem
         if (wantsAltUse)
             self.altFunctionUse = 1;
 
-        using VirtualPlayerExecutionContext.Scope scope = VirtualPlayerExecutionContext.Enter(
-            self, aimWorld, wantsUseItem, wantsAltUse, instance?.WorkTile);
-        orig(self);
+        if (!CompanionFaultGuard.IsAvailable(CompanionFaultGuard.VirtualItemCheckLane))
+        {
+            HaltSyntheticInput(self);
+            return;
+        }
+
+        try
+        {
+            using VirtualPlayerExecutionContext.Scope scope = VirtualPlayerExecutionContext.Enter(
+                self, aimWorld, wantsUseItem, wantsAltUse, instance?.WorkTile);
+            orig(self);
+        }
+        catch (Exception exception)
+        {
+            HaltSyntheticInput(self);
+            CompanionFaultGuard.Trip(CompanionFaultGuard.VirtualItemCheckLane, exception);
+        }
+        finally
+        {
+            RestoreHijackedLocalPlayer();
+        }
     }
 
     private static void Projectile_Update(OrigProjectileUpdate orig, Projectile projectile, int index)
@@ -616,9 +691,29 @@ public sealed class CompanionEntitySystem : ModSystem
             return;
         }
 
-        using VirtualPlayerExecutionContext.Scope scope = VirtualPlayerExecutionContext.Enter(
-            virtualOwner, aimWorld, wantsUseItem, wantsAltUse);
-        orig(projectile, index);
+        if (!CompanionFaultGuard.IsAvailable(CompanionFaultGuard.VirtualProjectileLane))
+        {
+            projectile.active = false;
+            return;
+        }
+
+        try
+        {
+            using VirtualPlayerExecutionContext.Scope scope = VirtualPlayerExecutionContext.Enter(
+                virtualOwner, aimWorld, wantsUseItem, wantsAltUse);
+            orig(projectile, index);
+        }
+        catch (Exception exception)
+        {
+            // Avoid Kill(): it dispatches arbitrary projectile hooks again. Marking inactive
+            // keeps a broken virtual-owned projectile from re-entering update next frame.
+            projectile.active = false;
+            CompanionFaultGuard.Trip(CompanionFaultGuard.VirtualProjectileLane, exception);
+        }
+        finally
+        {
+            RestoreHijackedLocalPlayer();
+        }
     }
 
     // Last line of defense: if any code path still manages to leave Main.myPlayer pointing
@@ -687,6 +782,12 @@ public sealed class CompanionEntitySystem : ModSystem
     private void RunRecoveredItemCheck(Player player, Vector2 aimWorld, bool wantsUseItem,
         bool wantsAltUse, Point? workTile)
     {
+        if (!CompanionFaultGuard.IsAvailable(CompanionFaultGuard.VirtualItemCheckLane))
+        {
+            HaltSyntheticInput(player);
+            return;
+        }
+
         try
         {
             if (wantsAltUse && player.itemAnimation == 0)
@@ -701,9 +802,8 @@ public sealed class CompanionEntitySystem : ModSystem
         }
         catch (Exception exception)
         {
-            Mod.Logger.Error($"Recovered ItemCheck failed for synthetic player {player.whoAmI}", exception);
-            player.controlUseItem = false;
-            player.channel = false;
+            HaltSyntheticInput(player);
+            CompanionFaultGuard.Trip(CompanionFaultGuard.VirtualItemCheckLane, exception);
         }
         finally
         {
@@ -735,6 +835,7 @@ public sealed class CompanionEntitySystem : ModSystem
         leakedContextRecoveries = 0;
         projectileOwnerCorrections = 0;
         VirtualPlayerExecutionContext.Reset();
+        CompanionFaultGuard.Reset();
         if (!keepHookState)
             hooksInstalled = false;
     }

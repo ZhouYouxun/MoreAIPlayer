@@ -33,5 +33,11 @@ public enum CompanionMode
 
     /// <summary>挖矿: digs alongside the owner, harvests nearby ore and lights the tunnel.
     /// Still defends itself when something closes in. Requires a pickaxe in the pick slot.</summary>
-    Mining = 5
+    Mining = 5,
+
+    /// <summary>自由行动: roams the owner's vicinity on its own, wanders between random spots with
+    /// a bit of idle life, and proactively hunts any enemy inside a leash around the owner. Never
+    /// edits terrain (no digging, no placing). Not a posted mode — it still recalls to the owner
+    /// through the ordinary far-away / stuck / rescue teleport path if it drifts too far.</summary>
+    FreeRoam = 6
 }

@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using Microsoft.Xna.Framework;
 using Terraria;
@@ -359,6 +360,7 @@ public sealed class HunterSystem : ModSystem
         UpdateScheduledSpawns(localPlayer);
 
         List<int> conflictedSlots = null;
+        List<int> faultedSlots = null;
         foreach ((int slot, HunterInstance instance) in BySlot)
         {
             Player me = instance.Entity;
@@ -403,20 +405,75 @@ public sealed class HunterSystem : ModSystem
                 continue;
             }
 
-            instance.Brain.Update(instance, localPlayer);
-            instance.AimWorld = CompanionEntitySystem.SanitizeHunterAim(me, instance.AimWorld, instance);
-            CompanionModBridge.FeedMouseState(me, instance.AimWorld, instance.WantsAltUse);
-            instance.ItemCheckPreparedFrame = Main.GameUpdateCount;
+            bool updated = CompanionFaultGuard.Run($"hunter update #{slot}", () =>
+            {
+                instance.Brain.Update(instance, localPlayer);
+                instance.AimWorld = CompanionEntitySystem.SanitizeHunterAim(me, instance.AimWorld, instance);
+                CompanionModBridge.FeedMouseState(me, instance.AimWorld, instance.WantsAltUse);
+                instance.ItemCheckPreparedFrame = Main.GameUpdateCount;
+            });
+
+            if (updated)
+            {
+                instance.FaultStreak = 0;
+                continue;
+            }
+
+            HaltHunterInput(me);
+            instance.FaultStreak++;
+            if (instance.FaultStreak >= HunterInstance.MaxFaultStreak)
+                (faultedSlots ??= []).Add(slot);
         }
 
         if (conflictedSlots is not null)
         {
             foreach (int slot in conflictedSlots)
+                RetireHunter(slot, announceFault: false);
+        }
+
+        if (faultedSlots is not null)
+        {
+            foreach (int slot in faultedSlots)
+                RetireHunter(slot, announceFault: true);
+        }
+    }
+
+    private static void HaltHunterInput(Player player)
+    {
+        player.controlUseItem = false;
+        player.controlUseTile = false;
+        player.controlHook = false;
+        player.channel = false;
+        player.releaseUseItem = true;
+        player.releaseUseTile = true;
+    }
+
+    private static void RetireHunter(int slot, bool announceFault)
+    {
+        if (!BySlot.Remove(slot, out HunterInstance instance))
+            return;
+
+        try
+        {
+            CompanionEntitySystem.KillOwnedProjectiles(slot);
+        }
+        catch (Exception exception)
+        {
+            CompanionFaultGuard.Report($"hunter cleanup #{slot}", exception);
+        }
+        finally
+        {
+            HaltHunterInput(instance.Entity);
+            instance.Entity.active = false;
+            if (Main.player is not null && slot >= 0 && slot < Main.player.Length &&
+                ReferenceEquals(Main.player[slot], instance.Entity))
             {
-                if (BySlot.Remove(slot, out HunterInstance conflicted))
-                    conflicted.Entity.active = false;
+                Main.player[slot] = instance.OriginalPlayer;
             }
         }
+
+        if (announceFault)
+            CompanionFaultGuard.AnnounceRetired("HunterDisabled");
     }
 
     private static void ResetCorpseGibs(Player me)

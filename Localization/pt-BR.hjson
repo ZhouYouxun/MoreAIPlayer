@@ -5,6 +5,15 @@
 
 Mods: {
 	MoreAIPlayer: {
+		Fault: {
+			SubsystemError: "[Companheiro Fantasma] O subsistema {0} encontrou um erro interno e foi ignorado por enquanto. O jogo continua normalmente."
+			CompanionDisabled: "[Companheiro Fantasma] Um companheiro continuou falhando e foi removido com segurança para proteger o jogo."
+			HunterDisabled: "[Companheiro Fantasma] Um caçador continuou falhando e foi removido com segurança para proteger o jogo."
+			CircuitOpened: "[Companheiro Fantasma] {0} encontrou um erro e foi pausado nesta sessão do mundo. Os demais sistemas permanecem ativos."
+			CircuitStillOpen: "[Companheiro Fantasma] Uma operação arriscada permanece pausada após um erro. Recarregue o mundo antes de tentar de novo."
+			BackpackDropBlocked: "[Companheiro Fantasma] Esvaziar mochila vem desativado por padrão para proteger seu mundo. Ative nas configurações somente após verificar a compatibilidade."
+		}
+
 		Configs: {
 			MoreAIPlayerClientConfig: {
 				DisplayName: Configurações de cliente dos Companheiros Fantasmas
@@ -13,6 +22,7 @@ Mods: {
 					CompanionDiagnostics: Diagnóstico dos companheiros
 					CompanionBalance: Equilíbrio e sobrevivência dos companheiros
 					CompanionPickup: Coleta de itens do mundo pelos companheiros
+					CompanionSafety: Segurança dos companheiros
 				}
 
 				EnablePhantomPlayerDebugText: {
@@ -20,19 +30,34 @@ Mods: {
 					Tooltip: Mostra leituras de desenvolvimento em tempo real sobre os companheiros fantasma. Desativado por padrão.
 				}
 
+				ShowCompanionHealthBars: {
+					// Label: "[i:LifeCrystal] Show companion health bars"
+					// Tooltip: Disabled by default. Companions occupy real player slots, so the game already draws a health bar over them. Enable to also show the mod's own bar below each companion.
+				}
+
+				AllowRightClickOpenBackpack: {
+					// Label: "[i:Chest] Right-click a companion to open its backpack"
+					// Tooltip: Disabled by default. When off, right-clicking a companion does nothing and the backpack opens only through the matrix panel at the top of the screen. Enable to open it by right-clicking the companion.
+				}
+
 				CompanionsFightAfterOwnerDeath: {
-					Label: Companheiros lutam após a morte do jogador
+					Label: "[i:EnchantedSword] Companheiros lutam após a morte do jogador"
 					Tooltip: Ativado por padrão. Se você morrer durante um chefe, os companheiros vinculados permanecem e continuam lutando. Desative para dispensá-los imediatamente ao morrer.
 				}
 
 				CompanionsTakeDamage: {
-					Label: Companheiros recebem dano
+					Label: "[i:CobaltShield] Companheiros recebem dano"
 					Tooltip: Ativado por padrão. Companheiros recebem dano, podem morrer e revivem após o tempo normal. Desative para torná-los imunes a todo dano.
 				}
 
 				CompanionsAutoCollectWorldItems: {
-					Label: Companheiros coletam itens do mundo automaticamente
+					Label: "[i:TreasureMagnet] Companheiros coletam itens do mundo automaticamente"
 					Tooltip: Desativado por padrão. Quando desligado, os companheiros não examinam, reservam, perseguem nem coletam itens do mundo. Ative somente após confirmar a compatibilidade com seu mundo e outros mods.
+				}
+
+				CompanionsAllowBackpackWorldDrops: {
+					Label: "[i:TrashCan] Permitir que companheiros soltem itens da mochila no mundo"
+					Tooltip: Desativado por padrão. Esvaziar mochila cria itens no mundo e pode chamar hooks de outros mods. Ative somente após confirmar que o salvamento está estável.
 				}
 			}
 		}
@@ -57,6 +82,29 @@ Mods: {
 				Complexity: Armas de aparência semelhante podem usar mecanismos internos muito diferentes; por isso algumas precisam de muito mais tempo para receber suporte seguro. Agradeço a sua paciência.
 				ConfigSuggestion: Considere verificar as opções de configuração.
 				Tooltip: Informações sobre o desenvolvimento e as opções de configuração.
+			}
+
+			CompanionDevelopmentBook: {
+				DisplayName: Livro de desenvolvimento
+				Tooltip:
+					'''
+					Clique esquerdo para executar uma serie de testes de depuracao.
+					Os testes serao executados automaticamente.
+					-- Item de desenvolvedor --
+					'''
+				Started: Teste de desenvolvimento iniciado.
+				Stopped: Teste de desenvolvimento interrompido e limpo.
+				Completed: Teste de desenvolvimento concluido e limpo.
+				Failed: Teste de desenvolvimento interrompido; o companheiro temporario foi limpo.
+				StepSummon: "[DEV] Companheiro temporario invocado."
+				StepAttack: "[DEV] Alternado para o modo de ataque."
+				StepEscort: "[DEV] Alternado para o modo de escolta."
+				StepGarrison: "[DEV] Alternado para o modo de guarnicao."
+				StepCatch: "[DEV] Alternado para o modo de captura."
+				StepFishing: "[DEV] Alternado para o modo de pesca."
+				StepMining: "[DEV] Alternado para o modo de mineracao."
+				StepWaypoint: "[DEV] Ponto de rota definido."
+				StepBackpack: "[DEV] Item inserido na mochila."
 			}
 
 			CompanionDebugger: {

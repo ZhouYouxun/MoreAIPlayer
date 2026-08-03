@@ -82,7 +82,10 @@ public static class CompanionManagerPanel
     /// Persistent top-centre matrix. It gives every summoned companion a stable click target,
     /// so opening a loadout never depends on catching a moving character in the world.
     /// </summary>
-    public static void DrawQuickAccessBar()
+    public static void DrawQuickAccessBar() =>
+        CompanionFaultGuard.RunDraw("companion quick access bar", DrawQuickAccessBarCore);
+
+    private static void DrawQuickAccessBarCore()
     {
         if (Main.gameMenu || Main.dedServ || Main.netMode != NetmodeID.SinglePlayer ||
             Main.hideUI || Main.mapFullscreen)
@@ -175,8 +178,13 @@ public static class CompanionManagerPanel
         lastQuickHoveredSlot = hoveredSlot;
     }
 
-    /// <summary>Runs inside an interface layer (UI scale batch): draws the panel and handles clicks.</summary>
-    public static void DrawAndInteract()
+    /// <summary>Runs inside an interface layer (UI scale batch): draws the panel and handles clicks.
+    /// Fenced so a fault in panel drawing or click handling degrades to a missing panel for the
+    /// frame instead of aborting the shared HUD interface layer.</summary>
+    public static void DrawAndInteract() =>
+        CompanionFaultGuard.RunDraw("companion manager panel", DrawAndInteractCore);
+
+    private static void DrawAndInteractCore()
     {
         if (!open)
             return;

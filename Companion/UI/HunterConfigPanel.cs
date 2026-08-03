@@ -47,7 +47,10 @@ public static class HunterConfigPanel
         opacity = 0f;
     }
 
-    public static void DrawAndInteract()
+    public static void DrawAndInteract() =>
+        CompanionFaultGuard.RunDraw("hunter config panel", DrawAndInteractCore);
+
+    private static void DrawAndInteractCore()
     {
         if (!open)
             return;

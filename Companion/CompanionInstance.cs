@@ -63,6 +63,14 @@ public sealed class CompanionInstance
     /// <summary>Times another system replaced Main.player[Slot] and the inactive slot was reclaimed.</summary>
     public long SlotRepairs;
 
+    /// <summary>Consecutive ticks this companion's own per-tick update threw. A clean tick resets
+    /// it; reaching <see cref="MaxFaultStreak"/> retires the companion instead of letting it fault
+    /// forever, which is the minimal-damage fallback — remove the one broken thing, keep the game.</summary>
+    public int FaultStreak;
+
+    /// <summary>How many consecutive faulting ticks a companion is given before it is retired.</summary>
+    public const int MaxFaultStreak = 5;
+
     /// <summary>
     /// A "go here" marker placed by the command book. While set, the companion paths to it
     /// (particles mark the spot). The brain owns its lifetime: it clears on arrival, on the

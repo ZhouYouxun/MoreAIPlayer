@@ -5,6 +5,15 @@
 
 Mods: {
 	MoreAIPlayer: {
+		Fault: {
+			SubsystemError: "[Phantom-Begleiter] Das Teilsystem {0} hatte einen internen Fehler und wurde vorerst übersprungen. Das Spiel läuft weiter."
+			CompanionDisabled: "[Phantom-Begleiter] Ein Begleiter verursachte wiederholt Fehler und wurde zum Schutz des Spiels sicher entfernt."
+			HunterDisabled: "[Phantom-Begleiter] Ein Jäger verursachte wiederholt Fehler und wurde zum Schutz des Spiels sicher entfernt."
+			CircuitOpened: "[Phantom-Begleiter] {0} hatte einen Fehler und wurde für diese Weltsitzung pausiert. Andere Begleiterfunktionen bleiben aktiv."
+			CircuitStillOpen: "[Phantom-Begleiter] Eine riskante Begleiteraktion bleibt nach einem Fehler pausiert. Lade die Welt neu, bevor du es erneut versuchst."
+			BackpackDropBlocked: "[Phantom-Begleiter] Rucksack leeren ist zum Schutz des Spielstands standardmäßig deaktiviert. Aktiviere es erst nach einer Kompatibilitätsprüfung in den Einstellungen."
+		}
+
 		Configs: {
 			MoreAIPlayerClientConfig: {
 				DisplayName: Phantom-Begleiter Client-Einstellungen
@@ -13,6 +22,7 @@ Mods: {
 					CompanionDiagnostics: Begleiter-Diagnose
 					CompanionBalance: Begleiter-Balance und Überleben
 					CompanionPickup: Weltgegenstände der Begleiter
+					CompanionSafety: Begleiter-Sicherheit
 				}
 
 				EnablePhantomPlayerDebugText: {
@@ -20,19 +30,34 @@ Mods: {
 					Tooltip: Zeigt über Phantom-Begleitern eine Live-Entwicklungsanzeige. Standardmäßig deaktiviert.
 				}
 
+				ShowCompanionHealthBars: {
+					// Label: "[i:LifeCrystal] Show companion health bars"
+					// Tooltip: Disabled by default. Companions occupy real player slots, so the game already draws a health bar over them. Enable to also show the mod's own bar below each companion.
+				}
+
+				AllowRightClickOpenBackpack: {
+					// Label: "[i:Chest] Right-click a companion to open its backpack"
+					// Tooltip: Disabled by default. When off, right-clicking a companion does nothing and the backpack opens only through the matrix panel at the top of the screen. Enable to open it by right-clicking the companion.
+				}
+
 				CompanionsFightAfterOwnerDeath: {
-					Label: Begleiter kämpfen nach dem Tod weiter
+					Label: "[i:EnchantedSword] Begleiter kämpfen nach dem Tod weiter"
 					Tooltip: Standardmäßig aktiviert. Bei deinem Tod im Bosskampf bleiben gebundene Begleiter und kämpfen weiter. Deaktivieren, um sie beim Tod sofort aufzulösen.
 				}
 
 				CompanionsTakeDamage: {
-					Label: Begleiter erleiden Schaden
+					Label: "[i:CobaltShield] Begleiter erleiden Schaden"
 					Tooltip: Standardmäßig aktiviert. Begleiter können Schaden erleiden, sterben und nach ihrer normalen Wartezeit wiederbelebt werden. Deaktivieren macht sie gegen allen Schaden immun.
 				}
 
 				CompanionsAutoCollectWorldItems: {
-					Label: Begleiter sammeln Weltgegenstände automatisch ein
+					Label: "[i:TreasureMagnet] Begleiter sammeln Weltgegenstände automatisch ein"
 					Tooltip: Standardmäßig deaktiviert. Ist die Option aus, scannen, reservieren, verfolgen und sammeln Begleiter keine Weltgegenstände. Erst nach einer Kompatibilitätsprüfung mit Spielstand und Mods aktivieren.
+				}
+
+				CompanionsAllowBackpackWorldDrops: {
+					Label: "[i:TrashCan] Begleiter dürfen Rucksackgegenstände in die Welt werfen"
+					Tooltip: Standardmäßig deaktiviert. Rucksack leeren erzeugt Weltgegenstände und kann Item-Hooks anderer Mods auslösen. Erst aktivieren, wenn dein Spielstand stabil ist.
 				}
 			}
 		}
@@ -57,6 +82,29 @@ Mods: {
 				Complexity: Ähnlich aussehende Waffen können intern sehr unterschiedlich funktionieren; einige benötigen daher deutlich mehr Zeit, um sicher unterstützt zu werden. Danke für eure Geduld.
 				ConfigSuggestion: Schau auch in die Konfigurationsoptionen.
 				Tooltip: Hinweis zum Entwicklungsstand und zu Konfigurationsoptionen.
+			}
+
+			CompanionDevelopmentBook: {
+				DisplayName: Entwicklungsbuch
+				Tooltip:
+					'''
+					Linksklick startet eine Reihe von Debug-Tests.
+					Die Tests laufen automatisch ab.
+					-- Entwicklergegenstand --
+					'''
+				Started: Entwicklungstest gestartet.
+				Stopped: Entwicklungstest beendet und bereinigt.
+				Completed: Entwicklungstest abgeschlossen und bereinigt.
+				Failed: Entwicklungstest abgebrochen; der temporaere Begleiter wurde bereinigt.
+				StepSummon: "[DEV] Temporaerer Begleiter beschworen."
+				StepAttack: "[DEV] Angriffsmodus aktiviert."
+				StepEscort: "[DEV] Eskortmodus aktiviert."
+				StepGarrison: "[DEV] Wachmodus aktiviert."
+				StepCatch: "[DEV] Fangmodus aktiviert."
+				StepFishing: "[DEV] Angelmodus aktiviert."
+				StepMining: "[DEV] Bergbaumodus aktiviert."
+				StepWaypoint: "[DEV] Wegpunkt gesetzt."
+				StepBackpack: "[DEV] Rucksackgegenstand eingefuegt."
 			}
 
 			CompanionDebugger: {

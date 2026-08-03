@@ -53,8 +53,12 @@ public static class CompanionModeWheel
         heldTicks = 0;
     }
 
-    /// <summary>Input half, driven from ModSystem.UpdateUI so it runs once per frame.</summary>
-    public static void UpdateInput()
+    /// <summary>Input half, driven from ModSystem.UpdateUI so it runs once per frame. Fenced so a
+    /// fault in the wheel's input handling can never propagate into the shared UpdateUI hook.</summary>
+    public static void UpdateInput() =>
+        CompanionFaultGuard.Run("companion mode wheel input", UpdateInputCore);
+
+    private static void UpdateInputCore()
     {
         bool freshRightPress = Main.mouseRight && !previousMouseRight;
         previousMouseRight = Main.mouseRight;
@@ -182,8 +186,12 @@ public static class CompanionModeWheel
         return (-MathHelper.PiOver2 + index * sector).ToRotationVector2();
     }
 
-    /// <summary>Draw half, called from the interface layer.</summary>
-    public static void Draw()
+    /// <summary>Draw half, called from the interface layer. Fenced so a fault here degrades to a
+    /// missing wheel for the frame instead of aborting the whole HUD interface layer.</summary>
+    public static void Draw() =>
+        CompanionFaultGuard.RunDraw("companion mode wheel", DrawCore);
+
+    private static void DrawCore()
     {
         if (!active)
             return;

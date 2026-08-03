@@ -49,7 +49,8 @@ public static class CompanionLootSystem
     /// new or migrated save must remain inert until its owner explicitly enables this feature.
     /// </summary>
     public static bool WorldItemCollectionEnabled =>
-        MoreAIPlayerClientConfig.Instance?.CompanionsAutoCollectWorldItems == true;
+        MoreAIPlayerClientConfig.Instance?.CompanionsAutoCollectWorldItems == true &&
+        CompanionFaultGuard.IsAvailable(CompanionFaultGuard.WorldItemCollectionLane);
 
     private const float PickupReach = 48f;
     private const int ScanInterval = 12;
@@ -74,6 +75,25 @@ public static class CompanionLootSystem
             return false;
         }
 
+        bool collectedOrMoving = false;
+        if (!CompanionFaultGuard.RunCritical(
+                CompanionFaultGuard.WorldItemCollectionLane,
+                () => collectedOrMoving = TryCollectNearbyEquipmentCore(instance, owner, profile, navigator)))
+        {
+            // Never attempt a second world-item mutation while handling the original failure.
+            // Forgetting the local target is enough to return this companion to normal AI.
+            ForgetTarget(instance);
+            return false;
+        }
+        return collectedOrMoving;
+    }
+
+    private static bool TryCollectNearbyEquipmentCore(
+        CompanionInstance instance,
+        Player owner,
+        CompanionProfile profile,
+        CompanionNavigator navigator)
+    {
         if (Main.netMode != NetmodeID.SinglePlayer || instance is null || owner is null ||
             profile is null || navigator is null || !instance.Entity.active ||
             instance.Entity.dead || !owner.active)
@@ -165,9 +185,32 @@ public static class CompanionLootSystem
     /// <summary>Drops only the forty backpack slots; worn gear and every dedicated slot stay put.</summary>
     public static int DumpBackpack(int companionSlot, Player requester)
     {
+        // World-item creation is the one manual backpack action most likely to encounter a
+        // foreign GlobalItem hook. Keep it opt-in until the player has confirmed the save is
+        // compatible; refusing the click preserves every item in the backpack.
+        if (MoreAIPlayerClientConfig.Instance?.CompanionsAllowBackpackWorldDrops != true)
+        {
+            CompanionFaultGuard.AnnounceSafetyBlock("BackpackDropBlocked");
+            return 0;
+        }
+
         if (!TryGetOwnedContext(companionSlot, requester, out CompanionInstance instance, out CompanionProfile profile))
             return 0;
 
+        int dropped = 0;
+        CompanionFaultGuard.RunCritical(CompanionFaultGuard.BackpackDropLane,
+            () => dropped = DumpBackpackCore(instance, profile));
+        return dropped;
+    }
+
+    /// <summary>
+    /// This is deliberately one-way only after <see cref="Item.NewItem"/> has returned a valid
+    /// index: the source slot stays intact until then. If a foreign hook throws, completed drops
+    /// remain visible in the world and every untouched backpack slot remains untouched; the
+    /// fault guard blocks the rest of the batch instead of attempting a risky second mutation.
+    /// </summary>
+    private static int DumpBackpackCore(CompanionInstance instance, CompanionProfile profile)
+    {
         int dropped = 0;
         foreach (Item stored in profile.Backpack)
         {
@@ -205,6 +248,14 @@ public static class CompanionLootSystem
         if (!TryGetOwnedContext(companionSlot, requester, out CompanionInstance instance, out CompanionProfile profile))
             return 0;
 
+        int transferred = 0;
+        CompanionFaultGuard.RunCritical(CompanionFaultGuard.BackpackTransferLane,
+            () => transferred = TransferBackpackCore(instance, requester, profile));
+        return transferred;
+    }
+
+    private static int TransferBackpackCore(CompanionInstance instance, Player requester, CompanionProfile profile)
+    {
         int transferred = 0;
         for (int i = 0; i < profile.Backpack.Length; i++)
         {

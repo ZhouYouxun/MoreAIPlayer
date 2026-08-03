@@ -23,6 +23,14 @@ public sealed class HunterInstance
     public long AimCorrections;
     public long SlotRepairs;
 
+    /// <summary>Consecutive ticks this hunter's own per-tick update threw. A clean tick resets it;
+    /// reaching <see cref="MaxFaultStreak"/> retires the hunter rather than letting it fault
+    /// forever (the minimal-damage fallback).</summary>
+    public int FaultStreak;
+
+    /// <summary>How many consecutive faulting ticks a hunter is given before it is retired.</summary>
+    public const int MaxFaultStreak = 5;
+
     public void BindLoadout(Player playerTarget, string hunterName, HunterGameStage stage, int hunterCount)
     {
         Player me = Entity;

@@ -5,6 +5,15 @@
 
 Mods: {
 	MoreAIPlayer: {
+		Fault: {
+			SubsystemError: "[Phantom Companion] Subsystem {0} hit an internal error and was skipped for now. The game keeps running normally."
+			CompanionDisabled: "[Phantom Companion] A companion kept faulting and was safely removed to protect the game."
+			HunterDisabled: "[Phantom Companion] A hunter kept faulting and was safely removed to protect the game."
+			CircuitOpened: "[Phantom Companion] {0} hit an error and has been paused for this world session. Other companion systems remain active."
+			CircuitStillOpen: "[Phantom Companion] A risky companion operation remains paused after an error. Reload the world before trying it again."
+			BackpackDropBlocked: "[Phantom Companion] Companion backpack Drop All is disabled by default to protect your save. Enable it in Config only after checking compatibility."
+		}
+
 		Configs: {
 			MoreAIPlayerClientConfig: {
 				DisplayName: Phantom Companion Client Settings
@@ -13,6 +22,7 @@ Mods: {
 					CompanionDiagnostics: Companion Diagnostics
 					CompanionBalance: Companion Balance & Survival
 					CompanionPickup: Companion World-Item Pickup
+					CompanionSafety: Companion Safety
 				}
 
 				EnablePhantomPlayerDebugText: {
@@ -20,19 +30,34 @@ Mods: {
 					Tooltip: Shows the live development readout above phantom companions. Disabled by default.
 				}
 
+				ShowCompanionHealthBars: {
+					Label: "[i:LifeCrystal] Show companion health bars"
+					Tooltip: Disabled by default. Companions occupy real player slots, so the game already draws a health bar over them. Enable to also show the mod's own bar below each companion.
+				}
+
+				AllowRightClickOpenBackpack: {
+					Label: "[i:Chest] Right-click a companion to open its backpack"
+					Tooltip: Disabled by default. When off, right-clicking a companion does nothing and the backpack opens only through the matrix panel at the top of the screen. Enable to open it by right-clicking the companion.
+				}
+
 				CompanionsFightAfterOwnerDeath: {
-					Label: Companions fight after owner death
+					Label: "[i:EnchantedSword] Companions fight after owner death"
 					Tooltip: Enabled by default. If you die during a boss fight, your bound companions remain and keep fighting. Disable to dismiss all bound companions immediately when you die.
 				}
 
 				CompanionsTakeDamage: {
-					Label: Companions take damage
+					Label: "[i:CobaltShield] Companions take damage"
 					Tooltip: Enabled by default. Companions take normal damage and can die, then revive after their normal delay. Disable to make companions immune to all damage.
 				}
 
 				CompanionsAutoCollectWorldItems: {
-					Label: Companions automatically collect world items
+					Label: "[i:TreasureMagnet] Companions automatically collect world items"
 					Tooltip: Disabled by default. When off, companions do not scan, reserve, approach, or collect world drops. Enable only after confirming compatibility with your save and other mods.
+				}
+
+				CompanionsAllowBackpackWorldDrops: {
+					Label: "[i:TrashCan] Allow companions to drop backpack items into the world"
+					Tooltip: Disabled by default. Drop All creates world items and can invoke other mods' item hooks. Enable only after confirming that your save is stable.
 				}
 			}
 		}
@@ -57,6 +82,29 @@ Mods: {
 				Complexity: Similar-looking weapons can use very different code internally; some therefore need much more time to support safely. Thank you for your patience.
 				ConfigSuggestion: Consider checking the configuration options.
 				Tooltip: Development status and configuration options.
+			}
+
+			CompanionDevelopmentBook: {
+				DisplayName: Development Book
+				Tooltip:
+					'''
+					Left click to run a series of debug tests.
+					The tests run automatically.
+					-- Developer Item --
+					'''
+				Started: Development test started.
+				Stopped: Development test stopped and cleaned up.
+				Completed: Development test completed and cleaned up.
+				Failed: Development test stopped; the temporary companion was cleaned up.
+				StepSummon: "[DEV] Temporary companion summoned."
+				StepAttack: "[DEV] Switched to Attack mode."
+				StepEscort: "[DEV] Switched to Escort mode."
+				StepGarrison: "[DEV] Switched to Garrison mode."
+				StepCatch: "[DEV] Switched to Catch mode."
+				StepFishing: "[DEV] Switched to Fishing mode."
+				StepMining: "[DEV] Switched to Mining mode."
+				StepWaypoint: "[DEV] Waypoint issued."
+				StepBackpack: "[DEV] Backpack item injected."
 			}
 
 			CompanionDebugger: {
@@ -203,12 +251,14 @@ Mods: {
 			AttackAnimationBusy: Previous swing has not finished
 			AttackAttacking: Attacking
 			ModeAttack: Attack
+			ModeFreeRoam: Free Roam
 			ModeEscort: Escort
 			ModeGarrison: Garrison
 			ModeCatch: Catching
 			ModeFishing: Fishing
 			ModeMining: Mining
-			ModeAttackDescription: Roam freely and seek enemies
+			ModeAttackDescription: Follow the owner and hunt nearby threats
+			ModeFreeRoamDescription: Wander the owner's vicinity and hunt nearby enemies on its own (never edits terrain)
 			ModeEscortDescription: Stay close and answer threats near the owner
 			ModeGarrisonDescription: Hold this position and return if knocked away
 			ModeCatchDescription: Prioritize catching critters without hurting them

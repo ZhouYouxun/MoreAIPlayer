@@ -50,7 +50,10 @@ public static class PlayerScaleMatrixPanel
         opacity = 0f;
     }
 
-    public static void DrawAndInteract()
+    public static void DrawAndInteract() =>
+        CompanionFaultGuard.RunDraw("player scale matrix panel", DrawAndInteractCore);
+
+    private static void DrawAndInteractCore()
     {
         if (!open)
             return;

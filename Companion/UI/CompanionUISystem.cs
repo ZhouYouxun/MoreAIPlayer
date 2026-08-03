@@ -115,7 +115,7 @@ public sealed class CompanionUISystem : ModSystem
     /// "nothing I changed had any effect" can be told apart from "the change did not help" —
     /// three rounds of fixes were evaluated without that distinction being available.
     /// </summary>
-    public const string BuildStamp = "2026-08-02 #22 world-item-pickup-gate";
+    public const string BuildStamp = "2026-08-03 #23 fault-isolation-and-safe-drop";
 
     /// <summary>Draws a live decision readout over each companion only when the player has
     /// explicitly enabled the client-side diagnostic configuration.</summary>
@@ -226,7 +226,7 @@ public sealed class CompanionUISystem : ModSystem
 
     private static bool CanDrawCompanionHealthBars() =>
         !Main.gameMenu && Main.netMode == NetmodeID.SinglePlayer &&
-        MoreAIPlayerClientConfig.Instance?.CompanionsTakeDamage != false;
+        MoreAIPlayerClientConfig.Instance?.ShowCompanionHealthBars == true;
 
     /// <summary>Small Calamity-style stealth meter under each companion wearing rogue armor.</summary>
     private static void DrawStealthBars()
@@ -360,12 +360,14 @@ public sealed class CompanionUISystem : ModSystem
             "MoreAIPlayer: Companion Overlays",
             () =>
             {
-                DrawCompanionHealthBars();
-                DrawStealthBars();
-                DrawReviveTimers();
-                DrawDiagnostics();
-                DrawHunterTracker();
-                return true;
+                return CompanionFaultGuard.RunDraw("companion overlays", () =>
+                {
+                    DrawCompanionHealthBars();
+                    DrawStealthBars();
+                    DrawReviveTimers();
+                    DrawDiagnostics();
+                    DrawHunterTracker();
+                });
             },
             InterfaceScaleType.Game));
 

@@ -5,6 +5,15 @@
 
 Mods: {
 	MoreAIPlayer: {
+		Fault: {
+			SubsystemError: "[Widmowy Towarzysz] Podsystem {0} napotkał błąd wewnętrzny i został na razie pominięty. Gra działa dalej."
+			CompanionDisabled: "[Widmowy Towarzysz] Towarzysz wielokrotnie powodował błędy i został bezpiecznie usunięty, aby chronić grę."
+			HunterDisabled: "[Widmowy Towarzysz] Łowca wielokrotnie powodował błędy i został bezpiecznie usunięty, aby chronić grę."
+			CircuitOpened: "[Widmowy Towarzysz] {0} napotkał błąd i został wstrzymany na tę sesję świata. Pozostałe systemy działają dalej."
+			CircuitStillOpen: "[Widmowy Towarzysz] Ryzykowna operacja pozostaje wstrzymana po błędzie. Wczytaj świat ponownie przed kolejną próbą."
+			BackpackDropBlocked: "[Widmowy Towarzysz] Opróżnij plecak jest domyślnie wyłączone, aby chronić zapis. Włącz je w ustawieniach dopiero po sprawdzeniu zgodności."
+		}
+
 		Configs: {
 			MoreAIPlayerClientConfig: {
 				DisplayName: Ustawienia klienta Widmowych Towarzyszy
@@ -13,6 +22,7 @@ Mods: {
 					CompanionDiagnostics: Diagnostyka towarzyszy
 					CompanionBalance: Balans i przetrwanie towarzyszy
 					CompanionPickup: Zbieranie przedmiotów świata przez towarzyszy
+					CompanionSafety: Bezpieczeństwo towarzyszy
 				}
 
 				EnablePhantomPlayerDebugText: {
@@ -20,19 +30,34 @@ Mods: {
 					Tooltip: Wyświetla nad widmowymi towarzyszami bieżące informacje diagnostyczne. Domyślnie wyłączone.
 				}
 
+				ShowCompanionHealthBars: {
+					// Label: "[i:LifeCrystal] Show companion health bars"
+					// Tooltip: Disabled by default. Companions occupy real player slots, so the game already draws a health bar over them. Enable to also show the mod's own bar below each companion.
+				}
+
+				AllowRightClickOpenBackpack: {
+					// Label: "[i:Chest] Right-click a companion to open its backpack"
+					// Tooltip: Disabled by default. When off, right-clicking a companion does nothing and the backpack opens only through the matrix panel at the top of the screen. Enable to open it by right-clicking the companion.
+				}
+
 				CompanionsFightAfterOwnerDeath: {
-					Label: Towarzysze walczą po śmierci gracza
+					Label: "[i:EnchantedSword] Towarzysze walczą po śmierci gracza"
 					Tooltip: Domyślnie włączone. Gdy zginiesz podczas walki z bossem, związani towarzysze zostają i walczą dalej. Wyłącz, aby natychmiast ich rozproszyć po śmierci.
 				}
 
 				CompanionsTakeDamage: {
-					Label: Towarzysze otrzymują obrażenia
+					Label: "[i:CobaltShield] Towarzysze otrzymują obrażenia"
 					Tooltip: Domyślnie włączone. Towarzysze otrzymują obrażenia, mogą zginąć i odradzają się po zwykłym czasie oczekiwania. Wyłącz, aby uodpornić ich na wszystkie obrażenia.
 				}
 
 				CompanionsAutoCollectWorldItems: {
-					Label: Towarzysze automatycznie zbierają przedmioty świata
+					Label: "[i:TreasureMagnet] Towarzysze automatycznie zbierają przedmioty świata"
 					Tooltip: Domyślnie wyłączone. Gdy opcja jest wyłączona, towarzysze nie skanują, nie rezerwują, nie podchodzą ani nie zbierają przedmiotów świata. Włącz ją dopiero po sprawdzeniu zgodności z zapisem i innymi modami.
+				}
+
+				CompanionsAllowBackpackWorldDrops: {
+					Label: "[i:TrashCan] Pozwól towarzyszom wyrzucać przedmioty z plecaka do świata"
+					Tooltip: Domyślnie wyłączone. Opróżnij plecak tworzy przedmioty świata i może wywołać hooki innych modów. Włącz dopiero po potwierdzeniu stabilności zapisu.
 				}
 			}
 		}
@@ -57,6 +82,29 @@ Mods: {
 				Complexity: Bronie o podobnym wyglądzie mogą działać wewnętrznie zupełnie inaczej, więc część z nich wymaga znacznie więcej czasu na bezpieczną obsługę. Dziękuję za cierpliwość.
 				ConfigSuggestion: Warto zajrzeć do opcji konfiguracji.
 				Tooltip: Informacje o stanie rozwoju i opcjach konfiguracji.
+			}
+
+			CompanionDevelopmentBook: {
+				DisplayName: Ksiega deweloperska
+				Tooltip:
+					'''
+					Lewy klik uruchamia serie testow debugowania.
+					Testy wykonuja sie automatycznie.
+					-- Przedmiot deweloperski --
+					'''
+				Started: Test deweloperski rozpoczal sie.
+				Stopped: Test deweloperski zatrzymany i wyczyszczony.
+				Completed: Test deweloperski zakonczony i wyczyszczony.
+				Failed: Test deweloperski przerwany; tymczasowy towarzysz zostal wyczyszczony.
+				StepSummon: "[DEV] Przywolano tymczasowego towarzysza."
+				StepAttack: "[DEV] Przelaczono na tryb ataku."
+				StepEscort: "[DEV] Przelaczono na tryb eskorty."
+				StepGarrison: "[DEV] Przelaczono na tryb garnizonu."
+				StepCatch: "[DEV] Przelaczono na tryb lapacza."
+				StepFishing: "[DEV] Przelaczono na tryb wedkowania."
+				StepMining: "[DEV] Przelaczono na tryb kopania."
+				StepWaypoint: "[DEV] Wyznaczono punkt trasy."
+				StepBackpack: "[DEV] Dodano przedmiot do plecaka."
 			}
 
 			CompanionDebugger: {

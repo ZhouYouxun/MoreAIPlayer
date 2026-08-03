@@ -142,7 +142,6 @@ public sealed class CompanionPlayer : ModPlayer
             Profiles.Add(CompanionProfile.Load(savedProfile));
     }
 
-    public int CustomPotionCooldown;
     public int WhipBuffTimer;
 
     public override void ResetEffects()
@@ -267,13 +266,10 @@ public sealed class CompanionPlayer : ModPlayer
         if (ManualRescueTime > 0)
             ManualRescueTime--;
 
-        if (CustomPotionCooldown > 0)
-            CustomPotionCooldown--;
-
         if (CompanionEntitySystem.IsCompanion(Player))
         {
             Player.statMana = Player.statManaMax2;
-            if (!Player.dead && CustomPotionCooldown <= 0 && Player.statLife <= Player.statLifeMax2 - 100)
+            if (!Player.dead && Player.potionDelay <= 0 && Player.statLife <= Player.statLifeMax2 - 100)
             {
                 TryUseHealingPotion();
             }
@@ -284,38 +280,16 @@ public sealed class CompanionPlayer : ModPlayer
 
     private void TryUseHealingPotion()
     {
-        int bestSlot = -1;
-        int maxHeal = 100;
-
-        for (int i = 0; i < Player.inventory.Length; i++)
-        {
-            Item item = Player.inventory[i];
-            if (!item.IsAir && item.stack > 0 && item.healLife > maxHeal)
-            {
-                maxHeal = item.healLife;
-                bestSlot = i;
-            }
-        }
-
-        int healAmount;
-        if (bestSlot >= 0)
-        {
-            Item item = Player.inventory[bestSlot];
-            healAmount = item.healLife;
-            item.stack--;
-            if (item.stack <= 0)
-                item.TurnToAir();
-        }
-        else
-        {
-            healAmount = 100;
-        }
-
-        Player.statLife = System.Math.Min(Player.statLifeMax2, Player.statLife + healAmount);
-        CombatText.NewText(Player.Hitbox, Color.Green, healAmount.ToString());
-        Terraria.Audio.SoundEngine.PlaySound(SoundID.Item3, Player.Center);
-        CustomPotionCooldown = 1800; // 30s CD
-        Player.potionDelay = 1800;
+        // Do not maintain a mod-name/item-ID table here. QuickHeal is vanilla's generic
+        // healing-potion path: it recognises Item.potion and Item.healLife, runs dynamic
+        // GetHealLife hooks, respects ConsumeItem, invokes OnConsumeItem (for example,
+        // Calamity Bloodfin's buff), and applies the item's own modified potion delay.
+        // That makes this work for normal modded healing potions without pretending every
+        // healing item shares one fixed 30-second cooldown.
+        // A third-party potion hook can still assume that its consumer is a real player.
+        // Contain that compatibility failure to auto-healing instead of letting one item
+        // repeatedly fault the main player-update loop.
+        CompanionFaultGuard.RunCritical(CompanionFaultGuard.HealingPotionLane, Player.QuickHeal);
     }
 
     public override bool CanBeHitByProjectile(Projectile proj)

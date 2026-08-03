@@ -43,6 +43,12 @@ public sealed class CompanionBrain
     // Escort mode: bodyguard spacing, tighter than the roaming follow distance.
     private const float EscortFollowSide = 34f;
     private const float EscortIdleDistance = 30f;
+
+    // Squad spacing: how far apart squadmates fan out around the shared follow point so multiple
+    // companions read as a loose group ("spring outing") instead of stacking on one spot. Escort
+    // lines up tighter than a loose Attack follow.
+    private const float AttackSpreadSpacing = 32f;
+    private const float EscortSpreadSpacing = 20f;
     // How near the owner an enemy has to be before an escort engages it, and how near itself
     // before it defends regardless. Escort answers threats; it does not go hunting.
     private const float EscortGuardRadius = 20f * 16f;
@@ -52,6 +58,14 @@ public sealed class CompanionBrain
     // it is dragged back, and how close counts as "standing on the spot".
     private const float HoldLeash = 8f * 16f;
     private const float HoldReturnDistance = 20f;
+
+    // Free-roam: the leash radius around the owner the companion wanders and hunts within, and how
+    // close counts as reaching a wander goal. FreeRoam is NOT a posted mode — the ordinary
+    // far-away / stuck / rescue teleport policy still recalls it; this only bounds where it
+    // chooses to go and which enemies it is willing to chase.
+    private const float FreeRoamLeash = 40f * 16f;
+    private const float FreeRoamArrive = 24f;
+    private const int FreeRoamGoalTimeout = 300; // give up on an unreachable wander goal after 5s
 
     // Command-book waypoint: how close counts as "arrived".
     private const float WaypointArriveDistance = 24f;
@@ -86,9 +100,20 @@ public sealed class CompanionBrain
     private bool holdActive;               // resolved each tick: is a hold anchor in force?
     private Vector2 holdAnchor;
 
-    // Leash applied to combat navigation while holding a post (garrison / reached waypoint).
+    // Leash applied to combat navigation while holding a post (garrison / reached waypoint), or
+    // while an escort/free-roamer chases anchored to the owner. The radius varies by case: a tight
+    // hold/escort leash, or the wide free-roam leash.
     private bool combatLeashActive;
     private Vector2 combatLeashAnchor;
+    private float combatLeashRadius = HoldLeash;
+
+    // Free-roam wander state: the current wander goal, whether one is set, the pause timer at a
+    // reached spot, the give-up timer for an unreachable goal, and the glance-around timer.
+    private Vector2 freeRoamGoal;
+    private bool hasFreeRoamGoal;
+    private int freeRoamDwellTicks;
+    private int freeRoamGoalTicks;
+    private int freeRoamFlipTimer;
 
     // Stuck-teleport tracking.
     private Vector2 stuckReference;
@@ -207,7 +232,10 @@ public sealed class CompanionBrain
         // no target at all.
         bool guarding = GuardEngaged(me, out NPC nearestThreat);
 
-        NPC target = SelectTarget(me, owner, ownerData);
+        // Free-roam is a proactive hunter: it engages any valid enemy inside its leash around the
+        // owner, not just close threats and bosses. Other modes pass 0 and keep the old gating.
+        float huntRadius = mode == CompanionMode.FreeRoam ? FreeRoamLeash : 0f;
+        NPC target = SelectTarget(me, owner, ownerData, huntRadius);
 
         // Escort guards rather than hunts. It previously refused to target anything at all,
         // which is not what "follow and defend" means: a bodyguard that stands next to its
@@ -279,10 +307,14 @@ public sealed class CompanionBrain
         else if (target is not null && plan is not null)
         {
             // An escort chasing a target must not drift off its charge, so it fights on the
-            // same leash a posted companion uses — anchored to the owner rather than a spot.
+            // same leash a posted companion uses — anchored to the owner rather than a spot. A
+            // free-roamer chases on the same principle but with a much longer leash: it hunts
+            // across its roam zone yet still cannot be dragged to the far side of the map.
             bool escortLeash = mode == CompanionMode.Escort && !holdActive;
-            combatLeashActive = holdActive || escortLeash;
-            combatLeashAnchor = escortLeash ? owner.Center : holdAnchor;
+            bool freeRoamLeash = mode == CompanionMode.FreeRoam && !holdActive;
+            combatLeashActive = holdActive || escortLeash || freeRoamLeash;
+            combatLeashAnchor = holdActive ? holdAnchor : owner.Center;
+            combatLeashRadius = freeRoamLeash ? FreeRoamLeash : HoldLeash;
             PositionForCombat(me, target, plan);
             TryAttack(instance, me, target, plan, profile);
             combatLeashActive = false;
@@ -303,6 +335,12 @@ public sealed class CompanionBrain
             // and matches the "stays put like Garrison" half of the mode's contract.
             navigator.Idle(me);
         }
+        else if (mode == CompanionMode.FreeRoam)
+        {
+            // 自由行动: wander the owner's vicinity on its own when there is nothing to fight.
+            // Placed ahead of build/follow so a free-roamer neither builds nor shadows the owner.
+            FreeRoamWander(me, owner);
+        }
         else if (CompanionBuildingSystem.TryPerformBuildWork(instance, owner, profile, navigator))
         {
         }
@@ -312,10 +350,14 @@ public sealed class CompanionBrain
         // manual storage surface: put items in, transfer them out, or use Drop All yourself.
         else if (mode == CompanionMode.Escort)
         {
-            FollowOwner(me, owner, EscortFollowSide, EscortIdleDistance);
+            FollowOwner(me, owner, EscortFollowSide, EscortIdleDistance,
+                CompanionEntitySystem.SquadOrdinal(instance),
+                CompanionEntitySystem.CountActiveOwnedBy(instance.OwnerWhoAmI), EscortSpreadSpacing);
         }
         else if (!owner.dead)
-            FollowOwner(me, owner, 64f, IdleDistance * 0.5f);
+            FollowOwner(me, owner, 64f, IdleDistance * 0.5f,
+                CompanionEntitySystem.SquadOrdinal(instance),
+                CompanionEntitySystem.CountActiveOwnedBy(instance.OwnerWhoAmI), AttackSpreadSpacing);
         else
             navigator.Idle(me);
 
@@ -380,7 +422,6 @@ public sealed class CompanionBrain
             me.statLife = System.Math.Max(100, me.statLifeMax);
             ResetCorpseGibs(me);
             TeleportBeside(me, owner);
-            me.GetModPlayer<CompanionPlayer>().CustomPotionCooldown = 0;
             if (instance.TryGetContext(out _, out CompanionProfile profile))
                 profile.Mode = CompanionMode.Attack;
             softHoldActive = false;
@@ -442,7 +483,7 @@ public sealed class CompanionBrain
         return false;
     }
 
-    private NPC SelectTarget(Player me, Player owner, CompanionPlayer data)
+    private NPC SelectTarget(Player me, Player owner, CompanionPlayer data, float huntRadius = 0f)
     {
         // A failed search deliberately has the same short cache as a successful one.
         // Previously currentTarget == -1 bypassed this block, causing the companion to
@@ -480,7 +521,10 @@ public sealed class CompanionBrain
             bool closeThreat = System.Math.Min(ownerDistance, companionDistance) <= AutomaticAggroRange;
             bool boss = candidate.boss;
             bool miniBoss = NPCID.Sets.ShouldBeCountedAsBoss[candidate.type] || candidate.rarity > 0 || candidate.lifeMax >= 10000;
-            if (!requested && !closeThreat && !boss && !miniBoss)
+            // Free-roam hunting: anything inside the leash counts as fair game, so the companion
+            // actively clears its roam zone instead of waiting for enemies to wander into aggro range.
+            bool inHuntZone = huntRadius > 0f && System.Math.Min(ownerDistance, companionDistance) <= huntRadius;
+            if (!requested && !closeThreat && !boss && !miniBoss && !inHuntZone)
                 continue;
 
             float score = ScoreTarget(candidate, ownerDistance, companionDistance, requested, closeThreat, boss, miniBoss);
@@ -803,8 +847,8 @@ public sealed class CompanionBrain
         if (combatLeashActive)
         {
             Vector2 fromAnchor = goal - combatLeashAnchor;
-            if (fromAnchor.Length() > HoldLeash)
-                goal = combatLeashAnchor + Vector2.Normalize(fromAnchor) * HoldLeash;
+            if (fromAnchor.Length() > combatLeashRadius)
+                goal = combatLeashAnchor + Vector2.Normalize(fromAnchor) * combatLeashRadius;
         }
         navigator.Navigate(me, goal);
     }
@@ -1130,6 +1174,16 @@ public sealed class CompanionBrain
         if (!CompanionLootSystem.WorldItemCollectionEnabled)
             return;
 
+        // Item identity and teardown are controlled by every loaded mod. A failed collection
+        // therefore opens only the world-item circuit; combat, following and the companion
+        // itself keep running, while this path remains inert until the next world load.
+        CompanionFaultGuard.RunCritical(
+            CompanionFaultGuard.WorldItemCollectionLane,
+            () => CollectCaughtCrittersCore(me, profile));
+    }
+
+    private static void CollectCaughtCrittersCore(Player me, CompanionProfile profile)
+    {
         foreach (Item drop in Main.ActiveItems)
         {
             if (drop.makeNPC <= 0 || drop.noGrabDelay > 0)
@@ -1232,7 +1286,8 @@ public sealed class CompanionBrain
         navigator.Navigate(me, holdAnchor);
     }
 
-    private void FollowOwner(Player me, Player owner, float sideOffset, float idleReachX)
+    private void FollowOwner(Player me, Player owner, float sideOffset, float idleReachX,
+        int squadOrdinal, int squadCount, float spreadSpacing)
     {
         // Stand slightly behind the owner. When the owner turns around, react with a
         // randomized human-like delay (0.5s–3s) before walking over to the other side.
@@ -1250,7 +1305,20 @@ public sealed class CompanionBrain
         if (sideSwitchTimer > 0 && --sideSwitchTimer == 0)
             followSide = -owner.direction;
 
-        Vector2 standPoint = owner.Center + new Vector2(followSide * sideOffset, 0f);
+        // Fan a multi-companion squad out around the shared follow point so it reads as a loose
+        // group rather than one sprite stacked N deep. Each companion aims at its own offset and
+        // settles there (the offset stays within idleReachX, so nobody paces back and forth). A
+        // small stable per-companion jitter, seeded off the slot, breaks up the even line without
+        // oscillating. Horizontal only: a vertical offset would make companions hop toward a point
+        // above or below the owner.
+        float spread = 0f;
+        if (squadCount > 1)
+        {
+            spread = (squadOrdinal - (squadCount - 1) * 0.5f) * spreadSpacing;
+            spread += (me.whoAmI * 37) % 15 - 7;
+        }
+
+        Vector2 standPoint = owner.Center + new Vector2(followSide * sideOffset + spread, 0f);
         Vector2 offset = standPoint - me.Center;
         if (System.Math.Abs(offset.X) <= idleReachX && System.Math.Abs(offset.Y) <= 96f)
         {
@@ -1261,6 +1329,81 @@ public sealed class CompanionBrain
         }
 
         navigator.Navigate(me, standPoint);
+    }
+
+    /// <summary>
+    /// 自由行动 idle movement: wander between random spots inside the free-roam leash around the
+    /// owner, pausing at each with a little idle life (glancing around). Never edits terrain. When
+    /// the owner walks off, the next goal — and any current pause — is pulled back toward them, and
+    /// the ordinary far-away / stuck teleport policy still recalls the companion if it ends up lost.
+    /// </summary>
+    private void FreeRoamWander(Player me, Player owner)
+    {
+        float ownerDistance = Vector2.Distance(me.Center, owner.Center);
+
+        // Dwell: standing at a reached spot, doing nothing in particular for a random beat.
+        if (freeRoamDwellTicks > 0)
+        {
+            freeRoamDwellTicks--;
+            navigator.Idle(me);
+            // Glance around every so often so a paused companion still looks alive.
+            if (--freeRoamFlipTimer <= 0)
+            {
+                me.ChangeDir(Main.rand.NextBool() ? 1 : -1);
+                freeRoamFlipTimer = Main.rand.Next(40, 140);
+            }
+            // Do not keep lounging while the owner strides away — cut the pause short and re-home.
+            if (ownerDistance > FreeRoamLeash)
+            {
+                freeRoamDwellTicks = 0;
+                hasFreeRoamGoal = false;
+            }
+            return;
+        }
+
+        bool reached = hasFreeRoamGoal && Vector2.Distance(me.Center, freeRoamGoal) <= FreeRoamArrive;
+        bool timedOut = hasFreeRoamGoal && --freeRoamGoalTicks <= 0;
+
+        if (hasFreeRoamGoal && (reached || timedOut))
+        {
+            // Arrived, or gave up on an unreachable spot: pause here before choosing somewhere new.
+            hasFreeRoamGoal = false;
+            freeRoamDwellTicks = Main.rand.Next(30, 240);
+            freeRoamFlipTimer = Main.rand.Next(20, 80);
+            navigator.Idle(me);
+            return;
+        }
+
+        if (!hasFreeRoamGoal)
+        {
+            freeRoamGoal = PickFreeRoamGoal(me, owner, ownerDistance);
+            hasFreeRoamGoal = true;
+            freeRoamGoalTicks = FreeRoamGoalTimeout;
+        }
+
+        navigator.Navigate(me, freeRoamGoal);
+    }
+
+    /// <summary>
+    /// Picks the next wander destination for free-roam: a random horizontal offset around the
+    /// owner, kept near the owner's feet so the navigator gets a reachable ground goal rather than
+    /// a point floating in mid-air. Outside the leash it heads back toward the owner; occasionally
+    /// it "checks in" by visiting the owner directly.
+    /// </summary>
+    private static Vector2 PickFreeRoamGoal(Player me, Player owner, float ownerDistance)
+    {
+        int direction;
+        if (ownerDistance > FreeRoamLeash)
+            direction = owner.Center.X >= me.Center.X ? 1 : -1; // outside the leash: come back in
+        else if (Main.rand.NextBool(5))
+            return owner.Center;                                // occasional check-in visit
+        else
+            direction = Main.rand.NextBool() ? 1 : -1;
+
+        float reach = FreeRoamLeash * Main.rand.NextFloat(0.25f, 1f);
+        float x = owner.Center.X + direction * reach;
+        float y = owner.Center.Y + Main.rand.NextFloat(-48f, 48f);
+        return new Vector2(x, y);
     }
 
     private void UpdateTeleportPolicy(CompanionInstance instance, Player me, Player owner, CompanionPlayer ownerData, CompanionProfile profile, bool posted)
@@ -1278,7 +1421,11 @@ public sealed class CompanionBrain
         // an owner teleport breaks the post and snaps the companion back to Attack mode at owner's side.
         if (ownerTeleported && distance > RescueDistance)
         {
-            profile.Mode = CompanionMode.Attack;
+            // A posted mode breaks on an owner teleport and snaps back to Attack at the owner's
+            // side. Free-roam is a deliberate standing order, not a post, so it is preserved — the
+            // companion simply teleports along and keeps roaming the owner's new vicinity.
+            if (profile.Mode != CompanionMode.FreeRoam)
+                profile.Mode = CompanionMode.Attack;
             softHoldActive = false;
             instance.Waypoint = null;
             instance.WaypointTimeLeft = 0;

@@ -11,6 +11,8 @@ namespace MoreAIPlayer;
 /// </summary>
 public sealed class DevelopmentNotice : ModItem
 {
+    private const string CatDoodle = "      ╱|、\n    (˚ˎ 。7\n     |、˜〵\n     じしˍ,)ノ";
+
     // Borrow the vanilla Keybrand sprite until the mod has a dedicated icon for this notice.
     public override string Texture => $"Terraria/Images/Item_{ItemID.Keybrand}";
 
@@ -53,6 +55,10 @@ public sealed class DevelopmentNotice : ModItem
         tooltips.Add(new TooltipLine(Mod, "ConfigSuggestion", GetText("ConfigSuggestion"))
         {
             OverrideColor = new Color(145, 225, 255)
+        });
+        tooltips.Add(new TooltipLine(Mod, "CatDoodle", CatDoodle)
+        {
+            OverrideColor = new Color(215, 215, 215)
         });
     }
 

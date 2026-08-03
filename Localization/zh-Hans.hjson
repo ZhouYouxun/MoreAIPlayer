@@ -5,6 +5,15 @@
 
 Mods: {
 	MoreAIPlayer: {
+		Fault: {
+			SubsystemError: "[幻影伙伴] 子系统 {0} 内部出错，已暂时跳过本次运行；游戏继续正常运行。"
+			CompanionDisabled: "[幻影伙伴] 一个伙伴反复出错，已被安全移除以保护游戏。"
+			HunterDisabled: "[幻影伙伴] 一个猎人反复出错，已被安全移除以保护游戏。"
+			CircuitOpened: "[幻影伙伴] {0} 出错，已在本次世界会话中暂停；其他伙伴功能仍会继续运行。"
+			CircuitStillOpen: "[幻影伙伴] 某项高风险伙伴操作因先前错误而保持暂停。请重载世界后再尝试。"
+			BackpackDropBlocked: "[幻影伙伴] 为保护存档，伙伴背包的“全部丢出”默认关闭。确认兼容性后可在配置中手动开启。"
+		}
+
 		Configs: {
 			MoreAIPlayerClientConfig: {
 				DisplayName: 幻影伙伴客户端设置
@@ -13,6 +22,7 @@ Mods: {
 					CompanionDiagnostics: 伙伴调试
 					CompanionBalance: 伙伴平衡与生存
 					CompanionPickup: 伙伴拾取世界掉落物
+					CompanionSafety: 伙伴安全保护
 				}
 
 				EnablePhantomPlayerDebugText: {
@@ -20,19 +30,34 @@ Mods: {
 					Tooltip: 在幻影伙伴头顶显示实时开发调试读数。默认关闭，仅在需要排查问题时手动开启。
 				}
 
+				ShowCompanionHealthBars: {
+					Label: "[i:LifeCrystal] 显示伙伴血条"
+					Tooltip: 默认关闭。伙伴占用真实玩家槽位，游戏本身已经会在其头顶画一条血条；开启后会额外在每个伙伴脚下再画一条本模组自己的血条。
+				}
+
+				AllowRightClickOpenBackpack: {
+					Label: "[i:Chest] 右键幻影玩家打开其背包"
+					Tooltip: 默认关闭。关闭时右键点击幻影玩家不会有任何反应，只能通过屏幕顶部的矩阵小框来打开背包；开启后即可像之前一样右键幻影玩家打开背包。
+				}
+
 				CompanionsFightAfterOwnerDeath: {
-					Label: 主控死亡后伙伴继续战斗
+					Label: "[i:EnchantedSword] 主控死亡后伙伴继续战斗"
 					Tooltip: 默认开启。Boss 战中主控玩家死亡后，已绑定的伙伴会留在场上继续战斗；关闭后，主控死亡时其所有已召唤伙伴都会立刻解散。
 				}
 
 				CompanionsTakeDamage: {
-					Label: 伙伴会受到伤害
+					Label: "[i:CobaltShield] 伙伴会受到伤害"
 					Tooltip: 默认开启。伙伴会正常受伤、死亡，并在原有等待时间后复活；关闭后伙伴免疫所有伤害。
 				}
 
 				CompanionsAutoCollectWorldItems: {
-					Label: 伙伴自动拾取世界掉落物
+					Label: "[i:TreasureMagnet] 伙伴自动拾取世界掉落物"
 					Tooltip: 默认关闭。关闭时伙伴不会扫描、预约、靠近或拾取地面掉落物；确认存档和其他模组兼容后再手动开启。
+				}
+
+				CompanionsAllowBackpackWorldDrops: {
+					Label: "[i:TrashCan] 允许伙伴将背包物品丢到世界中"
+					Tooltip: 默认关闭。“全部丢出”会创建世界掉落物，并可能触发其他模组的物品钩子；确认存档稳定后再手动开启。
 				}
 			}
 		}
@@ -57,6 +82,29 @@ Mods: {
 				Complexity: 外观相近的武器，底层代码机制可能完全不同；有些兼容需要更多时间才能安全完成，感谢理解与耐心等待。
 				ConfigSuggestion: 【考虑去看看配置选项】
 				Tooltip: 查看开发说明与配置选项。
+			}
+
+			CompanionDevelopmentBook: {
+				DisplayName: 开发书
+				Tooltip:
+					'''
+					点击左键进行一系列的调试
+					调试将自动进行
+					--开发者物品--
+					'''
+				Started: 开发调试已开始。
+				Stopped: 开发调试已停止并清理。
+				Completed: 开发调试已完成并清理。
+				Failed: 开发调试中断，临时伙伴已清理。
+				StepSummon: "[开发调试] 已召唤临时伙伴。"
+				StepAttack: "[开发调试] 已切换：攻击模式。"
+				StepEscort: "[开发调试] 已切换：护卫模式。"
+				StepGarrison: "[开发调试] 已切换：镇守模式。"
+				StepCatch: "[开发调试] 已切换：捕捉模式。"
+				StepFishing: "[开发调试] 已切换：钓鱼模式。"
+				StepMining: "[开发调试] 已切换：挖矿模式。"
+				StepWaypoint: "[开发调试] 已下达路标。"
+				StepBackpack: "[开发调试] 已注入背包物品。"
 			}
 
 			CompanionDebugger: {
@@ -203,12 +251,14 @@ Mods: {
 			AttackAnimationBusy: 上一次挥动尚未结束
 			AttackAttacking: 攻击中
 			ModeAttack: 综合进攻
+				ModeFreeRoam: 自由行动
 			ModeEscort: 护卫
 			ModeGarrison: 镇守
 			ModeCatch: 捕捉
 			ModeFishing: 钓鱼
 			ModeMining: 挖矿
-			ModeAttackDescription: 自由行动，主动索敌
+			ModeAttackDescription: 跟随主人，索敌并追击附近威胁
+				ModeFreeRoamDescription: 在附近自由闲逛、自主清剿放养圈内的敌人，想干嘛干嘛（不改动地形）
 			ModeEscortDescription: 贴身跟随，只应对靠近主人的威胁
 			ModeGarrisonDescription: 钉在当前位置，被打走会走回来
 			ModeCatchDescription: 优先用捕虫网抓小动物，不再误伤它们

@@ -5,6 +5,15 @@
 
 Mods: {
 	MoreAIPlayer: {
+		Fault: {
+			SubsystemError: "[Призрачный спутник] Подсистема {0} столкнулась с внутренней ошибкой и пока пропущена. Игра продолжает работать."
+			CompanionDisabled: "[Призрачный спутник] Спутник многократно ошибался и был безопасно удалён для защиты игры."
+			HunterDisabled: "[Призрачный спутник] Охотник многократно ошибался и был безопасно удалён для защиты игры."
+			CircuitOpened: "[Призрачный спутник] {0} столкнулась с ошибкой и приостановлена на эту сессию мира. Остальные системы продолжают работать."
+			CircuitStillOpen: "[Призрачный спутник] Рискованная операция остаётся приостановленной после ошибки. Перезагрузите мир перед новой попыткой."
+			BackpackDropBlocked: "[Призрачный спутник] Очистить рюкзак по умолчанию отключено для защиты сохранения. Включайте в настройках только после проверки совместимости."
+		}
+
 		Configs: {
 			MoreAIPlayerClientConfig: {
 				DisplayName: Клиентские настройки призрачных спутников
@@ -13,6 +22,7 @@ Mods: {
 					CompanionDiagnostics: Диагностика спутников
 					CompanionBalance: Баланс и выживание спутников
 					CompanionPickup: Сбор предметов мира спутниками
+					CompanionSafety: Безопасность спутников
 				}
 
 				EnablePhantomPlayerDebugText: {
@@ -20,19 +30,34 @@ Mods: {
 					Tooltip: Показывает над призрачными спутниками текущие данные разработки. По умолчанию выключено.
 				}
 
+				ShowCompanionHealthBars: {
+					// Label: "[i:LifeCrystal] Show companion health bars"
+					// Tooltip: Disabled by default. Companions occupy real player slots, so the game already draws a health bar over them. Enable to also show the mod's own bar below each companion.
+				}
+
+				AllowRightClickOpenBackpack: {
+					// Label: "[i:Chest] Right-click a companion to open its backpack"
+					// Tooltip: Disabled by default. When off, right-clicking a companion does nothing and the backpack opens only through the matrix panel at the top of the screen. Enable to open it by right-clicking the companion.
+				}
+
 				CompanionsFightAfterOwnerDeath: {
-					Label: Спутники сражаются после смерти игрока
+					Label: "[i:EnchantedSword] Спутники сражаются после смерти игрока"
 					Tooltip: Включено по умолчанию. Если вы погибнете во время битвы с боссом, связанные спутники останутся и продолжат сражаться. Отключите, чтобы сразу распустить их после смерти.
 				}
 
 				CompanionsTakeDamage: {
-					Label: Спутники получают урон
+					Label: "[i:CobaltShield] Спутники получают урон"
 					Tooltip: Включено по умолчанию. Спутники получают урон, могут погибнуть и возрождаются после обычной задержки. Отключите, чтобы сделать их неуязвимыми.
 				}
 
 				CompanionsAutoCollectWorldItems: {
-					Label: Спутники автоматически собирают предметы мира
+					Label: "[i:TreasureMagnet] Спутники автоматически собирают предметы мира"
 					Tooltip: По умолчанию выключено. Пока опция выключена, спутники не ищут, не резервируют, не преследуют и не собирают предметы мира. Включайте её только после проверки совместимости с сохранением и другими модами.
+				}
+
+				CompanionsAllowBackpackWorldDrops: {
+					Label: "[i:TrashCan] Разрешить спутникам выбрасывать предметы рюкзака в мир"
+					Tooltip: По умолчанию выключено. Очистить рюкзак создаёт предметы мира и может вызвать хуки других модов. Включайте только после подтверждения стабильности сохранения.
 				}
 			}
 		}
@@ -57,6 +82,29 @@ Mods: {
 				Complexity: Похожее оружие может иметь совершенно разные внутренние механики, поэтому некоторым экземплярам требуется гораздо больше времени для безопасной поддержки. Спасибо за терпение.
 				ConfigSuggestion: Загляните в параметры конфигурации.
 				Tooltip: Сведения о разработке и параметрах конфигурации.
+			}
+
+			CompanionDevelopmentBook: {
+				DisplayName: Kniga razrabotki
+				Tooltip:
+					'''
+					Levyy klik zapuskaet seriyu otladochnykh testov.
+					Testy vypolnyayutsya avtomaticheski.
+					-- Predmet razrabotchika --
+					'''
+				Started: Test razrabotki zapushchen.
+				Stopped: Test razrabotki ostanovlen i ochishchen.
+				Completed: Test razrabotki zavershen i ochishchen.
+				Failed: Test razrabotki prervan; vremennyy sputnik ochishchen.
+				StepSummon: "[DEV] Vremennyy sputnik prizvan."
+				StepAttack: "[DEV] Vklyuchen rezhim ataki."
+				StepEscort: "[DEV] Vklyuchen rezhim soprovozhdeniya."
+				StepGarrison: "[DEV] Vklyuchen garnizonnyy rezhim."
+				StepCatch: "[DEV] Vklyuchen rezhim lovli."
+				StepFishing: "[DEV] Vklyuchen rezhim rybalki."
+				StepMining: "[DEV] Vklyuchen rezhim dobychi."
+				StepWaypoint: "[DEV] Put' zadana."
+				StepBackpack: "[DEV] Predmet dobavlen v ryukzak."
 			}
 
 			CompanionDebugger: {
