@@ -100,6 +100,18 @@ public sealed class CompanionProfile
             preferAltUseWeapons.Add(key);
     }
 
+    /// <summary>
+    /// Gives this companion a player-selected display name. The text comes from Terraria's
+    /// platform text-input path, so it deliberately stays as Unicode instead of being reduced
+    /// to an ASCII-only "player name". A blank value is not a useful companion name and is
+    /// rejected by the caller.
+    /// </summary>
+    public void Rename(string name)
+    {
+        if (!string.IsNullOrWhiteSpace(name))
+            Name = name.Trim();
+    }
+
     private CompanionProfile(int id)
     {
         Id = id;

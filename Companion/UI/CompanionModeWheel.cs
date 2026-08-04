@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using Microsoft.Xna.Framework;
+using ReLogic.Graphics;
 using Terraria;
 using Terraria.Audio;
 using Terraria.GameContent;
@@ -11,36 +12,35 @@ using MoreAIPlayer.Companion.Content;
 namespace MoreAIPlayer.Companion.UI;
 
 /// <summary>
-/// Hold right click with the command book out to open a radial mode picker centred on the
-/// cursor; release to commit whichever sector the cursor is pointing at.
-///
-/// This replaced a right-click cycle. With six modes a cycle meant up to five clicks to reach
-/// the one you wanted, and no way to see what was available without walking the whole ring.
-///
-/// Drawn directly into an interface layer rather than as a UIState: it is a transient overlay
-/// anchored to wherever the cursor happened to be, so it has no layout to speak of, and it
-/// needs to read raw mouse state on the same frame it draws.
+/// Hold right click with the command book out to open a compact, vertical tactic menu; release
+/// over a row to commit it. The old radial layout made the seven labels collide with the world
+/// and offered no visual distinction between combat and utility work.
 /// </summary>
 public static class CompanionModeWheel
 {
-    private const float Radius = 78f;
-    private const float DeadZone = 18f;
-    private const int SlotWidth = 92;
-    private const int SlotHeight = 30;
+    private const int PanelWidth = 196;
+    private const int PanelPadding = 14;
+    private const int GroupLabelHeight = 18;
+    private const int ButtonWidth = 168;
+    private const int ButtonHeight = 26;
+    private const int RowGap = 3;
+    private const int GroupGap = 10;
+    private const int CaptionHeight = 36;
+    private const int CombatCount = 4;
 
-    // A right click shorter than this is a click, not a deliberate wheel gesture, and must not
+    // A right click shorter than this is a click, not a deliberate menu gesture, and must not
     // change anything: switching mode silently is how a companion ends up in a mode its owner
     // never chose, which then looks exactly like the AI being broken.
     private const int MinimumHoldTicks = 12;
 
     private static bool active;
-    private static Vector2 center;
+    private static Vector2 panelTopLeft;
     private static int hovered = -1;
     private static int lastHovered = -1;
     private static bool previousMouseRight;
     private static int heldTicks;
 
-    /// <summary>True while the wheel owns the mouse. Other systems check this to stay out of the
+    /// <summary>True while the menu owns the mouse. Other systems check this to stay out of the
     /// way — in particular the double-right-click rescue gesture must not fire through it.</summary>
     public static bool Active => active;
 
@@ -54,9 +54,9 @@ public static class CompanionModeWheel
     }
 
     /// <summary>Input half, driven from ModSystem.UpdateUI so it runs once per frame. Fenced so a
-    /// fault in the wheel's input handling can never propagate into the shared UpdateUI hook.</summary>
+    /// fault in the menu's input handling can never propagate into the shared UpdateUI hook.</summary>
     public static void UpdateInput() =>
-        CompanionFaultGuard.Run("companion mode wheel input", UpdateInputCore);
+        CompanionFaultGuard.Run("companion mode menu input", UpdateInputCore);
 
     private static void UpdateInputCore()
     {
@@ -75,12 +75,14 @@ public static class CompanionModeWheel
         if (!active)
         {
             // Opening requires a fresh press: releasing right click somewhere else and then
-            // wandering onto the book must not spring the wheel open already "held".
+            // wandering onto the book must not spring the menu open already "held".
             if (freshRightPress && holdingBook && !Main.playerInventory && !owner.mouseInterface &&
                 CompanionCommandBook.OwnedActiveCompanions(Main.myPlayer).Count > 0)
             {
                 active = true;
-                center = Main.MouseScreen;
+                panelTopLeft = ClampToScreen(
+                    Main.MouseScreen - new Vector2(PanelWidth * 0.5f, PanelHeight * 0.5f),
+                    PanelWidth, PanelHeight);
                 hovered = -1;
                 lastHovered = -1;
                 heldTicks = 0;
@@ -116,7 +118,7 @@ public static class CompanionModeWheel
 
     private static void Commit()
     {
-        // Too brief to be a wheel gesture, or released in the dead zone: cancel, change nothing.
+        // Too brief to be a menu gesture, or released outside a row: cancel, change nothing.
         if (heldTicks < MinimumHoldTicks || hovered < 0 || hovered >= CompanionModeRules.WheelOrder.Length)
         {
             SoundEngine.PlaySound(SoundID.MenuClose with { Volume = 0.4f });
@@ -152,8 +154,6 @@ public static class CompanionModeWheel
         Player owner = Main.LocalPlayer;
         Rectangle overHead = new((int)owner.position.X, (int)owner.position.Y - 36, owner.width, owner.height);
         CombatText.NewText(overHead, CompanionModeRules.Tint(chosen), CompanionModeRules.Name(chosen));
-        // Also written to chat: the floating text is gone in a second, and a mode change that
-        // leaves no record is one the player cannot later rule out as the cause of odd behaviour.
         Color tint = CompanionModeRules.Tint(chosen);
         Main.NewText(T("ModeChanged",
             CompanionModeRules.Name(chosen),
@@ -166,38 +166,45 @@ public static class CompanionModeWheel
 
     private static int HoveredIndex()
     {
-        Vector2 offset = Main.MouseScreen - center;
-        if (offset.LengthSquared() < DeadZone * DeadZone)
-            return -1;
-
-        int count = CompanionModeRules.WheelOrder.Length;
-        float sector = MathHelper.TwoPi / count;
-
-        // Sector 0 points straight up; +PiOver2 rotates the maths angle into that frame, and the
-        // half-sector bias makes each sector centred on its label rather than starting at it.
-        float angle = offset.ToRotation() + MathHelper.PiOver2;
-        angle = (angle % MathHelper.TwoPi + MathHelper.TwoPi) % MathHelper.TwoPi;
-        return (int)((angle + sector * 0.5f) / sector) % count;
+        Point mouse = Main.MouseScreen.ToPoint();
+        for (int i = 0; i < CompanionModeRules.WheelOrder.Length; i++)
+        {
+            if (GetModeBox(i).Contains(mouse))
+                return i;
+        }
+        return -1;
     }
 
-    private static Vector2 SectorDirection(int index)
+    private static Rectangle GetModeBox(int index)
     {
-        float sector = MathHelper.TwoPi / CompanionModeRules.WheelOrder.Length;
-        return (-MathHelper.PiOver2 + index * sector).ToRotationVector2();
+        float y = panelTopLeft.Y + PanelPadding + GroupLabelHeight + index * (ButtonHeight + RowGap);
+        if (index >= CombatCount)
+            y += GroupGap + GroupLabelHeight;
+        return new Rectangle(
+            (int)(panelTopLeft.X + (PanelWidth - ButtonWidth) * 0.5f),
+            (int)y,
+            ButtonWidth,
+            ButtonHeight);
     }
+
+    private static int PanelHeight => PanelPadding * 2 +
+        GroupLabelHeight + CombatCount * ButtonHeight + (CombatCount - 1) * RowGap +
+        GroupGap + GroupLabelHeight +
+        (CompanionModeRules.WheelOrder.Length - CombatCount) * ButtonHeight +
+        (CompanionModeRules.WheelOrder.Length - CombatCount - 1) * RowGap + CaptionHeight;
+
+    private static Rectangle PanelArea => new((int)panelTopLeft.X, (int)panelTopLeft.Y, PanelWidth, PanelHeight);
 
     /// <summary>Draw half, called from the interface layer. Fenced so a fault here degrades to a
-    /// missing wheel for the frame instead of aborting the whole HUD interface layer.</summary>
+    /// missing menu for the frame instead of aborting the whole HUD interface layer.</summary>
     public static void Draw() =>
-        CompanionFaultGuard.RunDraw("companion mode wheel", DrawCore);
+        CompanionFaultGuard.RunDraw("companion mode menu", DrawCore);
 
     private static void DrawCore()
     {
         if (!active)
             return;
 
-        // Availability is read off the first companion: a squad shares one mode anyway, and the
-        // wheel would be unreadable if every member greyed out different sectors.
         List<CompanionInstance> squad = CompanionCommandBook.OwnedActiveCompanions(Main.myPlayer);
         CompanionProfile reference = null;
         foreach (CompanionInstance instance in squad)
@@ -210,6 +217,15 @@ public static class CompanionModeWheel
         }
 
         var font = FontAssets.MouseText.Value;
+        DrawRectangle(PanelArea, new Color(14, 19, 31, 239));
+        DrawBorder(PanelArea, new Color(80, 105, 142), 2);
+        DrawBorder(new Rectangle(PanelArea.X + 4, PanelArea.Y + 4, PanelArea.Width - 8, PanelArea.Height - 8),
+            new Color(40, 55, 79, 220), 1);
+
+        DrawGroupLabel(font, T("ModeCombatGroup"),
+            panelTopLeft.Y + PanelPadding, new Color(255, 170, 145));
+        float utilityLabelY = GetModeBox(CombatCount).Y - GroupGap - GroupLabelHeight;
+        DrawGroupLabel(font, T("ModeUtilityGroup"), utilityLabelY, new Color(135, 220, 190));
 
         for (int i = 0; i < CompanionModeRules.WheelOrder.Length; i++)
         {
@@ -217,45 +233,56 @@ public static class CompanionModeWheel
             bool available = reference is null || CompanionModeRules.IsAvailable(mode, reference);
             bool isHovered = i == hovered;
             bool isCurrent = reference is not null && reference.Mode == mode;
-
-            Vector2 slotCenter = center + SectorDirection(i) * Radius;
-            Rectangle box = Utils.CenteredRectangle(slotCenter, new Vector2(SlotWidth, SlotHeight));
+            Rectangle box = GetModeBox(i);
 
             Color tint = CompanionModeRules.Tint(mode);
-            Color back = available ? new Color(20, 24, 40, 235) : new Color(26, 26, 30, 235);
-            Color border = available ? Color.Lerp(new Color(80, 90, 120), tint, isCurrent ? 0.75f : 0.35f)
+            Color back = available ? new Color(22, 29, 46, 238) : new Color(31, 31, 36, 235);
+            Color border = available ? Color.Lerp(new Color(74, 92, 123), tint, isCurrent ? 0.82f : 0.38f)
                                      : new Color(70, 70, 78);
             if (isHovered)
             {
-                back = Color.Lerp(back, tint, available ? 0.30f : 0.10f);
+                back = Color.Lerp(back, tint, available ? 0.34f : 0.10f);
                 border = Color.Lerp(border, Color.White, 0.45f);
             }
 
             DrawRectangle(box, back);
-            DrawBorder(box, border, 2);
+            DrawBorder(box, border, isCurrent ? 3 : 2);
 
             Color textColor = available ? (isHovered ? Color.White : Color.Lerp(Color.White, tint, 0.55f))
                                         : new Color(120, 120, 128);
             string label = CompanionModeRules.Name(mode);
-            Vector2 labelSize = font.MeasureString(label) * 0.9f;
+            Vector2 labelSize = font.MeasureString(label) * 0.84f;
             Utils.DrawBorderString(Main.spriteBatch, label,
-                slotCenter - labelSize * 0.5f, textColor, 0.9f);
+                new Vector2(box.Center.X - labelSize.X * 0.5f, box.Center.Y - labelSize.Y * 0.5f), textColor, 0.84f);
         }
 
-        // Hovered sector's description (or why it is unavailable) under the ring.
         if (hovered >= 0 && hovered < CompanionModeRules.WheelOrder.Length)
         {
             CompanionMode mode = CompanionModeRules.WheelOrder[hovered];
             bool available = reference is null || CompanionModeRules.IsAvailable(mode, reference);
-            string caption = available
-                ? CompanionModeRules.Description(mode)
-                : CompanionModeRules.RequirementText(mode);
+            string caption = available ? CompanionModeRules.Description(mode) : CompanionModeRules.RequirementText(mode);
             Color captionColor = available ? new Color(215, 220, 235) : new Color(255, 160, 120);
-
-            Vector2 size = font.MeasureString(caption) * 0.85f;
-            Vector2 spot = center + new Vector2(-size.X * 0.5f, Radius + SlotHeight);
-            Utils.DrawBorderString(Main.spriteBatch, caption, spot, captionColor, 0.85f);
+            Vector2 size = font.MeasureString(caption) * 0.68f;
+            Vector2 spot = new(
+                PanelArea.Center.X - size.X * 0.5f,
+                GetModeBox(CompanionModeRules.WheelOrder.Length - 1).Bottom + 11f);
+            Utils.DrawBorderString(Main.spriteBatch, caption, spot, captionColor, 0.68f);
         }
+    }
+
+    private static void DrawGroupLabel(DynamicSpriteFont font, string label, float y, Color color)
+    {
+        Vector2 size = font.MeasureString(label) * 0.68f;
+        Utils.DrawBorderString(Main.spriteBatch, label,
+            new Vector2(PanelArea.Center.X - size.X * 0.5f, y), color, 0.68f);
+    }
+
+    private static Vector2 ClampToScreen(Vector2 topLeft, int width, int height)
+    {
+        const float margin = 10f;
+        return new Vector2(
+            MathHelper.Clamp(topLeft.X, margin, Math.Max(margin, Main.screenWidth - width - margin)),
+            MathHelper.Clamp(topLeft.Y, margin, Math.Max(margin, Main.screenHeight - height - margin)));
     }
 
     private static void DrawRectangle(Rectangle area, Color color) =>

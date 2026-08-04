@@ -114,7 +114,8 @@ Mods: {
 					Lewy przycisk myszy: przywołuje towarzysza w miejscu kursora. Użyj ponownie, aby przywołać kolejnego zapisanego towarzysza.
 					Towarzysze są przypisani do gracza, a nie świata, i każdy zużywa miejsce sługi.
 					Prawy przycisk myszy: otwiera menedżer towarzyszy. Możesz tam odesłać wybranych albo wszystkich naraz.
-					Prawy klik na towarzyszu: otwiera jego wyposażenie i plecak. Nie musisz trzymać żadnego przedmiotu.
+					Kliknij panel towarzyszy na górze ekranu: otwiera wyposażenie i plecak.
+					Możesz też włączyć w ustawieniach „Prawy klik na towarzyszu otwiera plecak”, aby otwierać go bezpośrednio prawym kliknięciem na towarzyszu.
 					Broń: można użyć każdej broni, także przywołującej. Pasek broni jest sprawdzany od lewej do prawej; bronie dystansowe używają podstawowej amunicji, gdy jej zabraknie.
 
 					Uwagi techniczne:
@@ -190,6 +191,12 @@ Mods: {
 			DefaultName: Widmowy towarzysz
 			InventoryTitle: "{0} · Wyposażenie i plecak"
 			Close: Zamknij
+			Rename: Zmień nazwę
+			RenameTitle: Zmień nazwę: {0}
+			RenamePrompt: Wpisz nową nazwę (obsługiwany jest Unicode)
+			RenameSave: Zapisz
+			RenameCancel: Anuluj
+			RenameEmpty: Towarzysz musi mieć nazwę.
 			Armor: Pancerz
 			Vanity: Wygląd
 			Dye: Barwnik
@@ -246,19 +253,23 @@ Mods: {
 			AttackAnimationBusy: Poprzedni atak jeszcze się nie zakończył
 			AttackAttacking: Atakuje
 			ModeAttack: Atak
+			// ModeFreeRoam: Free Roam
 			ModeEscort: Eskorta
 			ModeGarrison: Posterunek
 			ModeCatch: Łapanie
 			ModeFishing: Łowienie
 			ModeMining: Górnictwo
+			ModeCombatGroup: Walka
+			ModeUtilityGroup: Zaplecze
 			ModeAttackDescription: Porusza się swobodnie i szuka wrogów
+			// ModeFreeRoamDescription: Wander the owner's vicinity and hunt nearby enemies on its own (never edits terrain)
 			ModeEscortDescription: Trzyma się blisko i reaguje na zagrożenia właściciela
 			ModeGarrisonDescription: Utrzymuje pozycję i wraca po odrzuceniu
 			ModeCatchDescription: Łapie stworzenia bez ranienia ich
 			ModeFishingDescription: Łowi w pobliżu, pozostając w miejscu
 			ModeMiningDescription: Kopie z tobą, wydobywa rudę i oświetla drogę
 			ModeCatchRequirement: Wymaga siatki w odpowiednim slocie
-			ModeFishingRequirement: Wymaga wędki w odpowiednim slocie
+			ModeFishingRequirement: Wymaga wędki w odpowiednim slocie oraz przynęty na pasku lub w plecaku
 			ModeMiningRequirement: Wymaga kilofa w slocie 2
 			AvoidNoThreat: Nie wykryto zagrożenia
 			AvoidReacting: Reaguje

@@ -181,7 +181,51 @@ public static class CompanionWeaponBehaviors
     public static float GetMeleeReach(Player companion, Item weapon)
     {
         float scale = companion?.GetAdjustedItemScale(weapon) ?? weapon.scale;
-        return System.Math.Max(44f, System.Math.Max(weapon.width, weapon.height) * scale + 6f);
+        float reach = System.Math.Max(44f, System.Math.Max(weapon.width, weapon.height) * scale + 6f);
+
+        // Spears deal their actual hit through a short-lived projectile. Their item sprite is
+        // tiny, so sizing the engagement range from the sprite alone makes a companion walk
+        // inside the enemy before trying to stab. Estimate the thrust from the launch speed,
+        // bounded so an unusual modded spear cannot turn into a gun-range weapon.
+        if (IsCloseCombatWeapon(weapon) && weapon.noMelee && weapon.shoot > ProjectileID.None)
+            reach = System.Math.Max(reach, MathHelper.Clamp(weapon.shootSpeed * 12f + 52f, 96f, 180f));
+
+        return reach;
+    }
+
+    /// <summary>
+    /// Whether a weapon needs a close striking position even though it may spawn a projectile.
+    /// A spear is the important case: its projectile is the thrust hitbox, not a bullet. Direct
+    /// melee weapons and whips belong to the same close-combat family; yoyos stay ranged because
+    /// their own range set explicitly describes a persistent remote hitbox.
+    /// </summary>
+    public static bool IsCloseCombatWeapon(Item weapon)
+    {
+        if (weapon.IsAir || !weapon.CountsAsClass(DamageClass.Melee))
+            return false;
+        if (weapon.shoot <= ProjectileID.None || !weapon.noMelee)
+            return true;
+
+        if (ProjectileID.Sets.IsAWhip.Length > weapon.shoot && ProjectileID.Sets.IsAWhip[weapon.shoot])
+            return true;
+        if (ProjectileID.Sets.YoyosMaximumRange.Length > weapon.shoot &&
+            ProjectileID.Sets.YoyosMaximumRange[weapon.shoot] > 0f)
+        {
+            return false;
+        }
+
+        if (ContentSamples.ProjectilesByType.TryGetValue(weapon.shoot, out Projectile sample) &&
+            (sample.aiStyle == ProjAIStyleID.Spear || sample.aiStyle == ProjAIStyleID.Flail ||
+             sample.aiStyle == ProjAIStyleID.ShortSword || sample.aiStyle == ProjAIStyleID.HeldProjectile))
+        {
+            return true;
+        }
+
+        // A custom spear may not borrow vanilla Spear AI. Slow launch speed plus a deliberate
+        // swing cadence is the conservative generic signature for that case; fast thrown blades
+        // and beam-like melee projectiles remain ranged until a mod explicitly gives them a
+        // close-combat AI style.
+        return weapon.shootSpeed <= 6f && weapon.useTime >= 10;
     }
 
     private static bool HasAmmo(CompanionProfile inventory, int ammoType)

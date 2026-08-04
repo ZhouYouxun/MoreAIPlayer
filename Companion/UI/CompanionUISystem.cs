@@ -115,7 +115,7 @@ public sealed class CompanionUISystem : ModSystem
     /// "nothing I changed had any effect" can be told apart from "the change did not help" —
     /// three rounds of fixes were evaluated without that distinction being available.
     /// </summary>
-    public const string BuildStamp = "2026-08-03 #23 fault-isolation-and-safe-drop";
+    public const string BuildStamp = "2026-08-04 #26 logistics-fishing-mining";
 
     /// <summary>Draws a live decision readout over each companion only when the player has
     /// explicitly enabled the client-side diagnostic configuration.</summary>

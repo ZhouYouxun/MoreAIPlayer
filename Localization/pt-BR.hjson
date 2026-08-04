@@ -114,7 +114,8 @@ Mods: {
 					Clique esquerdo: invoca um companheiro na posição do cursor. Use de novo para invocar o próximo companheiro salvo.
 					Companheiros ficam vinculados ao jogador, não ao mundo, e cada um consome um espaço de lacaio.
 					Clique direito: abre o gerenciador de companheiros. Nele, você pode dispensar alguns companheiros ou todos de uma vez.
-					Clique direito em um companheiro: abre seus equipamentos e sua mochila. Não é preciso segurar item algum.
+					Clique no painel de companheiros no topo da tela: abre os equipamentos e a mochila.
+					Você também pode ativar em Configurações «Clique direito em um companheiro para abrir a mochila» para abri-la diretamente com o clique direito no companheiro.
 					Armas: qualquer arma é aceita, inclusive armas de invocação. A barra de armas é verificada da esquerda para a direita; armas à distância usam munição básica quando ela acaba.
 
 					Notas técnicas:
@@ -190,6 +191,12 @@ Mods: {
 			DefaultName: Companheiro fantasma
 			InventoryTitle: "{0} · Equipamentos e mochila"
 			Close: Fechar
+			Rename: Renomear
+			RenameTitle: Renomear {0}
+			RenamePrompt: Digite um novo nome (Unicode é compatível)
+			RenameSave: Salvar
+			RenameCancel: Cancelar
+			RenameEmpty: Um companheiro precisa de um nome.
 			Armor: Armadura
 			Vanity: Visual
 			Dye: Corante
@@ -246,19 +253,23 @@ Mods: {
 			AttackAnimationBusy: O ataque anterior ainda não terminou
 			AttackAttacking: Atacando
 			ModeAttack: Ataque
+			// ModeFreeRoam: Free Roam
 			ModeEscort: Escolta
 			ModeGarrison: Guarda
 			ModeCatch: Captura
 			ModeFishing: Pesca
 			ModeMining: Mineração
+			ModeCombatGroup: Combate
+			ModeUtilityGroup: Utilidade
 			ModeAttackDescription: Move-se livremente e procura inimigos
+			// ModeFreeRoamDescription: Wander the owner's vicinity and hunt nearby enemies on its own (never edits terrain)
 			ModeEscortDescription: Fica perto e reage a ameaças próximas do dono
 			ModeGarrisonDescription: Mantém a posição e volta após ser empurrado
 			ModeCatchDescription: Prioriza capturar criaturas sem feri-las
 			ModeFishingDescription: Pesca por perto sem sair do lugar
 			ModeMiningDescription: Escava com você, minera e ilumina
 			ModeCatchRequirement: Requer uma rede no espaço de rede
-			ModeFishingRequirement: Requer uma vara no espaço de vara
+			ModeFishingRequirement: Requer uma vara no espaço de vara e isca na barra rápida ou mochila
 			ModeMiningRequirement: Requer uma picareta no espaço 2
 			AvoidNoThreat: Nenhuma ameaça detectada
 			AvoidReacting: Reagindo

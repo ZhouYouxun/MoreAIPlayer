@@ -114,7 +114,8 @@ Mods: {
 					Clic sinistro: evoca un compagno alla posizione del cursore. Usalo di nuovo per evocare il successivo compagno salvato.
 					I compagni sono legati al giocatore, non al mondo, e ciascuno consuma uno slot servitore.
 					Clic destro: apre il gestore dei compagni. Da lì puoi congedarne alcuni o tutti insieme.
-					Clic destro su un compagno: apre il suo equipaggiamento e lo zaino. Non devi tenere alcun oggetto in mano.
+					Clicca sul pannello dei compagni in alto sullo schermo: apre equipaggiamento e zaino.
+					Puoi anche attivare nelle Configurazioni “Clic destro su un compagno per aprire lo zaino” per aprirlo direttamente con il clic destro sul compagno.
 					Armi: è consentita qualsiasi arma, comprese quelle di evocazione. La barra delle armi viene controllata da sinistra a destra; le armi a distanza usano munizioni base quando finiscono le munizioni.
 
 					Note tecniche:
@@ -190,6 +191,12 @@ Mods: {
 			DefaultName: Compagno fantasma
 			InventoryTitle: "{0} · Equipaggiamento e zaino"
 			Close: Chiudi
+			Rename: Rinomina
+			RenameTitle: Rinomina {0}
+			RenamePrompt: Inserisci un nuovo nome (Unicode supportato)
+			RenameSave: Salva
+			RenameCancel: Annulla
+			RenameEmpty: Un compagno ha bisogno di un nome.
 			Armor: Armatura
 			Vanity: Aspetto
 			Dye: Tintura
@@ -246,19 +253,23 @@ Mods: {
 			AttackAnimationBusy: L'attacco precedente non è finito
 			AttackAttacking: Attacca
 			ModeAttack: Attacco
+			// ModeFreeRoam: Free Roam
 			ModeEscort: Scorta
 			ModeGarrison: Presidio
 			ModeCatch: Cattura
 			ModeFishing: Pesca
 			ModeMining: Estrazione
+			ModeCombatGroup: Combattimento
+			ModeUtilityGroup: Servizi
 			ModeAttackDescription: Si muove liberamente e cerca nemici
+			// ModeFreeRoamDescription: Wander the owner's vicinity and hunt nearby enemies on its own (never edits terrain)
 			ModeEscortDescription: Resta vicino e reagisce alle minacce del proprietario
 			ModeGarrisonDescription: Mantiene la posizione e torna se viene spinto via
 			ModeCatchDescription: Cattura le creature senza ferirle
 			ModeFishingDescription: Pesca nelle vicinanze restando fermo
 			ModeMiningDescription: Scava con te, estrae minerali e illumina
 			ModeCatchRequirement: Richiede un retino nel relativo slot
-			ModeFishingRequirement: Richiede una canna nel relativo slot
+			ModeFishingRequirement: Richiede una canna nel relativo slot e un'esca nella barra rapida o nello zaino
 			ModeMiningRequirement: Richiede un piccone nello slot 2
 			AvoidNoThreat: Nessuna minaccia rilevata
 			AvoidReacting: Reagisce

@@ -114,7 +114,8 @@ Mods: {
 					Clic gauche : invoque un compagnon à la position du curseur. Réutilisez-le pour invoquer le compagnon sauvegardé suivant.
 					Les compagnons sont liés au joueur, non au monde, et chacun consomme un emplacement de serviteur.
 					Clic droit : ouvre le gestionnaire de compagnons. Vous pouvez y renvoyer certains compagnons ou tous à la fois.
-					Clic droit sur un compagnon : ouvre son équipement et son sac. Vous n'avez pas besoin de tenir un objet.
+					Cliquez sur le panneau des compagnons en haut de l'écran : ouvre son équipement et son sac.
+					Vous pouvez aussi activer « Clic droit sur un compagnon pour ouvrir son sac » dans la configuration afin de l'ouvrir directement par clic droit.
 					Armes : toutes les armes sont acceptées, y compris celles d'invocation. La barre d'armes est vérifiée de gauche à droite ; les armes à distance utilisent des munitions de base si elles n'en ont plus.
 
 					Notes techniques :
@@ -190,6 +191,12 @@ Mods: {
 			DefaultName: Compagnon fantôme
 			InventoryTitle: "{0} · Équipement et sac"
 			Close: Fermer
+			Rename: Renommer
+			RenameTitle: Renommer {0}
+			RenamePrompt: Saisissez un nouveau nom (Unicode pris en charge)
+			RenameSave: Enregistrer
+			RenameCancel: Annuler
+			RenameEmpty: Un compagnon a besoin d'un nom.
 			Armor: Armure
 			Vanity: Apparence
 			Dye: Teinture
@@ -246,19 +253,23 @@ Mods: {
 			AttackAnimationBusy: L'attaque précédente n'est pas terminée
 			AttackAttacking: Attaque
 			ModeAttack: Attaque
+			// ModeFreeRoam: Free Roam
 			ModeEscort: Escorte
 			ModeGarrison: Garnison
 			ModeCatch: Capture
 			ModeFishing: Pêche
 			ModeMining: Minage
+			ModeCombatGroup: Combat
+			ModeUtilityGroup: Logistique
 			ModeAttackDescription: Se déplace librement et cherche les ennemis
+			// ModeFreeRoamDescription: Wander the owner's vicinity and hunt nearby enemies on its own (never edits terrain)
 			ModeEscortDescription: Reste proche et répond aux menaces voisines
 			ModeGarrisonDescription: Tient la position et revient après une projection
 			ModeCatchDescription: Capture les créatures sans les blesser
 			ModeFishingDescription: Pêche à proximité sans bouger
 			ModeMiningDescription: Creuse avec vous, mine et éclaire
 			ModeCatchRequirement: Nécessite un filet dans son emplacement
-			ModeFishingRequirement: Nécessite une canne dans son emplacement
+			ModeFishingRequirement: Nécessite une canne dans son emplacement et un appât dans la barre rapide ou le sac
 			ModeMiningRequirement: Nécessite une pioche à l'emplacement 2
 			AvoidNoThreat: Aucune menace détectée
 			AvoidReacting: Réagit

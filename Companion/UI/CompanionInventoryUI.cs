@@ -25,6 +25,11 @@ public sealed class CompanionInventoryUI : UIState
     private readonly Vector2? initialPanelPosition;
     private DraggableUIPanel panel = null!;
     private UIText statsText = null!;
+    private UIText titleText = null!;
+    private UIPanel renameOverlay;
+    private UIPanel renameDialog;
+    private CompanionNameTextInput renameInput;
+    private UIText renameErrorText;
 
     public CompanionInventoryUI(CompanionProfile data, int companionSlot, Vector2? initialPanelPosition = null)
     {
@@ -49,10 +54,10 @@ public sealed class CompanionInventoryUI : UIState
         Append(panel);
 
         string companionName = string.IsNullOrWhiteSpace(data.Name) ? T("DefaultName") : data.Name;
-        UIText title = new(T("InventoryTitle", companionName), 1.05f, true);
-        title.Left.Set(18f, 0f);
-        title.Top.Set(12f, 0f);
-        panel.Append(title);
+        titleText = new UIText(T("InventoryTitle", companionName), 1.05f, true);
+        titleText.Left.Set(18f, 0f);
+        titleText.Top.Set(12f, 0f);
+        panel.Append(titleText);
 
         UITextPanel<string> closeButton = new(T("Close"), 0.8f, false);
         closeButton.Width.Set(64f, 0f);
@@ -62,27 +67,55 @@ public sealed class CompanionInventoryUI : UIState
         closeButton.OnLeftClick += (_, _) => CompanionUISystem.Close();
         panel.Append(closeButton);
 
+        UITextPanel<string> renameButton = new(T("Rename"), 0.8f, false);
+        renameButton.Width.Set(76f, 0f);
+        renameButton.Height.Set(30f, 0f);
+        renameButton.Left.Set(-160f, 1f);
+        renameButton.Top.Set(8f, 0f);
+        renameButton.OnLeftClick += (_, _) => OpenRenameDialog();
+        panel.Append(renameButton);
+
         // ── Group 1: worn equipment (left block) and accessories (right column) ──────────
         const float equipLabelY = 50f;
         const float equipTopY = equipLabelY + LabelGap;
 
         AddLabel(panel, T("Armor"), Margin, equipLabelY);
         AddVerticalSlots(panel, data.Armor, Margin, equipTopY,
+            ItemSlot.Context.EquipArmor,
             (CompanionSlotRules.IsHeadArmor, T("HeadArmorOnly")),
             (CompanionSlotRules.IsBodyArmor, T("BodyArmorOnly")),
             (CompanionSlotRules.IsLegArmor, T("LegArmorOnly")));
 
         AddLabel(panel, T("Vanity"), Margin + SlotStep, equipLabelY);
-        AddVerticalSlots(panel, data.Vanity, Margin + SlotStep, equipTopY,
-            (CompanionSlotRules.IsHeadArmor, T("HeadVanityOnly")),
-            (CompanionSlotRules.IsBodyArmor, T("BodyVanityOnly")),
-            (CompanionSlotRules.IsLegArmor, T("LegVanityOnly")));
+        for (int i = 0; i < data.Vanity.Length; i++)
+        {
+            System.Func<Item, bool> rule;
+            string rejection;
+            switch (i)
+            {
+                case 0:
+                    rule = CompanionSlotRules.IsHeadArmor;
+                    rejection = T("HeadVanityOnly");
+                    break;
+                case 1:
+                    rule = CompanionSlotRules.IsBodyArmor;
+                    rejection = T("BodyVanityOnly");
+                    break;
+                default:
+                    rule = CompanionSlotRules.IsLegArmor;
+                    rejection = T("LegVanityOnly");
+                    break;
+            }
+            panel.Append(CreateSlot(data.Vanity, i, rule, rejection, Margin + SlotStep, equipTopY + i * SlotStep,
+                drawContext: ItemSlot.Context.EquipArmorVanity, emptySilhouetteIndex: 3 + i * 6));
+        }
 
         AddLabel(panel, T("Dye"), Margin + SlotStep * 2f, equipLabelY);
         for (int i = 0; i < data.Dyes.Length; i++)
         {
             panel.Append(CreateSlot(data.Dyes, i, CompanionSlotRules.IsDye, T("DyeOnly"),
-                Margin + SlotStep * 2f, equipTopY + i * SlotStep));
+                Margin + SlotStep * 2f, equipTopY + i * SlotStep,
+                drawContext: ItemSlot.Context.EquipDye));
         }
 
         AddLabel(panel, T("Accessories"), ColumnTwo, equipLabelY);
@@ -93,7 +126,8 @@ public sealed class CompanionInventoryUI : UIState
                 data.Accessories, i, CompanionSlotRules.IsAccessory, T("AccessoryOnly"),
                 ColumnTwo + i * SlotStep, equipTopY,
                 isLocked: () => capturedIndex >= CompanionSlotRules.UnlockedAccessorySlots(),
-                lockedText: AccessoryLockReason(capturedIndex)));
+                lockedText: AccessoryLockReason(capturedIndex),
+                drawContext: ItemSlot.Context.EquipAccessory));
         }
 
         // Tucked under the accessory row, filling the space beside the three equip columns.
@@ -170,7 +204,7 @@ public sealed class CompanionInventoryUI : UIState
             height: 30f,
             textScale: 0.78f);
         // Sits immediately left of the close button on the title row.
-        stealthToggle.Left.Set(-224f, 1f);
+        stealthToggle.Left.Set(-300f, 1f);
         stealthToggle.Top.Set(8f, 0f);
         panel.Append(stealthToggle);
 
@@ -191,13 +225,15 @@ public sealed class CompanionInventoryUI : UIState
         float toolColumn = Margin + (data.Ammo.Length + 0.5f) * SlotStep;
         AddLabel(panel, T("Tools"), toolColumn, ammoLabelY);
         panel.Append(CreateSlot(data.Net, 0, CompanionSlotRules.IsCatchingTool,
-            T("NetOnly"), toolColumn, ammoTopY));
+            T("NetOnly"), toolColumn, ammoTopY, emptyItemGhostType: ItemID.BugNet));
         panel.Append(CreateSlot(data.Rod, 0, CompanionSlotRules.IsFishingPole,
-            T("RodOnly"), toolColumn + SlotStep, ammoTopY));
+            T("RodOnly"), toolColumn + SlotStep, ammoTopY, emptyItemGhostType: ItemID.WoodFishingPole));
         panel.Append(CreateSlot(data.Hook, 0, CompanionSlotRules.IsGrapplingHook,
-            T("HookOnly"), toolColumn + SlotStep * 2f, ammoTopY));
+            T("HookOnly"), toolColumn + SlotStep * 2f, ammoTopY,
+            drawContext: ItemSlot.Context.EquipGrapple));
         panel.Append(CreateSlot(data.Mount, 0, CompanionSlotRules.IsMount,
-            T("MountOnly"), toolColumn + SlotStep * 3f, ammoTopY));
+            T("MountOnly"), toolColumn + SlotStep * 3f, ammoTopY,
+            drawContext: ItemSlot.Context.EquipMount));
 
         // ── Group 4: backpack ────────────────────────────────────────────────────────────
         const float backpackLabelY = ammoTopY + CompanionItemSlot.SlotSize + GroupGap;
@@ -252,7 +288,7 @@ public sealed class CompanionInventoryUI : UIState
         // a vanilla control behind it. Do not set Main.blockMouse here: it is a broader global
         // input gate, and keeping it live over this whole panel makes vanilla skip its item-hover
         // and transfer-feedback paths for an unpredictable number of later frames.
-        if (panel is not null && panel.ContainsPoint(Main.MouseScreen))
+        if (renameDialog is not null || (panel is not null && panel.ContainsPoint(Main.MouseScreen)))
             Main.LocalPlayer.mouseInterface = true;
 
         base.Update(gameTime);
@@ -313,6 +349,101 @@ public sealed class CompanionInventoryUI : UIState
         }
     }
 
+    private void OpenRenameDialog()
+    {
+        if (renameDialog is not null)
+            return;
+
+        // The dimmer is a real full-screen UI element, not just a draw effect: it keeps clicks
+        // on the loadout below from changing gear while the player is naming the companion.
+        renameOverlay = new UIPanel();
+        renameOverlay.Width.Set(0f, 1f);
+        renameOverlay.Height.Set(0f, 1f);
+        renameOverlay.BackgroundColor = new Color(0, 0, 0, 126);
+        renameOverlay.BorderColor = Color.Transparent;
+        renameOverlay.OnLeftClick += (_, _) => Main.LocalPlayer.mouseInterface = true;
+        Append(renameOverlay);
+
+        renameDialog = new UIPanel();
+        renameDialog.Width.Set(392f, 0f);
+        renameDialog.Height.Set(162f, 0f);
+        renameDialog.HAlign = 0.5f;
+        renameDialog.VAlign = 0.5f;
+        renameDialog.BackgroundColor = new Color(17, 25, 43, 250);
+        renameDialog.BorderColor = new Color(104, 180, 235);
+        Append(renameDialog);
+
+        UIText heading = new(T("RenameTitle", DisplayName()), 0.94f, true);
+        heading.Left.Set(18f, 0f);
+        heading.Top.Set(14f, 0f);
+        renameDialog.Append(heading);
+
+        UIText prompt = new(T("RenamePrompt"), 0.72f);
+        prompt.Left.Set(18f, 0f);
+        prompt.Top.Set(42f, 0f);
+        renameDialog.Append(prompt);
+
+        renameInput = new CompanionNameTextInput(data.Name);
+        renameInput.Width.Set(-36f, 1f);
+        renameInput.Height.Set(36f, 0f);
+        renameInput.Left.Set(18f, 0f);
+        renameInput.Top.Set(62f, 0f);
+        renameDialog.Append(renameInput);
+
+        renameErrorText = new UIText(string.Empty, 0.62f);
+        renameErrorText.Left.Set(18f, 0f);
+        renameErrorText.Top.Set(102f, 0f);
+        renameDialog.Append(renameErrorText);
+
+        UITextPanel<string> cancelButton = new(T("RenameCancel"), 0.7f, false);
+        cancelButton.Width.Set(82f, 0f);
+        cancelButton.Height.Set(28f, 0f);
+        cancelButton.Left.Set(-188f, 1f);
+        cancelButton.Top.Set(-38f, 1f);
+        cancelButton.OnLeftClick += (_, _) => CloseRenameDialog();
+        renameDialog.Append(cancelButton);
+
+        UITextPanel<string> saveButton = new(T("RenameSave"), 0.7f, false);
+        saveButton.Width.Set(82f, 0f);
+        saveButton.Height.Set(28f, 0f);
+        saveButton.Left.Set(-98f, 1f);
+        saveButton.Top.Set(-38f, 1f);
+        saveButton.OnLeftClick += (_, _) => SaveRename();
+        renameDialog.Append(saveButton);
+    }
+
+    private void SaveRename()
+    {
+        if (renameInput is null || string.IsNullOrWhiteSpace(renameInput.Text))
+        {
+            renameErrorText?.SetText(T("RenameEmpty"));
+            return;
+        }
+
+        data.Rename(renameInput.Text);
+        CompanionInstance companion = CompanionEntitySystem.GetBySlot(companionSlot);
+        if (companion is not null)
+            companion.Entity.name = data.Name;
+        titleText?.SetText(T("InventoryTitle", DisplayName()));
+        SoundEngine.PlaySound(SoundID.MenuTick with { Volume = 0.6f, Pitch = 0.16f });
+        CloseRenameDialog();
+    }
+
+    private void CloseRenameDialog()
+    {
+        if (renameDialog is null)
+            return;
+
+        RemoveChild(renameDialog);
+        RemoveChild(renameOverlay);
+        renameOverlay = null;
+        renameDialog = null;
+        renameInput = null;
+        renameErrorText = null;
+    }
+
+    private string DisplayName() => string.IsNullOrWhiteSpace(data.Name) ? T("DefaultName") : data.Name;
+
     /// <summary>True when at least one ordinary rotation slot holds something usable as a weapon.</summary>
     private bool HasRotationWeapon()
     {
@@ -337,18 +468,22 @@ public sealed class CompanionInventoryUI : UIState
         Language.GetTextValue($"Mods.MoreAIPlayer.CompanionUI.{key}", args);
 
     private static CompanionItemSlot CreateSlot(Item[] items, int index, System.Func<Item, bool> rule, string rejectionText, float left, float top,
-        System.Func<bool> isHighlighted = null, Color? accentColor = null, System.Func<bool> isLocked = null, string lockedText = null)
+        System.Func<bool> isHighlighted = null, Color? accentColor = null, System.Func<bool> isLocked = null, string lockedText = null,
+        int drawContext = ItemSlot.Context.BankItem, int emptyItemGhostType = ItemID.None, int emptySilhouetteIndex = -1)
     {
-        CompanionItemSlot slot = new(items, index, rule, rejectionText, isHighlighted, accentColor, isLocked, lockedText);
+        CompanionItemSlot slot = new(items, index, rule, rejectionText, isHighlighted, accentColor, isLocked, lockedText,
+            drawContext, emptyItemGhostType, emptySilhouetteIndex);
         slot.Left.Set(left, 0f);
         slot.Top.Set(top, 0f);
         return slot;
     }
 
-    private static void AddVerticalSlots(UIElement panel, Item[] items, float left, float top, params (System.Func<Item, bool> Rule, string Rejection)[] rules)
+    private static void AddVerticalSlots(UIElement panel, Item[] items, float left, float top, int drawContext,
+        params (System.Func<Item, bool> Rule, string Rejection)[] rules)
     {
         for (int i = 0; i < items.Length; i++)
-            panel.Append(CreateSlot(items, i, rules[i].Rule, rules[i].Rejection, left, top + i * SlotStep));
+            panel.Append(CreateSlot(items, i, rules[i].Rule, rules[i].Rejection, left, top + i * SlotStep,
+                drawContext: drawContext));
     }
 
     private static void AddLabel(UIElement panel, string text, float left, float top)

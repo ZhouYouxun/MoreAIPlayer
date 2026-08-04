@@ -1,4 +1,5 @@
 using Microsoft.Xna.Framework;
+using Terraria;
 using Terraria.Localization;
 
 namespace MoreAIPlayer.Companion;
@@ -75,7 +76,7 @@ public static class CompanionModeRules
     public static bool IsAvailable(CompanionMode mode, CompanionProfile profile) => mode switch
     {
         CompanionMode.Catch => CompanionSlotRules.IsCatchingTool(profile.NetTool) && !profile.NetTool.IsAir,
-        CompanionMode.Fishing => CompanionSlotRules.IsFishingPole(profile.RodTool) && !profile.RodTool.IsAir,
+        CompanionMode.Fishing => CompanionSlotRules.IsFishingPole(profile.RodTool) && !profile.RodTool.IsAir && HasFishingBait(profile),
         CompanionMode.Mining => CompanionSlotRules.IsPickaxe(profile.PickTool) && !profile.PickTool.IsAir,
         _ => true
     };
@@ -83,4 +84,23 @@ public static class CompanionModeRules
     /// <summary>The mode to actually run this tick: the chosen one, or Attack when its gear is gone.</summary>
     public static CompanionMode Effective(CompanionProfile profile) =>
         IsAvailable(profile.Mode, profile) ? profile.Mode : CompanionMode.Attack;
+
+    /// <summary>
+    /// Vanilla fishing checks the regular inventory after its dedicated ammo row. The companion
+    /// maps its hotbar and backpack into that regular inventory, so bait in either player-facing
+    /// area is valid. This deliberately does not consume or move bait itself; the real
+    /// fishing-pole ItemCheck owns normal bait consumption.
+    /// </summary>
+    public static bool HasFishingBait(CompanionProfile profile) =>
+        ContainsBait(profile.Hotbar) || ContainsBait(profile.Backpack);
+
+    private static bool ContainsBait(Item[] items)
+    {
+        foreach (Item item in items)
+        {
+            if (!item.IsAir && item.stack > 0 && item.bait > 0)
+                return true;
+        }
+        return false;
+    }
 }

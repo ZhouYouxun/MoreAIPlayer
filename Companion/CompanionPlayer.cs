@@ -39,9 +39,12 @@ public sealed class CompanionPlayer : ModPlayer
     public int RequestedTarget = -1;
     public int CombatRequestTime;
 
-    /// <summary>Set true whenever this player's weapon connects; the brain reads and clears
-    /// it to detect a whiffed melee swing (see CompanionBrain's miss-streak aggression).</summary>
-    public bool MeleeHitLanded;
+    /// <summary>
+    /// Advances whenever this companion deals contact damage. The brain snapshots the value
+    /// before a deliberate attack, then checks whether it advanced when that use finishes;
+    /// this works for both an item swing and its companion-owned projectile.
+    /// </summary>
+    public int CombatHitSerial;
 
     /// <summary>Ticks remaining on the "come guard me" signal. Companions read their owner's
     /// copy to decide whether to teleport in and guard (see CompanionBrain's rescue policy).
@@ -386,13 +389,13 @@ public sealed class CompanionPlayer : ModPlayer
     public override void OnHitNPCWithItem(Item item, NPC target, NPC.HitInfo hit, int damageDone)
     {
         if (Main.netMode == NetmodeID.SinglePlayer)
-            MeleeHitLanded = true;
+            CombatHitSerial++;
     }
 
     public override void OnHitNPCWithProj(Projectile proj, NPC target, NPC.HitInfo hit, int damageDone)
     {
         if (Main.netMode == NetmodeID.SinglePlayer)
-            MeleeHitLanded = true;
+            CombatHitSerial++;
     }
 
 
@@ -418,7 +421,13 @@ public sealed class CompanionPlayer : ModPlayer
                 ObservedTileX = Player.tileTargetX;
                 ObservedTileY = Player.tileTargetY;
                 ObservedTileType = tile.TileType;
-                MiningObservationTime = 20;
+                // tileTarget already contains vanilla Smart Cursor's resolved left-click tile,
+                // not merely the raw mouse position. Tunnel assistance therefore follows the
+                // same down/left/right target the owner is actually mining with auto cursor.
+                // Long enough that a brief pause between the owner's swings does not make the
+                // companion down tools and walk off; short enough that it stops once the owner
+                // genuinely moves on to something else.
+                MiningObservationTime = 40;
 
                 Point direction = CardinalDirection(Player.Center, new Vector2(ObservedTileX * 16f + 8f, ObservedTileY * 16f + 8f));
                 if (direction == TunnelDirection)

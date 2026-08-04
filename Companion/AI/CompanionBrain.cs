@@ -17,7 +17,9 @@ public sealed class CompanionBrain
     private const float IdleDistance = 96f;
     private const float TeleportDistance = 800f;
     private const int TeleportDelayTicks = 240;
-    private const float RescueDistance = 5f * 16f;
+    // A companion this close is already beside its owner. No automatic recall is allowed inside
+    // this radius, including the stuck and vertical-follow safeguards below.
+    private const float NoTeleportDistance = 3f * 16f;
     private const int RescueCooldownTicks = 60;
     private const float AutomaticAggroRange = 15f * 16f;
     private const float MaximumCombatRange = 800f;
@@ -39,6 +41,27 @@ public sealed class CompanionBrain
 
     // How close a netted critter has to land for the companion to pocket it.
     private const float CritterPickupRange = 6f * 16f;
+
+    // Mining: when nothing is within pick reach, how far from the owner's dig point the companion
+    // may sit before it closes the gap. Kept just past a pick's reach so it digs shoulder to
+    // shoulder with the owner instead of hanging back and swinging at nothing.
+    private const float MiningApproachDistance = 5f * 16f;
+    private const int SustainedTunnelTicks = 120; // two seconds of one deliberate mining direction
+    private const float MiningSnapDistance = 10f;
+    private const float MiningDarknessThreshold = 0.24f;
+    private const int MiningLightCooldownTicks = 180;
+
+    // Fishing mirrors vanilla's basic pond thresholds: fewer than 75 liquid tiles cannot fish,
+    // while 300 is the normal full-power target. The local scan is capped at that useful target
+    // and refreshed infrequently, so a lake full of companions does not become a per-frame world
+    // flood-fill.
+    private const int FishingMinimumWaterTiles = 75;
+    private const int FishingIdealWaterTiles = 300;
+    private const int FishingSearchRadiusTiles = 26;
+    private const int FishingVerticalSearchTiles = 18;
+    private const int FishingPoolHalfWidth = 36;
+    private const int FishingPoolDepthScan = 80;
+    private const int FishingRescanTicks = 180;
 
     // Escort mode: bodyguard spacing, tighter than the roaming follow distance.
     private const float EscortFollowSide = 34f;
@@ -74,6 +97,14 @@ public sealed class CompanionBrain
     // many ticks means the companion is wedged and recalls to the owner.
     private const float StuckProgressDistance = 24f;
     private const int StuckTeleportTicks = 120; // 2s
+
+    // Vertical follow rescue: a companion below its owner still gets several genuine jump
+    // attempts to solve terrain normally. If it keeps trying but gains no meaningful height,
+    // recall it instead of leaving it to hop below a cliff forever.
+    private const float VerticalRescueMinimumHeight = 8f * 16f;
+    private const float VerticalRescueProgressDistance = 24f;
+    private const int VerticalRescueJumpAttempts = 3;
+    private const int VerticalRescueNoProgressLimit = 90;
 
     // Revive delay after a death that vanilla actually landed.
     private const int NormalReviveTicks = 300; // 5s
@@ -115,9 +146,25 @@ public sealed class CompanionBrain
     private int freeRoamGoalTicks;
     private int freeRoamFlipTimer;
 
+    // Fishing keeps one good water aim briefly instead of re-measuring the same pond every tick.
+    private FishingSpot? fishingSpot;
+    private int fishingSpotScanCooldown;
+
+    // Tunnel lighting is intentionally occasional: one companion should light a dark tunnel,
+    // not burn through an entire backpack of torches while the player holds the mouse down.
+    private int miningLightCooldown;
+
     // Stuck-teleport tracking.
     private Vector2 stuckReference;
     private int notProgressingTicks;
+
+    // Vertical-follow rescue tracking. The best reached Y is deliberately kept across a jump's
+    // rise and fall: hopping up a little and landing back at the same ledge is not progress.
+    private bool verticalRescueActive;
+    private float verticalRescueBestY;
+    private int verticalRescueNoProgressTicks;
+    private int verticalRescueJumpAttempts;
+    private bool verticalRescueJumpHeld;
 
     // Owner-teleport detection (compare the owner's per-tick position jump).
     private Vector2 lastOwnerCenter;
@@ -144,9 +191,21 @@ public sealed class CompanionBrain
     private int fruitlessSummons;
     private int summonBackoff;
 
-    // Miss-streak aggression: melee-class weapons push closer after a couple of whiffs.
-    private int consecutiveMeleeMisses;
-    private bool wasMeleeCombatSwingLastTick;
+    // Attack feedback is deliberately local to Attack / Free Roam. Those two modes are allowed
+    // to adapt their position; Escort and Garrison must respect their defensive posts instead.
+    private int consecutiveCloseCombatMisses;
+    private int consecutiveRangedMisses;
+    private bool pendingAdaptiveAttack;
+    private bool pendingAttackWasCloseCombat;
+    private int pendingHitSerial;
+    private int pendingAttackAge;
+    private int feedbackTarget = -1;
+    private string feedbackWeaponKey;
+
+    // A projectile can still be travelling when a rapid-fire weapon's use animation ends. Give
+    // ranged shots half a second to report a hit before calling them a miss; close weapons are
+    // resolved as soon as their swing ends.
+    private const int RangedFeedbackWindowTicks = 30;
 
     // Ticks the guard weapon stays out after the swarm that summoned it has broken up.
     private int guardHoldTicks;
@@ -155,6 +214,8 @@ public sealed class CompanionBrain
     // wants before taking it by force. 1.5s is longer than any legitimate weapon animation.
     private const int BlockedAttackForceTicks = 90;
     private int blockedAttackTicks;
+
+    private readonly record struct FishingSpot(Vector2 AimWorld, int WaterTiles);
 
     public bool ProtectCritters { get; private set; }
 
@@ -176,13 +237,23 @@ public sealed class CompanionBrain
         lastUseCompleted = lastItemAnimationSeen > 0 && me.itemAnimation == 0;
         lastItemAnimationSeen = me.itemAnimation;
 
-        if (lastUseCompleted && wasMeleeCombatSwingLastTick)
+        if (pendingAdaptiveAttack)
         {
-            CompanionPlayer selfData = me.GetModPlayer<CompanionPlayer>();
-            consecutiveMeleeMisses = selfData.MeleeHitLanded ? 0 : System.Math.Min(consecutiveMeleeMisses + 1, 4);
-            selfData.MeleeHitLanded = false;
+            pendingAttackAge++;
+            bool feedbackReady = pendingAttackWasCloseCombat
+                ? lastUseCompleted
+                : pendingAttackAge >= RangedFeedbackWindowTicks;
+            if (feedbackReady)
+            {
+                CompanionPlayer selfData = me.GetModPlayer<CompanionPlayer>();
+                bool hitLanded = selfData.CombatHitSerial != pendingHitSerial;
+                if (pendingAttackWasCloseCombat)
+                    consecutiveCloseCombatMisses = hitLanded ? 0 : System.Math.Min(consecutiveCloseCombatMisses + 1, 4);
+                else
+                    consecutiveRangedMisses = hitLanded ? 0 : System.Math.Min(consecutiveRangedMisses + 1, 5);
+                pendingAdaptiveAttack = false;
+            }
         }
-        wasMeleeCombatSwingLastTick = false;
 
         ResetControls(me);
         itemUseClaimedThisTick = false;
@@ -302,7 +373,7 @@ public sealed class CompanionBrain
         {
             NavigateToWaypoint(instance, me);
             if (target is not null && plan is not null)
-                TryAttack(instance, me, target, plan, profile); // shoot on the move
+                TryAttack(instance, me, target, plan, profile, mode is CompanionMode.Attack or CompanionMode.FreeRoam); // shoot on the move
         }
         else if (target is not null && plan is not null)
         {
@@ -315,8 +386,9 @@ public sealed class CompanionBrain
             combatLeashActive = holdActive || escortLeash || freeRoamLeash;
             combatLeashAnchor = holdActive ? holdAnchor : owner.Center;
             combatLeashRadius = freeRoamLeash ? FreeRoamLeash : HoldLeash;
-            PositionForCombat(me, target, plan);
-            TryAttack(instance, me, target, plan, profile);
+            bool adaptiveCombat = mode is CompanionMode.Attack or CompanionMode.FreeRoam;
+            PositionForCombat(me, target, plan, adaptiveCombat);
+            TryAttack(instance, me, target, plan, profile, adaptiveCombat);
             combatLeashActive = false;
         }
         else if (holdActive)
@@ -331,9 +403,7 @@ public sealed class CompanionBrain
         }
         else if (mode == CompanionMode.Fishing)
         {
-            // Casting is not implemented yet; standing still is the closest correct behaviour,
-            // and matches the "stays put like Garrison" half of the mode's contract.
-            navigator.Idle(me);
+            TryFishNearby(instance, me, profile);
         }
         else if (mode == CompanionMode.FreeRoam)
         {
@@ -350,14 +420,14 @@ public sealed class CompanionBrain
         // manual storage surface: put items in, transfer them out, or use Drop All yourself.
         else if (mode == CompanionMode.Escort)
         {
-            FollowOwner(me, owner, EscortFollowSide, EscortIdleDistance,
-                CompanionEntitySystem.SquadOrdinal(instance),
-                CompanionEntitySystem.CountActiveOwnedBy(instance.OwnerWhoAmI), EscortSpreadSpacing);
+            CompanionEntitySystem.SquadPosition(instance, out int ordinal, out int squadCount);
+            FollowOwner(me, owner, EscortFollowSide, EscortIdleDistance, ordinal, squadCount, EscortSpreadSpacing);
         }
         else if (!owner.dead)
-            FollowOwner(me, owner, 64f, IdleDistance * 0.5f,
-                CompanionEntitySystem.SquadOrdinal(instance),
-                CompanionEntitySystem.CountActiveOwnedBy(instance.OwnerWhoAmI), AttackSpreadSpacing);
+        {
+            CompanionEntitySystem.SquadPosition(instance, out int ordinal, out int squadCount);
+            FollowOwner(me, owner, 64f, IdleDistance * 0.5f, ordinal, squadCount, AttackSpreadSpacing);
+        }
         else
             navigator.Idle(me);
 
@@ -378,7 +448,7 @@ public sealed class CompanionBrain
         threatAvoidance.UpdateGarrisonAnchor(instance, profile, settledAtGarrison);
 
         if (!owner.dead)
-            UpdateTeleportPolicy(instance, me, owner, ownerData, profile, holdActive || traveling);
+            UpdateTeleportPolicy(instance, me, owner, ownerData, profile, mode, holdActive || traveling);
     }
 
     private static void ResetControls(Player me)
@@ -724,30 +794,33 @@ public sealed class CompanionBrain
         return count;
     }
 
-    private (bool isMeleeClass, float standoffFactor, float aggressionFactor) CombatFactors(Player me, CompanionWeaponPlan plan)
+    private (bool isCloseCombat, float standoffFactor, float aggressionFactor) CombatFactors(Player me, CompanionWeaponPlan plan, bool adaptiveCombat)
     {
-        bool isMeleeClass = plan.Weapon.CountsAsClass(DamageClass.Melee);
-        // Calamity "holdout" melee weapons (GrandDad and similar) are a self-propelled swing
-        // hitbox, not a travelling shot, so the weapon selector's shoot > 0 check mislabels
-        // them as UsesProjectile; left alone they'd be kept at gun range and whiff every
-        // swing. Standing at half that distance puts them back in their actual swing range.
-        bool isMeleeHoldout = isMeleeClass && plan.Weapon.channel && plan.UsesProjectile;
-        float holdoutFactor = isMeleeHoldout ? 0.5f : 1f;
-        // After a couple of whiffed swings in a row, a melee companion pushes in tighter
-        // instead of repeating the exact same losing position.
-        float aggressionFactor = isMeleeClass && consecutiveMeleeMisses >= 2 ? 0.7f : 1f;
-        return (isMeleeClass, holdoutFactor * aggressionFactor, aggressionFactor);
+        bool isCloseCombat = CompanionWeaponBehaviors.IsCloseCombatWeapon(plan.Weapon);
+        // A close weapon that keeps whiffing closes the gap in measured steps. Four misses put
+        // it at roughly half its nominal reach, enough to correct a spear's stale stand-off but
+        // not enough to make the companion overlap a boss every time one animation misses.
+        float aggressionFactor = !adaptiveCombat || !isCloseCombat
+            ? 1f
+            : MathHelper.Lerp(1f, 0.5f, consecutiveCloseCombatMisses / 4f);
+        // Ranged attacks stay at their intended firing distance at first. Only after a sustained
+        // miss streak do they step closer, which helps a slow shot blocked by terrain without
+        // turning normal guns into melee weapons.
+        float standoffFactor = adaptiveCombat && !isCloseCombat && consecutiveRangedMisses >= 4
+            ? 0.75f
+            : 1f;
+        return (isCloseCombat, standoffFactor, aggressionFactor);
     }
 
     /// <summary>Movement half of combat: walks to a firing/striking position. Identical in every
     /// mode except that a posted companion is leashed to its anchor (see <see cref="Travel"/>).</summary>
-    private void PositionForCombat(Player me, NPC target, CompanionWeaponPlan plan)
+    private void PositionForCombat(Player me, NPC target, CompanionWeaponPlan plan, bool adaptiveCombat)
     {
         float distance = Vector2.Distance(me.Center, target.Center);
         bool hasLineOfSight = Collision.CanHitLine(me.Center, 1, 1, target.Center, 1, 1);
-        (_, float standoffFactor, float aggressionFactor) = CombatFactors(me, plan);
+        (bool isCloseCombat, float standoffFactor, float aggressionFactor) = CombatFactors(me, plan, adaptiveCombat);
 
-        if (plan.UsesProjectile)
+        if (plan.UsesProjectile && !isCloseCombat)
         {
             float standoffMax = RangedStandoffMax * standoffFactor;
             float standoffMin = RangedStandoffMin * standoffFactor;
@@ -781,11 +854,11 @@ public sealed class CompanionBrain
 
     /// <summary>Attack half of combat: fires/swings when the target is reachable. Shared by every
     /// mode, and layered on top of waypoint travel so a companion shoots what it passes.</summary>
-    private void TryAttack(CompanionInstance instance, Player me, NPC target, CompanionWeaponPlan plan, CompanionProfile profile)
+    private void TryAttack(CompanionInstance instance, Player me, NPC target, CompanionWeaponPlan plan, CompanionProfile profile, bool adaptiveCombat)
     {
         float distance = Vector2.Distance(me.Center, target.Center);
         bool hasLineOfSight = Collision.CanHitLine(me.Center, 1, 1, target.Center, 1, 1);
-        (bool isMeleeClass, float standoffFactor, float aggressionFactor) = CombatFactors(me, plan);
+        (bool isCloseCombat, float standoffFactor, float aggressionFactor) = CombatFactors(me, plan, adaptiveCombat);
 
         // Defensive pre-attack: an enemy closing in from behind cover gets met with attacks
         // before it breaks line of sight, instead of the companion standing idle.
@@ -794,10 +867,10 @@ public sealed class CompanionBrain
             : 0f;
         bool approachingThreat = closingSpeed > 0.8f && distance < 340f;
 
-        bool inUseRange = plan.UsesProjectile
+        bool inUseRange = plan.UsesProjectile && !isCloseCombat
             ? distance <= GenericProjectileUseRange * standoffFactor
             : distance <= CompanionWeaponBehaviors.GetMeleeReach(me, plan.Weapon) * aggressionFactor;
-        bool defensiveNoLineOfSight = approachingThreat && (plan.UsesProjectile
+        bool defensiveNoLineOfSight = approachingThreat && (plan.UsesProjectile && !isCloseCombat
             ? distance <= 220f
             : distance <= CompanionWeaponBehaviors.GetMeleeReach(me, plan.Weapon) * 1.6f);
 
@@ -833,11 +906,40 @@ public sealed class CompanionBrain
             _ => CompanionWeaponOverrides.HasConfigurableAltUse(plan.Weapon) && profile.PrefersAltUse(plan.Weapon)
         };
 
+        float leadMultiplier = adaptiveCombat && !isCloseCombat
+            ? 1f + System.Math.Min(consecutiveRangedMisses, 3) * 0.12f
+            : 1f;
         Vector2 aim = plan.UsesProjectile
-            ? ComputeInterceptAim(me, target, plan.Weapon, profile)
+            ? ComputeInterceptAim(me, target, plan.Weapon, profile, leadMultiplier)
             : target.Center;
-        wasMeleeCombatSwingLastTick = isMeleeClass;
+        if (adaptiveCombat && me.itemAnimation == 0 && !itemUseClaimedThisTick)
+            BeginAdaptiveAttackFeedback(me, target, plan, isCloseCombat);
         UseHeldItem(instance, me, plan.Slot, aim, useAlt);
+    }
+
+    private void BeginAdaptiveAttackFeedback(Player me, NPC target, CompanionWeaponPlan plan, bool isCloseCombat)
+    {
+        string weaponKey = CompanionWeaponOverrides.ItemKey(plan.Weapon);
+        if (feedbackTarget != target.whoAmI || feedbackWeaponKey != weaponKey)
+        {
+            feedbackTarget = target.whoAmI;
+            feedbackWeaponKey = weaponKey;
+            consecutiveCloseCombatMisses = 0;
+            consecutiveRangedMisses = 0;
+            pendingAdaptiveAttack = false;
+            pendingAttackAge = 0;
+        }
+
+        // A rapid-fire weapon can start several animations while the first projectile is still
+        // in the air. Keep that one observation window intact instead of resetting it every
+        // use; any hit inside the window counts as a successful firing position.
+        if (pendingAdaptiveAttack)
+            return;
+
+        pendingAdaptiveAttack = true;
+        pendingAttackWasCloseCombat = isCloseCombat;
+        pendingHitSerial = me.GetModPlayer<CompanionPlayer>().CombatHitSerial;
+        pendingAttackAge = 0;
     }
 
     /// <summary>Navigate toward a goal, clamped to the hold leash while posted so combat chasing
@@ -930,7 +1032,7 @@ public sealed class CompanionBrain
     /// updates move the projectile multiple times per tick — against the target's velocity.
     /// A few fixed-point iterations converge close enough for straight-line projectiles.
     /// </summary>
-    private static Vector2 ComputeInterceptAim(Player me, NPC target, Item weapon, CompanionProfile profile)
+    private static Vector2 ComputeInterceptAim(Player me, NPC target, Item weapon, CompanionProfile profile, float leadMultiplier = 1f)
     {
         Vector2 fallback = target.Center;
         if (target.velocity.LengthSquared() < 2.25f)
@@ -963,7 +1065,7 @@ public sealed class CompanionBrain
         for (int i = 0; i < 3; i++)
         {
             float travelTicks = MathHelper.Clamp(Vector2.Distance(me.Center, aim) / effectiveSpeed, 0f, 40f);
-            aim = target.Center + target.velocity * travelTicks;
+            aim = target.Center + target.velocity * travelTicks * leadMultiplier;
         }
         return aim;
     }
@@ -991,6 +1093,9 @@ public sealed class CompanionBrain
 
     private bool TryPerformMiningOrTreeWork(CompanionInstance instance, Player me, Player owner, CompanionPlayer observation, CompanionProfile profile)
     {
+        if (miningLightCooldown > 0)
+            miningLightCooldown--;
+
         // The pick comes from the dedicated slot and nowhere else. Scanning the whole inventory
         // turned any pickaxe the companion happened to be carrying into a licence to dig, which
         // is the loose behaviour the pick slot exists to tighten up.
@@ -999,11 +1104,34 @@ public sealed class CompanionBrain
             : -1;
         if (pickaxeSlot >= 0 && observation.MiningObservationTime > 0)
         {
-            Point targetTile = observation.TunnelDirectionTime >= 180
-                ? FindTunnelTile(me, observation)
-                : FindSameTypeTile(me, observation);
+            Item pick = me.inventory[pickaxeSlot];
+            bool sustainedTunnel = observation.TunnelDirectionTime >= SustainedTunnelTicks &&
+                (observation.TunnelDirection.Y > 0 || observation.TunnelDirection.X != 0);
+
+            // A narrow shaft/tunnel cannot accommodate an ordinary follow offset. After two
+            // seconds of one deliberate mining direction, share the owner's exact position and
+            // work the same leading face.
+            if (sustainedTunnel && Vector2.DistanceSquared(me.Center, owner.Center) > MiningSnapDistance * MiningSnapDistance)
+            {
+                SnapToMiningOwner(me, owner);
+                return true;
+            }
+
+            if (TryLightMiningTunnel(instance, me, profile, observation))
+                return true;
+
+            Point targetTile = FindReachableMiningTile(me, observation, pick, sustainedTunnel);
             if (targetTile.X >= 0)
                 return MoveAndWorkTile(instance, me, pickaxeSlot, targetTile);
+
+            // Nothing minable within reach: close in on the spot the owner is digging so fresh
+            // tiles come into range, rather than standing back and swinging at nothing.
+            Vector2 digCenter = new(observation.ObservedTileX * 16f + 8f, observation.ObservedTileY * 16f + 8f);
+            if (Vector2.Distance(me.Center, digCenter) > MiningApproachDistance)
+            {
+                navigator.Navigate(me, digCenter);
+                return true;
+            }
         }
 
         int axeSlot = FindToolInventoryIndex(profile, item => item.axe > 0);
@@ -1017,26 +1145,55 @@ public sealed class CompanionBrain
         return false;
     }
 
-    private Point FindSameTypeTile(Player me, CompanionPlayer observation)
+    /// <summary>
+    /// Picks the best tile a mining companion can break from where it currently stands. Only tiles
+    /// already within pick reach are considered, so the companion always makes progress instead of
+    /// pathing at a buried block it can never line up on. Priority: exposed ore / Spelunker-
+    /// highlighted blocks first (grabbing valuables is the whole point of a mining buddy), then the
+    /// tiles closest to the spot the owner is digging, nudged toward the direction they are
+    /// tunnelling — so the companion clears the same passage instead of poking scattered holes off
+    /// to the side (which is what made its digging look misaligned).
+    /// </summary>
+    private static Point FindReachableMiningTile(Player me, CompanionPlayer observation, Item pick, bool sustainedTunnel)
     {
-        if (observation.ObservedTileType < 0)
-            return new Point(-1, -1);
+        Point dig = new(observation.ObservedTileX, observation.ObservedTileY);
+        Point tunnel = observation.TunnelDirection;
+        Point meTile = me.Center.ToTileCoordinates();
+        int reachX = Player.tileRangeX + pick.tileBoost + 1;
+        int reachY = Player.tileRangeY + pick.tileBoost + 1;
+        int? requiredOreType = IsOreTile(observation.ObservedTileType) ? observation.ObservedTileType : null;
 
         Point best = new(-1, -1);
-        float bestDistance = float.MaxValue;
-        for (int x = observation.ObservedTileX - 8; x <= observation.ObservedTileX + 8; x++)
+        float bestScore = float.MaxValue;
+        for (int x = meTile.X - reachX; x <= meTile.X + reachX; x++)
         {
-            for (int y = observation.ObservedTileY - 8; y <= observation.ObservedTileY + 8; y++)
+            for (int y = meTile.Y - reachY; y <= meTile.Y + reachY; y++)
             {
-                if (!CanMineNaturalTile(x, y, observation.ObservedTileType))
-                    continue;
-                if (x == observation.ObservedTileX && y == observation.ObservedTileY)
+                // Cheap reach test first — it culls most of the box before the more expensive
+                // CanKillTile check inside CanMineNaturalTile ever runs.
+                if (!IsTileInMiningReach(me, pick, x, y) || !CanMineNaturalTile(x, y, requiredOreType))
                     continue;
 
-                float distance = Vector2.DistanceSquared(me.Center, new Vector2(x * 16f + 8f, y * 16f + 8f));
-                if (distance < bestDistance)
+                // Once the owner has been cutting a deliberate shaft/tunnel for two seconds,
+                // keep the partner on the same leading face. Vertical shafts stay narrow;
+                // horizontal tunnels stay in the familiar three-tile-tall band.
+                if (sustainedTunnel && !IsOnMiningFrontier(x, y, dig, tunnel))
+                    continue;
+
+                float score = System.Math.Abs(x - dig.X) + System.Math.Abs(y - dig.Y);
+                int type = Main.tile[x, y].TileType;
+                if (requiredOreType.HasValue)
+                    score -= 1500f; // an observed ore means mine that exact ore type first
+                else if (type < Main.tileSpelunker.Length && Main.tileSpelunker[type])
+                    score -= 1000f; // ore already in reach is always worth taking first
+                if (tunnel.X != 0 && System.Math.Sign(x - dig.X) == tunnel.X)
+                    score -= 2f;
+                if (tunnel.Y != 0 && System.Math.Sign(y - dig.Y) == tunnel.Y)
+                    score -= 2f;
+
+                if (score < bestScore)
                 {
-                    bestDistance = distance;
+                    bestScore = score;
                     best = new Point(x, y);
                 }
             }
@@ -1044,17 +1201,107 @@ public sealed class CompanionBrain
         return best;
     }
 
-    private Point FindTunnelTile(Player me, CompanionPlayer observation)
+    private static bool IsOreTile(int tileType) =>
+        tileType >= 0 &&
+        ((tileType < TileID.Sets.Ore.Length && TileID.Sets.Ore[tileType]) ||
+         (tileType < Main.tileSpelunker.Length && Main.tileSpelunker[tileType]));
+
+    private static bool IsOnMiningFrontier(int x, int y, Point dig, Point direction)
     {
-        for (int step = 1; step <= 7; step++)
-        {
-            int x = observation.ObservedTileX + observation.TunnelDirection.X * step;
-            int y = observation.ObservedTileY + observation.TunnelDirection.Y * step;
-            if (CanMineNaturalTile(x, y, null))
-                return new Point(x, y);
-        }
-        return FindSameTypeTile(me, observation);
+        if (direction.Y > 0)
+            return y >= dig.Y - 1 && System.Math.Abs(x - dig.X) <= 1;
+        if (direction.X > 0)
+            return x >= dig.X - 1 && System.Math.Abs(y - dig.Y) <= 1;
+        if (direction.X < 0)
+            return x <= dig.X + 1 && System.Math.Abs(y - dig.Y) <= 1;
+        return true;
     }
+
+    private void SnapToMiningOwner(Player me, Player owner)
+    {
+        me.Center = owner.Center;
+        me.velocity = owner.velocity;
+        me.fallStart = (int)(me.position.Y / 16f);
+        navigator.Reset();
+        farFromOwnerTicks = 0;
+        stuckReference = me.Center;
+        notProgressingTicks = 0;
+        ResetVerticalFollowRescue();
+    }
+
+    private bool TryLightMiningTunnel(CompanionInstance instance, Player me, CompanionProfile profile, CompanionPlayer observation)
+    {
+        if (miningLightCooldown > 0)
+            return false;
+
+        Point anchor = new(observation.ObservedTileX, observation.ObservedTileY);
+        if (!WorldGen.InWorld(anchor.X, anchor.Y, 5) || Lighting.Brightness(anchor.X, anchor.Y) > MiningDarknessThreshold)
+            return false;
+
+        bool underwater = me.wet || Main.tile[anchor.X, anchor.Y].LiquidAmount > 0;
+        if (underwater)
+        {
+            int glowstickSlot = FindToolInventoryIndex(profile, IsGlowstick);
+            if (glowstickSlot < 0)
+                return false;
+
+            navigator.Idle(me);
+            UseHeldItem(instance, me, glowstickSlot, new Vector2(anchor.X * 16f + 8f, anchor.Y * 16f + 8f));
+            miningLightCooldown = MiningLightCooldownTicks;
+            return true;
+        }
+
+        int torchSlot = FindToolInventoryIndex(profile, IsTorch);
+        if (torchSlot < 0)
+            return false;
+
+        Point placement = FindNearbyTorchPlacement(me);
+        if (placement.X < 0)
+            return false;
+
+        navigator.Idle(me);
+        instance.WorkTile = placement;
+        UseHeldItem(instance, me, torchSlot, new Vector2(placement.X * 16f + 8f, placement.Y * 16f + 8f));
+        miningLightCooldown = MiningLightCooldownTicks;
+        return true;
+    }
+
+    private static bool IsTorch(Item item) =>
+        !item.IsAir && item.type > ItemID.None && item.type < ItemID.Sets.Torches.Length && ItemID.Sets.Torches[item.type];
+
+    private static bool IsGlowstick(Item item) =>
+        !item.IsAir && item.type > ItemID.None && item.type < ItemID.Sets.Glowsticks.Length && ItemID.Sets.Glowsticks[item.type];
+
+    private static Point FindNearbyTorchPlacement(Player me)
+    {
+        Point center = me.Center.ToTileCoordinates();
+        Point[] candidates =
+        [
+            new Point(center.X - 1, center.Y - 1), new Point(center.X + 1, center.Y - 1),
+            new Point(center.X - 2, center.Y), new Point(center.X + 2, center.Y),
+            new Point(center.X, center.Y - 2)
+        ];
+
+        foreach (Point point in candidates)
+        {
+            if (!WorldGen.InWorld(point.X, point.Y, 5))
+                continue;
+            Tile tile = Main.tile[point.X, point.Y];
+            if (tile.HasTile || tile.LiquidAmount > 0)
+                continue;
+            if (WorldGen.SolidTile(point.X, point.Y + 1) || WorldGen.SolidTile(point.X - 1, point.Y) || WorldGen.SolidTile(point.X + 1, point.Y))
+                return point;
+        }
+        return new Point(-1, -1);
+    }
+
+    /// <summary>Vanilla's tile-reach test (mirrors IsTargetTileInItemRange): whether the companion,
+    /// at its current position, could hit this tile with the given tool.</summary>
+    private static bool IsTileInMiningReach(Player me, Item tool, int x, int y) =>
+        me.position.X / 16f - Player.tileRangeX - tool.tileBoost <= x &&
+        (me.position.X + me.width) / 16f + Player.tileRangeX + tool.tileBoost - 1f >= x &&
+        me.position.Y / 16f - Player.tileRangeY - tool.tileBoost <= y &&
+        (me.position.Y + me.height) / 16f + Player.tileRangeY + tool.tileBoost - 2f >= y;
 
     private static bool CanMineNaturalTile(int x, int y, int? requiredType)
     {
@@ -1100,15 +1347,11 @@ public sealed class CompanionBrain
 
         Vector2 targetCenter = new(targetTile.X * 16f + 8f, targetTile.Y * 16f + 8f);
         Item tool = me.inventory[toolInventorySlot];
-        // Same reach formula vanilla uses in IsTargetTileInItemRange, so the companion only
-        // starts swinging once ItemCheck_UseMiningTools will actually hit the tile.
-        bool inRange =
-            me.position.X / 16f - Player.tileRangeX - tool.tileBoost <= targetTile.X &&
-            (me.position.X + me.width) / 16f + Player.tileRangeX + tool.tileBoost - 1f >= targetTile.X &&
-            me.position.Y / 16f - Player.tileRangeY - tool.tileBoost <= targetTile.Y &&
-            (me.position.Y + me.height) / 16f + Player.tileRangeY + tool.tileBoost - 2f >= targetTile.Y;
-
-        if (!inRange || !Collision.CanHitLine(me.Center, 1, 1, targetCenter, 1, 1))
+        // Mining/chopping only needs the tile within reach — vanilla never requires line of sight
+        // to it (that is a combat/placement rule). Requiring CanHitLine here made the companion
+        // refuse to dig any tile buried one layer into rock and pace around it forever, the single
+        // biggest cause of "mining feels broken". Reach alone, exactly as ItemCheck_UseMiningTools.
+        if (!IsTileInMiningReach(me, tool, targetTile.X, targetTile.Y))
         {
             navigator.Navigate(me, targetCenter);
             return true;
@@ -1118,6 +1361,139 @@ public sealed class CompanionBrain
         instance.WorkTile = targetTile;
         UseHeldItem(instance, me, toolInventorySlot, targetCenter);
         return true;
+    }
+
+    /// <summary>
+    /// Uses the actual vanilla fishing-pole path under the companion's virtual-player context.
+    /// The companion only presses the rod to cast when no bobber exists, then waits for the
+    /// bobber's catch state before pressing again to reel it in. Holding the rod every frame
+    /// would immediately retrieve a fresh bobber instead of allowing a bite.
+    /// </summary>
+    private bool TryFishNearby(CompanionInstance instance, Player me, CompanionProfile profile)
+    {
+        if (!CompanionModeRules.HasFishingBait(profile))
+        {
+            navigator.Idle(me);
+            return true;
+        }
+
+        int rodSlot = CompanionInstance.RodInventoryIndex;
+        if (me.inventory[rodSlot].IsAir || me.inventory[rodSlot].fishingPole <= 0)
+            return false;
+
+        Projectile bobber = FindOwnedFishingBobber(me);
+        if (bobber is not null)
+        {
+            navigator.Idle(me);
+            if (bobber.localAI[1] != 0f)
+                UseHeldItem(instance, me, rodSlot, bobber.Center);
+            return true;
+        }
+
+        if (fishingSpotScanCooldown > 0)
+            fishingSpotScanCooldown--;
+        if (!fishingSpot.HasValue || fishingSpotScanCooldown <= 0)
+        {
+            fishingSpot = FindBestFishingSpot(me);
+            fishingSpotScanCooldown = FishingRescanTicks;
+        }
+
+        if (!fishingSpot.HasValue)
+        {
+            navigator.Idle(me);
+            return true;
+        }
+
+        navigator.Idle(me);
+        UseHeldItem(instance, me, rodSlot, fishingSpot.Value.AimWorld);
+        return true;
+    }
+
+    private static Projectile FindOwnedFishingBobber(Player me)
+    {
+        foreach (Projectile projectile in Main.ActiveProjectiles)
+        {
+            if (projectile.owner == me.whoAmI && projectile.bobber)
+                return projectile;
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// Finds a water surface within ordinary rod range and scores it by vanilla-style connected
+    /// water volume first, distance second. The counter follows Projectile.GetFishingPondState's
+    /// width-at-surface then depth-per-column rule, capped once additional water no longer raises
+    /// normal fishing quality.
+    /// </summary>
+    private static FishingSpot? FindBestFishingSpot(Player me)
+    {
+        Point origin = me.Center.ToTileCoordinates();
+        FishingSpot? best = null;
+        float bestScore = float.MinValue;
+        float maxDistanceSquared = FishingSearchRadiusTiles * 16f * FishingSearchRadiusTiles * 16f;
+
+        for (int x = origin.X - FishingSearchRadiusTiles; x <= origin.X + FishingSearchRadiusTiles; x++)
+        {
+            for (int y = origin.Y - FishingVerticalSearchTiles; y <= origin.Y + FishingVerticalSearchTiles; y++)
+            {
+                if (!WorldGen.InWorld(x, y, 10) || !IsWaterSurface(x, y))
+                    continue;
+
+                Vector2 aim = new(x * 16f + 8f, y * 16f + 8f);
+                float distanceSquared = Vector2.DistanceSquared(me.MountedCenter, aim);
+                if (distanceSquared > maxDistanceSquared)
+                    continue;
+
+                int waterTiles = CountFishingWaterTiles(x, y);
+                if (waterTiles < FishingMinimumWaterTiles)
+                    continue;
+
+                float score = waterTiles * 10000f - distanceSquared;
+                if (score > bestScore)
+                {
+                    bestScore = score;
+                    best = new FishingSpot(aim, waterTiles);
+                }
+            }
+        }
+
+        return best;
+    }
+
+    private static bool IsWaterSurface(int x, int y)
+    {
+        if (!IsOpenWaterTile(x, y))
+            return false;
+        return !IsOpenWaterTile(x, y - 1);
+    }
+
+    private static bool IsOpenWaterTile(int x, int y)
+    {
+        if (!WorldGen.InWorld(x, y, 10))
+            return false;
+        Tile tile = Main.tile[x, y];
+        return tile.LiquidAmount > 0 && tile.LiquidType == LiquidID.Water && !WorldGen.SolidTile(x, y);
+    }
+
+    private static int CountFishingWaterTiles(int startX, int surfaceY)
+    {
+        int minX = startX;
+        int maxX = startX;
+        for (int step = 1; step <= FishingPoolHalfWidth && IsOpenWaterTile(minX - 1, surfaceY); step++)
+            minX--;
+        for (int step = 1; step <= FishingPoolHalfWidth && IsOpenWaterTile(maxX + 1, surfaceY); step++)
+            maxX++;
+
+        int waterTiles = 0;
+        for (int x = minX; x <= maxX; x++)
+        {
+            for (int y = surfaceY; y < surfaceY + FishingPoolDepthScan && IsOpenWaterTile(x, y); y++)
+            {
+                if (++waterTiles >= FishingIdealWaterTiles)
+                    return FishingIdealWaterTiles;
+            }
+        }
+        return waterTiles;
     }
 
     private bool TryCatchNearbyCritter(CompanionInstance instance, Player me, CompanionProfile profile)
@@ -1131,7 +1507,10 @@ public sealed class CompanionBrain
         float bestDistance = 12f * 16f;
         foreach (NPC candidate in Main.ActiveNPCs)
         {
-            if (!candidate.active || candidate.catchItem <= 0)
+            // A mod can make a town NPC technically nettable by assigning catchItem. Catch mode
+            // deliberately treats townNPC as a hard social boundary, so vanilla and modded town
+            // residents are never selected while ordinary vanilla/modded critters still are.
+            if (!candidate.active || candidate.townNPC || candidate.catchItem <= 0)
                 continue;
             if (ItemID.Sets.IsLavaBait[candidate.catchItem] && !ItemID.Sets.LavaproofCatchingTool[net.type])
                 continue;
@@ -1406,7 +1785,8 @@ public sealed class CompanionBrain
         return new Vector2(x, y);
     }
 
-    private void UpdateTeleportPolicy(CompanionInstance instance, Player me, Player owner, CompanionPlayer ownerData, CompanionProfile profile, bool posted)
+    private void UpdateTeleportPolicy(CompanionInstance instance, Player me, Player owner, CompanionPlayer ownerData,
+        CompanionProfile profile, CompanionMode mode, bool posted)
     {
         if (rescueCooldown > 0)
             rescueCooldown--;
@@ -1416,10 +1796,21 @@ public sealed class CompanionBrain
         bool ownerTeleported = DetectOwnerTeleport(owner);
         float distance = Vector2.Distance(me.Center, owner.Center);
 
+        // Three tiles is the hard inner safety radius. A companion already this close must never
+        // blink around the owner merely because it is standing on a small ledge or facing a wall.
+        if (distance <= NoTeleportDistance)
+        {
+            farFromOwnerTicks = 0;
+            stuckReference = me.Center;
+            notProgressingTicks = 0;
+            ResetVerticalFollowRescue();
+            return;
+        }
+
         // The owner just teleported (mirror, recall, teleporter, Rod of Discord…). Follow
         // instantly instead of waiting out the far-away timer. In Defense / Garrison mode,
         // an owner teleport breaks the post and snaps the companion back to Attack mode at owner's side.
-        if (ownerTeleported && distance > RescueDistance)
+        if (ownerTeleported)
         {
             // A posted mode breaks on an owner teleport and snaps back to Attack at the owner's
             // side. Free-roam is a deliberate standing order, not a post, so it is preserved — the
@@ -1440,10 +1831,19 @@ public sealed class CompanionBrain
         // damage from turning this into a dust strobe.
         bool wantRescue = ownerData.ManualRescueTime > 0 ||
             (ownerData.RescueSignalTime > 0 && profile.Mode != CompanionMode.Garrison);
-        if (wantRescue && rescueCooldown == 0 && distance > RescueDistance)
+        if (wantRescue && rescueCooldown == 0)
         {
             TeleportBeside(me, owner);
             rescueCooldown = RescueCooldownTicks;
+            return;
+        }
+
+        // A companion standing below an owner has a different failure mode from a wall wedge:
+        // every jump moves enough to reset the ordinary stuck timer, yet it never reaches the
+        // upper level. Detect that failed upward progress before the generic stuck fallback.
+        if (UpdateVerticalFollowRescue(me, owner, mode))
+        {
+            TeleportBeside(me, owner);
             return;
         }
 
@@ -1503,6 +1903,60 @@ public sealed class CompanionBrain
         return true;
     }
 
+    /// <summary>
+    /// Recalls only follow-oriented tactics when their owner is well above them and repeated jump
+    /// presses have not produced a real net climb. Attack, Free Roam and Escort all eventually
+    /// regroup with the owner; Garrison and utility orders intentionally do not use this shortcut.
+    /// </summary>
+    private bool UpdateVerticalFollowRescue(Player me, Player owner, CompanionMode mode)
+    {
+        bool followsOwner = mode is CompanionMode.Attack or CompanionMode.FreeRoam or CompanionMode.Escort;
+        bool ownerClearlyAbove = owner.Center.Y < me.Center.Y - VerticalRescueMinimumHeight;
+        if (!followsOwner || !ownerClearlyAbove || !navigator.IsTryingToMove)
+        {
+            ResetVerticalFollowRescue();
+            return false;
+        }
+
+        // Do not start a rescue merely because the owner is standing on a higher platform. A
+        // deliberate jump input is the evidence that navigation has actually tried to get there.
+        if (!verticalRescueActive)
+        {
+            if (!me.controlJump)
+                return false;
+
+            verticalRescueActive = true;
+            verticalRescueBestY = me.Center.Y;
+            verticalRescueNoProgressTicks = 0;
+            verticalRescueJumpAttempts = 0;
+            verticalRescueJumpHeld = false;
+        }
+
+        if (me.Center.Y < verticalRescueBestY - VerticalRescueProgressDistance)
+        {
+            verticalRescueBestY = me.Center.Y;
+            verticalRescueNoProgressTicks = 0;
+        }
+        else
+            verticalRescueNoProgressTicks++;
+
+        if (me.controlJump && !verticalRescueJumpHeld)
+            verticalRescueJumpAttempts++;
+        verticalRescueJumpHeld = me.controlJump;
+
+        return verticalRescueJumpAttempts >= VerticalRescueJumpAttempts &&
+            verticalRescueNoProgressTicks >= VerticalRescueNoProgressLimit;
+    }
+
+    private void ResetVerticalFollowRescue()
+    {
+        verticalRescueActive = false;
+        verticalRescueBestY = 0f;
+        verticalRescueNoProgressTicks = 0;
+        verticalRescueJumpAttempts = 0;
+        verticalRescueJumpHeld = false;
+    }
+
     /// <summary>True on the tick the owner's position jumps too far to be ordinary movement —
     /// a teleport. Always records the owner's position so the next comparison is fresh.</summary>
     private bool DetectOwnerTeleport(Player owner)
@@ -1528,6 +1982,7 @@ public sealed class CompanionBrain
         softHoldActive = false;
         stuckReference = me.Center;
         notProgressingTicks = 0;
+        ResetVerticalFollowRescue();
         CompanionEntitySystem.SpawnRecallDustBurst(me.Center);
     }
 

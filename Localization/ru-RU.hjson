@@ -114,7 +114,8 @@ Mods: {
 					ЛКМ: призвать спутника в позицию курсора. Используйте снова, чтобы призвать следующего сохранённого спутника.
 					Спутники привязаны к игроку, а не к миру, и каждый занимает слот прислужника.
 					ПКМ: открыть менеджер спутников. В нём можно распустить отдельных спутников или всех сразу.
-					ПКМ по спутнику: открыть его снаряжение и рюкзак. Не нужно держать какой-либо предмет.
+					Нажмите на панель спутников в верхней части экрана: откроются снаряжение и рюкзак.
+					Также можно включить в настройках «ПКМ по спутнику открывает рюкзак», чтобы открывать его напрямую правым кликом по спутнику.
 					Оружие: подходит любое оружие, включая призывное. Панель оружия проверяется слева направо; при нехватке боеприпасов дальнобойное оружие использует базовые.
 
 					Технические сведения:
@@ -190,6 +191,12 @@ Mods: {
 			DefaultName: Призрачный спутник
 			InventoryTitle: "{0} · Снаряжение и рюкзак"
 			Close: Закрыть
+			Rename: Переименовать
+			RenameTitle: Переименовать {0}
+			RenamePrompt: Введите новое имя (поддерживается Unicode)
+			RenameSave: Сохранить
+			RenameCancel: Отмена
+			RenameEmpty: У спутника должно быть имя.
 			Armor: Броня
 			Vanity: Стиль
 			Dye: Краситель
@@ -246,19 +253,23 @@ Mods: {
 			AttackAnimationBusy: Предыдущая атака ещё не завершена
 			AttackAttacking: Атакует
 			ModeAttack: Атака
+			// ModeFreeRoam: Free Roam
 			ModeEscort: Сопровождение
 			ModeGarrison: Пост
 			ModeCatch: Ловля
 			ModeFishing: Рыбалка
 			ModeMining: Добыча
+			ModeCombatGroup: Бой
+			ModeUtilityGroup: Снабжение
 			ModeAttackDescription: Свободно перемещается и ищет врагов
+			// ModeFreeRoamDescription: Wander the owner's vicinity and hunt nearby enemies on its own (never edits terrain)
 			ModeEscortDescription: Держится рядом и отвечает на угрозы возле хозяина
 			ModeGarrisonDescription: Удерживает позицию и возвращается после отбрасывания
 			ModeCatchDescription: Ловит существ, не причиняя им вреда
 			ModeFishingDescription: Рыбачит рядом, оставаясь на месте
 			ModeMiningDescription: Копает вместе с вами, добывает руду и освещает путь
 			ModeCatchRequirement: Нужен сачок в ячейке сачка
-			ModeFishingRequirement: Нужна удочка в ячейке удочки
+			ModeFishingRequirement: Нужны удочка в ячейке удочки и наживка на панели или в рюкзаке
 			ModeMiningRequirement: Нужна кирка в ячейке 2
 			AvoidNoThreat: Угроз не обнаружено
 			AvoidReacting: Реагирует

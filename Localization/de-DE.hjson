@@ -114,7 +114,8 @@ Mods: {
 					Linksklick: Beschwört einen Gefährten an der Mausposition. Erneut benutzen, um den nächsten gespeicherten Gefährten zu rufen.
 					Gefährten sind an den Spieler statt an die Welt gebunden und verbrauchen jeweils einen Dienerplatz.
 					Rechtsklick: Öffnet die Gefährtenverwaltung. Dort kannst du einzelne oder alle Gefährten entlassen.
-					Rechtsklick auf einen Gefährten: Öffnet seine Ausrüstung und seinen Rucksack. Du musst kein Item in der Hand halten.
+					Klicke auf das Gefährtenfeld am oberen Bildschirmrand: Öffnet Ausrüstung und Rucksack.
+					Du kannst in den Einstellungen auch „Rechtsklick auf einen Gefährten öffnet seinen Rucksack“ aktivieren, um ihn direkt per Rechtsklick zu öffnen.
 					Waffen: Jede Waffe ist möglich, auch Beschwörungswaffen. Die Waffenleiste wird von links nach rechts geprüft; Fernkampfwaffen nutzen bei leerer Munition Standardmunition.
 
 					Technische Hinweise:
@@ -190,6 +191,12 @@ Mods: {
 			DefaultName: Phantomgefährte
 			InventoryTitle: "{0} · Ausrüstung & Rucksack"
 			Close: Schließen
+			Rename: Umbenennen
+			RenameTitle: "{0} umbenennen"
+			RenamePrompt: Gib einen neuen Namen ein (Unicode wird unterstützt)
+			RenameSave: Speichern
+			RenameCancel: Abbrechen
+			RenameEmpty: Ein Begleiter braucht einen Namen.
 			Armor: Rüstung
 			Vanity: Kosmetik
 			Dye: Farbe
@@ -246,19 +253,23 @@ Mods: {
 			AttackAnimationBusy: Vorheriger Angriff ist noch nicht beendet
 			AttackAttacking: Greift an
 			ModeAttack: Angriff
+			// ModeFreeRoam: Free Roam
 			ModeEscort: Begleiten
 			ModeGarrison: Stellung
 			ModeCatch: Fangen
 			ModeFishing: Angeln
 			ModeMining: Bergbau
+			ModeCombatGroup: Kampf
+			ModeUtilityGroup: Versorgung
 			ModeAttackDescription: Frei bewegen und Gegner suchen
+			// ModeFreeRoamDescription: Wander the owner's vicinity and hunt nearby enemies on its own (never edits terrain)
 			ModeEscortDescription: Nah bleiben und Gefahren beim Besitzer abwehren
 			ModeGarrisonDescription: Position halten und nach Rückstoß zurückkehren
 			ModeCatchDescription: Tiere bevorzugt fangen, ohne sie zu verletzen
 			ModeFishingDescription: In der Nähe angeln und stehen bleiben
 			ModeMiningDescription: Mit dem Besitzer graben, Erz abbauen und Licht geben
 			ModeCatchRequirement: Benötigt ein Netz im Netzplatz
-			ModeFishingRequirement: Benötigt eine Angel im Angelplatz
+			ModeFishingRequirement: Benötigt eine Angel im Angelplatz und Köder in Schnellleiste oder Rucksack
 			ModeMiningRequirement: Benötigt eine Spitzhacke in Platz 2
 			AvoidNoThreat: Keine Gefahr erkannt
 			AvoidReacting: Reagiert

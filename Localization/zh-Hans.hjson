@@ -114,7 +114,8 @@ Mods: {
 					左键：在鼠标位置召唤伙伴；再次使用会召唤下一个已保存的伙伴
 					所有伙伴将会绑定至玩家而不是世界，这需要消换召唤栏位
 					右键：打开伙伴管理面板；可以删除一些伙伴，也可以全部一键解散
-					右键点击伙伴：打开其装备与背包【不需要拿任何东西右键】
+					点击屏幕最上方的伙伴面板：打开其装备与背包
+					也可以前往配置选项，开启“右键幻影玩家打开其背包”来直接右键伙伴本身打开背包
 					武器：可放入任意武器（含召唤武器）；按武器栏从左到右选择，远程武器无弹时会用默认弹药
 
 					技术要点：
@@ -195,6 +196,12 @@ Mods: {
 			DefaultName: 幻影伙伴
 			InventoryTitle: "{0} · 装备与背包"
 			Close: 关闭
+			Rename: 改名
+			RenameTitle: 为 {0} 改名
+			RenamePrompt: 输入新名字（支持 Unicode）
+			RenameSave: 保存
+			RenameCancel: 取消
+			RenameEmpty: 伙伴的名字不能为空。
 			Armor: 盔甲
 			Vanity: 时装
 			Dye: 染料
@@ -251,21 +258,23 @@ Mods: {
 			AttackAnimationBusy: 上一次挥动尚未结束
 			AttackAttacking: 攻击中
 			ModeAttack: 综合进攻
-				ModeFreeRoam: 自由行动
+			ModeFreeRoam: 自由行动
 			ModeEscort: 护卫
 			ModeGarrison: 镇守
 			ModeCatch: 捕捉
 			ModeFishing: 钓鱼
 			ModeMining: 挖矿
+			ModeCombatGroup: 战斗
+			ModeUtilityGroup: 后勤
 			ModeAttackDescription: 跟随主人，索敌并追击附近威胁
-				ModeFreeRoamDescription: 在附近自由闲逛、自主清剿放养圈内的敌人，想干嘛干嘛（不改动地形）
+			ModeFreeRoamDescription: 在附近自由闲逛、自主清剿放养圈内的敌人，想干嘛干嘛（不改动地形）
 			ModeEscortDescription: 贴身跟随，只应对靠近主人的威胁
 			ModeGarrisonDescription: 钉在当前位置，被打走会走回来
 			ModeCatchDescription: 优先用捕虫网抓小动物，不再误伤它们
 			ModeFishingDescription: 在附近水域自动钓鱼，原地不动
 			ModeMiningDescription: 跟着主人挖掘，顺路采矿并照明
 			ModeCatchRequirement: 需要捕虫网槽内有网
-			ModeFishingRequirement: 需要鱼竿槽内有钓竿
+			ModeFishingRequirement: 需要鱼竿槽内有钓竿，且快捷栏或背包内有鱼饵
 			ModeMiningRequirement: 需要镐位（2 号格）内有镐
 			AvoidNoThreat: 未发现威胁
 			AvoidReacting: 正在反应

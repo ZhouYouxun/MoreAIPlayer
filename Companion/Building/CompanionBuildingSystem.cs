@@ -558,7 +558,13 @@ public sealed class CompanionBuildingSystem : ModSystem
             placed = WorldGen.PlaceTile(job.X, job.Y, job.PlaceType, mute: false, forced: false,
                 plr: instance.Slot, style: job.Style);
             placed = placed && Main.tile[job.X, job.Y].HasTile && Main.tile[job.X, job.Y].TileType == job.PlaceType;
-            if (!placed && job.AllowAnchorPlacement && !Main.tile[job.X, job.Y].HasTile)
+            // A normal placement needs an already-built neighbour to anchor to. Cells queued in a
+            // plan are filled nearest-first, so an inner frame tile can come up before the block it
+            // would lean on and fail purely on ordering. Rather than retry forever and eventually
+            // drop it — which is what left visible gaps in shelters and arenas — force the cell in
+            // once it has clearly missed its turn. The cell is always part of the plan and is only
+            // ever empty here, so forcing it cannot overwrite anything the player placed.
+            if (!placed && (job.AllowAnchorPlacement || job.Attempts >= 3) && !Main.tile[job.X, job.Y].HasTile)
             {
                 placed = WorldGen.PlaceTile(job.X, job.Y, job.PlaceType, mute: false, forced: true,
                     plr: instance.Slot, style: job.Style);

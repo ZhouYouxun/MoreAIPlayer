@@ -80,20 +80,24 @@ public sealed class CompanionEntitySystem : ModSystem
     }
 
     /// <summary>
-    /// This companion's stable position within its owner's squad (0-based), counting only active
-    /// squadmates in a lower slot. Together with <see cref="CountActiveOwnedBy"/> this lets the
-    /// follow behaviour fan companions out around the owner instead of stacking them on one point.
-    /// Stable because slots are stable; cheap because a squad is only ever a handful of entries.
+    /// This companion's place in its owner's squad, in one pass: <paramref name="ordinal"/> is its
+    /// stable 0-based index (how many active squadmates sit in a lower slot) and
+    /// <paramref name="count"/> is the squad size. The follow behaviour uses the pair to fan
+    /// companions out around the owner instead of stacking them on one point. Stable because slots
+    /// are stable; cheap because a squad is only ever a handful of entries.
     /// </summary>
-    public static int SquadOrdinal(CompanionInstance self)
+    public static void SquadPosition(CompanionInstance self, out int ordinal, out int count)
     {
-        int ordinal = 0;
+        ordinal = 0;
+        count = 0;
         foreach (CompanionInstance instance in BySlot.Values)
         {
-            if (instance.OwnerWhoAmI == self.OwnerWhoAmI && instance.Entity.active && instance.Slot < self.Slot)
+            if (instance.OwnerWhoAmI != self.OwnerWhoAmI || !instance.Entity.active)
+                continue;
+            count++;
+            if (instance.Slot < self.Slot)
                 ordinal++;
         }
-        return ordinal;
     }
 
     public override void Load()

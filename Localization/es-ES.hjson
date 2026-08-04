@@ -114,7 +114,8 @@ Mods: {
 					Clic izquierdo: invoca a un compañero en el cursor. Úsalo otra vez para invocar al siguiente compañero guardado.
 					Los compañeros se vinculan al jugador, no al mundo, y cada uno consume un espacio de esbirro.
 					Clic derecho: abre el gestor de compañeros. Desde ahí puedes despedir a algunos o a todos de una vez.
-					Clic derecho sobre un compañero: abre su equipo y mochila. No necesitas llevar ningún objeto en la mano.
+					Haz clic en el panel de compañeros de la parte superior de la pantalla: abre su equipo y mochila.
+					También puedes activar «Clic derecho en un compañero para abrir su mochila» en Configuración para abrirla directamente con clic derecho sobre el compañero.
 					Armas: admite cualquier arma, incluso de invocación. La barra de armas se revisa de izquierda a derecha; las armas a distancia usan munición básica cuando se quedan sin ella.
 
 					Notas técnicas:
@@ -190,6 +191,12 @@ Mods: {
 			DefaultName: Compañero espectral
 			InventoryTitle: "{0} · Equipo y mochila"
 			Close: Cerrar
+			Rename: Renombrar
+			RenameTitle: Renombrar a {0}
+			RenamePrompt: Introduce un nuevo nombre (se admite Unicode)
+			RenameSave: Guardar
+			RenameCancel: Cancelar
+			RenameEmpty: Un compañero necesita un nombre.
 			Armor: Armadura
 			Vanity: Apariencia
 			Dye: Tinte
@@ -246,19 +253,23 @@ Mods: {
 			AttackAnimationBusy: El ataque anterior aún no terminó
 			AttackAttacking: Atacando
 			ModeAttack: Ataque
+			// ModeFreeRoam: Free Roam
 			ModeEscort: Escolta
 			ModeGarrison: Guardia
 			ModeCatch: Captura
 			ModeFishing: Pesca
 			ModeMining: Minería
+			ModeCombatGroup: Combate
+			ModeUtilityGroup: Utilidad
 			ModeAttackDescription: Se mueve libremente y busca enemigos
+			// ModeFreeRoamDescription: Wander the owner's vicinity and hunt nearby enemies on its own (never edits terrain)
 			ModeEscortDescription: Se mantiene cerca y responde a amenazas próximas
 			ModeGarrisonDescription: Mantiene la posición y vuelve si lo desplazan
 			ModeCatchDescription: Prioriza capturar criaturas sin dañarlas
 			ModeFishingDescription: Pesca cerca sin abandonar el sitio
 			ModeMiningDescription: Excava contigo, extrae minerales e ilumina
 			ModeCatchRequirement: Requiere una red en su hueco
-			ModeFishingRequirement: Requiere una caña en su hueco
+			ModeFishingRequirement: Requiere una caña en su hueco y cebo en la barra rápida o mochila
 			ModeMiningRequirement: Requiere un pico en el hueco 2
 			AvoidNoThreat: Sin amenazas
 			AvoidReacting: Reaccionando

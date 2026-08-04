@@ -114,7 +114,8 @@ Mods: {
 					Left click: summon a companion at the cursor. Use it again to summon the next saved companion.
 					Companions are tied to the player, not the world, and each one uses a minion slot.
 					Right click: open the companion manager. Dismiss individual companions there, or dismiss everyone at once.
-					Right-click a companion: open its equipment and backpack. You do not need to hold any item.
+					Click the companion panel at the top of the screen: open its equipment and backpack.
+					You can also enable “Right-click a companion to open its backpack” in Config to open it by right-clicking the companion itself.
 					Weapons: any weapon is allowed, including summon weapons. The weapon bar is checked from left to right; ranged weapons use default ammunition when empty.
 
 					Technical notes:
@@ -195,6 +196,12 @@ Mods: {
 			DefaultName: Phantom Companion
 			InventoryTitle: "{0} · Equipment & Backpack"
 			Close: Close
+			Rename: Rename
+			RenameTitle: Rename {0}
+			RenamePrompt: Enter a new name (Unicode supported)
+			RenameSave: Save
+			RenameCancel: Cancel
+			RenameEmpty: A companion needs a name.
 			Armor: Armor
 			Vanity: Vanity
 			Dye: Dye
@@ -257,6 +264,8 @@ Mods: {
 			ModeCatch: Catching
 			ModeFishing: Fishing
 			ModeMining: Mining
+			ModeCombatGroup: Combat
+			ModeUtilityGroup: Utility
 			ModeAttackDescription: Follow the owner and hunt nearby threats
 			ModeFreeRoamDescription: Wander the owner's vicinity and hunt nearby enemies on its own (never edits terrain)
 			ModeEscortDescription: Stay close and answer threats near the owner
@@ -265,7 +274,7 @@ Mods: {
 			ModeFishingDescription: Fish nearby while staying in place
 			ModeMiningDescription: Dig with the owner, mine ore, and provide light
 			ModeCatchRequirement: Requires a net in the net slot
-			ModeFishingRequirement: Requires a fishing rod in the rod slot
+			ModeFishingRequirement: Requires a fishing rod in the rod slot and bait in the hotbar or backpack
 			ModeMiningRequirement: Requires a pickaxe in slot 2
 			AvoidNoThreat: No threat detected
 			AvoidReacting: Reacting
