@@ -88,6 +88,21 @@ public sealed class CompanionInstance
     /// Read by the UI to draw the revive countdown over the owner's head.</summary>
     public int ReviveTicksLeft;
 
+    /// <summary>
+    /// The companion's real current health, kept outside Player's vanilla life-crystal stat
+    /// rebuild. Synthetic players intentionally do not inherit the owner's permanent crystal
+    /// history, so vanilla resets their current life around 100 while rebuilding stats each
+    /// update; this value preserves damage and healing across that rebuild.
+    /// </summary>
+    public int PersistentLife;
+
+    /// <summary>Whether <see cref="PersistentLife"/> has been seeded for this summon.</summary>
+    public bool PersistentLifeInitialized;
+
+    /// <summary>The previous shared maximum, used to keep a fully healed companion full when
+    /// the owner's maximum life changes.</summary>
+    public int LastSharedLifeMax;
+
     /// <summary>World item currently reserved for this companion's backpack pickup.</summary>
     public int LootTargetItemIndex = -1;
 
@@ -231,7 +246,12 @@ public sealed class CompanionInstance
         if (me.statLife > me.statLifeMax)
             me.statLife = me.statLifeMax;
         if (me.statLife < 1 && !me.dead)
-            me.statLife = me.statLifeMax;
+        {
+            // Vanilla Player.Hurt only calls KillMe for Main.myPlayer. A synthetic companion can
+            // therefore reach zero life without vanilla setting dead; preserve that lethal state
+            // so CompanionBrain can start its normal timed revive instead of refilling it here.
+            me.dead = true;
+        }
 
         // Mana Crystal progression belongs to the owner just like Life Crystal progression.
         // The brain already keeps a companion's current mana full; copying the owner's maximum

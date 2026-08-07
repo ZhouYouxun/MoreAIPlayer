@@ -47,7 +47,7 @@ Mods: {
 
 				CompanionsTakeDamage: {
 					Label: "[i:CobaltShield] Спутники получают урон"
-					Tooltip: Включено по умолчанию. Спутники получают урон, могут погибнуть и возрождаются после обычной задержки. Отключите, чтобы сделать их неуязвимыми.
+					Tooltip: По умолчанию выключено. Включите, чтобы спутники получали обычный урон, могли погибнуть и возрождались после обычной задержки. Пока выключено, они неуязвимы для любого урона.
 				}
 
 				CompanionsAutoCollectWorldItems: {
@@ -61,6 +61,8 @@ Mods: {
 				}
 			}
 		}
+
+		Keybinds.CompanionRescue.DisplayName: Экстренный призыв спутников
 
 		Items: {
 			DamageTestDummy: {
@@ -125,6 +127,8 @@ Mods: {
 					Поскольку эта система довольно необычна, пока поддерживается только одиночная игра.
 					Некоторые сложные или продвинутые оружия из других модов могут быть несовместимы. Полного списка нет, поэтому пробуйте их постепенно.
 					'''
+				RescueShortcut: Дважды нажмите [{0}], чтобы быстро призвать всех спутников к себе.
+				RescueDefaultKey: Правая кнопка мыши
 			}
 
 			CompanionCommandBook: {
@@ -197,6 +201,30 @@ Mods: {
 			RenameSave: Сохранить
 			RenameCancel: Отмена
 			RenameEmpty: У спутника должно быть имя.
+			Appearance: Внешность
+			AppearanceTitle: "{0} · Туалетный столик"
+			AppearanceBack: Назад
+			AppearanceHint: Изменения сохраняются сразу и видны на призванном спутнике.
+			AppearanceGender: Пол
+			AppearanceMale: Мужской
+			AppearanceFemale: Женский
+			AppearanceChange: Изменить
+			AppearanceSkin: Стиль кожи
+			AppearanceVariantValue: Стиль {0}
+			AppearanceHair: Причёска
+			AppearanceHairValue: Причёска {0}
+			AppearanceHairColor: Цвет волос
+			AppearanceSkinColor: Цвет кожи
+			AppearanceEyeColor: Цвет глаз
+			AppearanceShirtColor: Цвет рубашки
+			AppearanceUnderShirtColor: Цвет майки
+			AppearancePantsColor: Цвет штанов
+			AppearanceShoeColor: Цвет обуви
+			AppearanceColorHint: Применить цвет
+			AppearanceFineColor: Точный цвет: {0}
+			AppearanceRed: К
+			AppearanceGreen: З
+			AppearanceBlue: С
 			Armor: Броня
 			Vanity: Стиль
 			Dye: Краситель

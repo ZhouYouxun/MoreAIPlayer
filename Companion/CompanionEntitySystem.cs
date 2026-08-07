@@ -412,7 +412,7 @@ public sealed class CompanionEntitySystem : ModSystem
             // companions stay in the world and the existing owner-dead Attack path lets them
             // finish a boss fight. Turning it off is an explicit "dismiss on owner death"
             // preference, so every companion bound to that owner is released this same update.
-            if (owner.dead && MoreAIPlayerClientConfig.Instance?.CompanionsFightAfterOwnerDeath == false)
+            if (owner.dead && MoreAIPlayerClientConfig.Current?.CompanionsFightAfterOwnerDeath == false)
             {
                 (expired ??= []).Add(slot);
                 continue;
@@ -534,7 +534,13 @@ public sealed class CompanionEntitySystem : ModSystem
         if (UI.CompanionModeWheel.Active)
             return;
 
-        DetectRescueDoubleClick(freshRightPress);
+        // A player binding takes over the gesture completely. If it is explicitly cleared,
+        // retain the old double-right-click input so existing players are never left without a
+        // quick rescue command.
+        bool freshRescuePress = MoreAIPlayer.HasCompanionRescueKeybind
+            ? MoreAIPlayer.CompanionRescueKeybind.JustPressed
+            : freshRightPress;
+        DetectRescueDoubleClick(freshRescuePress);
 
         // UpdateUI runs between SetZoom_UI and SetZoom_Unscaled, so Main.MouseWorld would be
         // computed from UI-space mouse coordinates and miss the companion whenever the game
@@ -555,7 +561,7 @@ public sealed class CompanionEntitySystem : ModSystem
                 // Right-click open is opt-in. When disabled the backpack is reachable only
                 // through the top-of-screen matrix panel, and hovering a companion advertises
                 // nothing clickable.
-                if (MoreAIPlayerClientConfig.Instance?.AllowRightClickOpenBackpack != true)
+                if (MoreAIPlayerClientConfig.Current?.AllowRightClickOpenBackpack != true)
                     break;
 
                 HoveredSlot = slot;
@@ -578,7 +584,8 @@ public sealed class CompanionEntitySystem : ModSystem
     }
 
     /// <summary>
-    /// A quick double right-click anywhere in the world is a manual "come guard me" command:
+    /// A quick double press of the configured rescue binding (or right click when it is empty)
+    /// is a manual "come guard me" command:
     /// it raises the same rescue signal a hit would, so companions farther than a few tiles
     /// teleport to the owner. Runs only past UpdateUI's guards (singleplayer, in world,
     /// companions out, cursor not over UI) so it never hijacks an inventory right-click.
@@ -731,7 +738,45 @@ public sealed class CompanionEntitySystem : ModSystem
 
     public override void PostUpdateProjectiles() => RestoreHijackedLocalPlayer();
 
-    public override void PostUpdateEverything() => RestoreHijackedLocalPlayer();
+    public override void PostUpdateEverything()
+    {
+        RunCompanionContactDamagePass();
+        RestoreHijackedLocalPlayer();
+    }
+
+    /// <summary>
+    /// Terraria's ordinary player update only sends a hostile contact hit through the player it
+    /// currently considers local. A companion is intentionally a real Player in Main.player,
+    /// but it is not that local slot, so its contact collision can be skipped completely even
+    /// though all of its movement and rendering work. When survival is enabled, replay the
+    /// exact vanilla contact routine under a short-lived virtual-local context. This is not a
+    /// replacement damage formula: Update_NPCCollision still applies vanilla defence, immunity,
+    /// NPC/mod CanHitPlayer hooks, debuffs and special cooldown slots.
+    /// </summary>
+    private static void RunCompanionContactDamagePass()
+    {
+        if (Main.netMode != NetmodeID.SinglePlayer || !MoreAIPlayerClientConfig.CompanionDamageEnabled ||
+            BySlot.Count == 0 || !CompanionFaultGuard.IsAvailable(CompanionFaultGuard.CompanionContactDamageLane))
+            return;
+
+        foreach (CompanionInstance instance in BySlot.Values)
+        {
+            Player companion = instance.Entity;
+            if (!companion.active || companion.dead || companion.statLife <= 0)
+                continue;
+
+            Vector2 safeAim = instance.AimWorld == Vector2.Zero
+                ? companion.Center + new Vector2(companion.direction * 160f, 0f)
+                : instance.AimWorld;
+
+            using VirtualPlayerExecutionContext.Scope scope =
+                VirtualPlayerExecutionContext.Enter(companion, safeAim, false, false, null);
+            if (!CompanionFaultGuard.RunCritical(
+                    CompanionFaultGuard.CompanionContactDamageLane,
+                    companion.Update_NPCCollision))
+                return;
+        }
+    }
 
     internal static void RegisterProjectileOwnerCorrection() => projectileOwnerCorrections++;
 

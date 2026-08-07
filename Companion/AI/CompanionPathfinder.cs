@@ -367,5 +367,43 @@ public static class CompanionPathfinder
                (TileID.Sets.Platforms[tile.TileType] || Main.tileSolidTop[tile.TileType] && Main.tileSolid[tile.TileType]);
     }
 
+    /// <summary>
+    /// Hammering a platform can turn it into a one-way sloped step. It is still a platform for
+    /// pathfinding purposes, but it must not be treated like a wall by the movement fallback:
+    /// vanilla player collision already walks smoothly along this shape when fed horizontal
+    /// input alone.
+    /// </summary>
+    public static bool IsHammeredPlatform(int x, int y)
+    {
+        if (!IsPlatform(x, y))
+            return false;
+        return Main.tile[x, y].Slope != SlopeType.Solid;
+    }
+
+    /// <summary>Checks the actual contact band plus one tile in the intended walking direction.
+    /// A slope shifts the contact height inside the tile, so a single fixed "feet row" is not
+    /// reliable here.</summary>
+    public static bool IsNearHammeredPlatformStair(Player player, int direction)
+    {
+        int left = (int)(player.Left.X / 16f) - 1;
+        int right = (int)((player.Right.X - 1f) / 16f) + 1;
+        if (direction > 0)
+            right += 1;
+        else if (direction < 0)
+            left -= 1;
+
+        int firstRow = (int)((player.Bottom.Y - 3f) / 16f) - 1;
+        int lastRow = (int)((player.Bottom.Y + 3f) / 16f) + 1;
+        for (int x = left; x <= right; x++)
+        {
+            for (int y = firstRow; y <= lastRow; y++)
+            {
+                if (IsHammeredPlatform(x, y))
+                    return true;
+            }
+        }
+        return false;
+    }
+
     private static bool IsSolidOrPlatform(int x, int y) => IsSolid(x, y) || IsPlatform(x, y);
 }

@@ -490,6 +490,9 @@ public sealed class CompanionBrain
             me.dead = false;
             me.respawnTimer = 0;
             me.statLife = System.Math.Max(100, me.statLifeMax);
+            instance.PersistentLife = me.statLife;
+            instance.PersistentLifeInitialized = true;
+            instance.LastSharedLifeMax = me.statLifeMax;
             ResetCorpseGibs(me);
             TeleportBeside(me, owner);
             if (instance.TryGetContext(out _, out CompanionProfile profile))
@@ -506,6 +509,8 @@ public sealed class CompanionBrain
         // Hold the corpse down and keep vanilla from respawning it before the timer ends.
         me.dead = true;
         me.statLife = 0;
+        instance.PersistentLife = 0;
+        instance.PersistentLifeInitialized = true;
         me.velocity = Vector2.Zero;
         me.respawnTimer = instance.ReviveTicksLeft + 60;
         navigator.Idle(me);

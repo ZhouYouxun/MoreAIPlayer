@@ -9,7 +9,7 @@ using Terraria.UI;
 
 namespace MoreAIPlayer.Companion.UI;
 
-public sealed class CompanionInventoryUI : UIState
+public sealed class CompanionInventoryUI : UIState, ICompanionPanelState
 {
     // Layout grid. Slots are 52px, so a 56px step leaves a 4px seam: tight enough that a row
     // reads as one group, wide enough that the accent borders do not touch. Groups are then
@@ -266,6 +266,14 @@ public sealed class CompanionInventoryUI : UIState
                 SoundEngine.PlaySound(SoundID.Grab);
         };
         panel.Append(dumpButton);
+
+        UITextPanel<string> appearanceButton = new(T("Appearance"), 0.74f, false);
+        appearanceButton.Width.Set(actionWidth, 0f);
+        appearanceButton.Height.Set(actionHeight, 0f);
+        appearanceButton.Left.Set(-Margin - actionWidth * 3f - actionGap * 2f, 1f);
+        appearanceButton.Top.Set(actionTopY, 0f);
+        appearanceButton.OnLeftClick += (_, _) => CompanionUISystem.OpenAppearance(companionSlot, PanelPosition);
+        panel.Append(appearanceButton);
 
         UITextPanel<string> transferButton = new(
             Language.GetTextValue("Mods.MoreAIPlayer.CompanionCommand.TransferAll"), 0.74f, false);

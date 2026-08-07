@@ -47,7 +47,7 @@ Mods: {
 
 				CompanionsTakeDamage: {
 					Label: "[i:CobaltShield] Les compagnons subissent des dégâts"
-					Tooltip: Activé par défaut. Les compagnons subissent des dégâts, peuvent mourir et reviennent après leur délai normal. Désactivez-le pour les rendre immunisés à tous les dégâts.
+					Tooltip: Désactivé par défaut. Activez-le pour que les compagnons subissent des dégâts normaux, puissent mourir et reviennent après leur délai normal. Désactivé, ils sont immunisés contre tous les dégâts.
 				}
 
 				CompanionsAutoCollectWorldItems: {
@@ -61,6 +61,8 @@ Mods: {
 				}
 			}
 		}
+
+		Keybinds.CompanionRescue.DisplayName: Rappel d'urgence des compagnons
 
 		Items: {
 			DamageTestDummy: {
@@ -125,6 +127,8 @@ Mods: {
 					Ce système étant assez inhabituel, seul le mode solo est pris en charge pour l'instant.
 					Certaines armes de mods complexes ou avancées peuvent être incompatibles. Il n'existe pas de liste complète : testez-les progressivement.
 					'''
+				RescueShortcut: Double-cliquez sur [{0}] pour appeler rapidement tous les compagnons auprès de vous.
+				RescueDefaultKey: Bouton droit de la souris
 			}
 
 			CompanionCommandBook: {
@@ -197,6 +201,30 @@ Mods: {
 			RenameSave: Enregistrer
 			RenameCancel: Annuler
 			RenameEmpty: Un compagnon a besoin d'un nom.
+			Appearance: Apparence
+			AppearanceTitle: "{0} · Coiffeuse"
+			AppearanceBack: Retour
+			AppearanceHint: Les changements sont enregistrés immédiatement et visibles sur le compagnon invoqué.
+			AppearanceGender: Genre
+			AppearanceMale: Homme
+			AppearanceFemale: Femme
+			AppearanceChange: Changer
+			AppearanceSkin: Style de peau
+			AppearanceVariantValue: Style {0}
+			AppearanceHair: Coiffure
+			AppearanceHairValue: Coiffure {0}
+			AppearanceHairColor: Couleur des cheveux
+			AppearanceSkinColor: Couleur de peau
+			AppearanceEyeColor: Couleur des yeux
+			AppearanceShirtColor: Couleur du haut
+			AppearanceUnderShirtColor: Couleur du sous-vêtement
+			AppearancePantsColor: Couleur du pantalon
+			AppearanceShoeColor: Couleur des chaussures
+			AppearanceColorHint: Appliquer la couleur
+			AppearanceFineColor: Réglage fin : {0}
+			AppearanceRed: R
+			AppearanceGreen: V
+			AppearanceBlue: B
 			Armor: Armure
 			Vanity: Apparence
 			Dye: Teinture

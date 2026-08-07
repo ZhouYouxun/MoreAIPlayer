@@ -47,7 +47,7 @@ Mods: {
 
 				CompanionsTakeDamage: {
 					Label: "[i:CobaltShield] Towarzysze otrzymują obrażenia"
-					Tooltip: Domyślnie włączone. Towarzysze otrzymują obrażenia, mogą zginąć i odradzają się po zwykłym czasie oczekiwania. Wyłącz, aby uodpornić ich na wszystkie obrażenia.
+					Tooltip: Domyślnie wyłączone. Włącz, aby towarzysze otrzymywali normalne obrażenia, mogli zginąć i odradzali się po zwykłym czasie oczekiwania. Gdy opcja jest wyłączona, są odporni na wszystkie obrażenia.
 				}
 
 				CompanionsAutoCollectWorldItems: {
@@ -61,6 +61,8 @@ Mods: {
 				}
 			}
 		}
+
+		Keybinds.CompanionRescue.DisplayName: Awaryjne przywołanie towarzyszy
 
 		Items: {
 			DamageTestDummy: {
@@ -125,6 +127,8 @@ Mods: {
 					Ponieważ ten system jest dość nietypowy, na razie działa tylko w trybie jednoosobowym.
 					Niektóre złożone lub zaawansowane bronie z innych modów mogą być niezgodne. Nie ma pełnej listy — testuj je stopniowo.
 					'''
+				RescueShortcut: Kliknij dwukrotnie [{0}], aby szybko przywołać wszystkich towarzyszy do siebie.
+				RescueDefaultKey: Prawy przycisk myszy
 			}
 
 			CompanionCommandBook: {
@@ -197,6 +201,30 @@ Mods: {
 			RenameSave: Zapisz
 			RenameCancel: Anuluj
 			RenameEmpty: Towarzysz musi mieć nazwę.
+			Appearance: Wygląd
+			AppearanceTitle: "{0} · Toaletka"
+			AppearanceBack: Wróć
+			AppearanceHint: Zmiany zapisują się od razu i widać je na przywołanym towarzyszu.
+			AppearanceGender: Płeć
+			AppearanceMale: Mężczyzna
+			AppearanceFemale: Kobieta
+			AppearanceChange: Zmień
+			AppearanceSkin: Styl skóry
+			AppearanceVariantValue: Styl {0}
+			AppearanceHair: Fryzura
+			AppearanceHairValue: Włosy {0}
+			AppearanceHairColor: Kolor włosów
+			AppearanceSkinColor: Kolor skóry
+			AppearanceEyeColor: Kolor oczu
+			AppearanceShirtColor: Kolor koszuli
+			AppearanceUnderShirtColor: Kolor podkoszulka
+			AppearancePantsColor: Kolor spodni
+			AppearanceShoeColor: Kolor butów
+			AppearanceColorHint: Zastosuj kolor
+			AppearanceFineColor: Precyzyjny kolor: {0}
+			AppearanceRed: R
+			AppearanceGreen: G
+			AppearanceBlue: B
 			Armor: Pancerz
 			Vanity: Wygląd
 			Dye: Barwnik

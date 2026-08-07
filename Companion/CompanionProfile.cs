@@ -10,6 +10,17 @@ namespace MoreAIPlayer.Companion;
 
 public sealed class CompanionProfile
 {
+    public enum AppearanceColor
+    {
+        Hair,
+        Skin,
+        Eyes,
+        Shirt,
+        UnderShirt,
+        Pants,
+        Shoes
+    }
+
     public int Id { get; private set; }
     public string Name { get; private set; } = string.Empty;
     public bool MirrorsOwnerAppearance { get; private set; }
@@ -253,6 +264,40 @@ public sealed class CompanionProfile
         visual.underShirtColor = UnderShirtColor;
         visual.pantsColor = PantsColor;
         visual.shoeColor = ShoeColor;
+    }
+
+    /// <summary>
+    /// Commits an edit made in the companion dresser. A custom look deliberately stops mirroring
+    /// the owner: otherwise the next player update would immediately overwrite the user's edit.
+    /// </summary>
+    public void SetSkinVariant(int skinVariant)
+    {
+        int variantCount = System.Math.Max(1, PlayerVariantID.Sets.Male.Length);
+        SkinVariant = ((skinVariant % variantCount) + variantCount) % variantCount;
+        Male = PlayerVariantID.Sets.Male[SkinVariant];
+        MirrorsOwnerAppearance = false;
+    }
+
+    public void SetHair(int hair)
+    {
+        int hairCount = System.Math.Max(1, HairLoader.Count);
+        Hair = ((hair % hairCount) + hairCount) % hairCount;
+        MirrorsOwnerAppearance = false;
+    }
+
+    public void SetAppearanceColor(AppearanceColor channel, Color color)
+    {
+        switch (channel)
+        {
+            case AppearanceColor.Hair: HairColor = color; break;
+            case AppearanceColor.Skin: SkinColor = color; break;
+            case AppearanceColor.Eyes: EyeColor = color; break;
+            case AppearanceColor.Shirt: ShirtColor = color; break;
+            case AppearanceColor.UnderShirt: UnderShirtColor = color; break;
+            case AppearanceColor.Pants: PantsColor = color; break;
+            case AppearanceColor.Shoes: ShoeColor = color; break;
+        }
+        MirrorsOwnerAppearance = false;
     }
 
     public Item FindFirst(System.Func<Item, bool> predicate)

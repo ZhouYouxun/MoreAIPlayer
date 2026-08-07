@@ -47,7 +47,7 @@ Mods: {
 
 				CompanionsTakeDamage: {
 					Label: "[i:CobaltShield] Companheiros recebem dano"
-					Tooltip: Ativado por padrão. Companheiros recebem dano, podem morrer e revivem após o tempo normal. Desative para torná-los imunes a todo dano.
+					Tooltip: Desativado por padrão. Ative para que os companheiros recebam dano normal, possam morrer e revivam após o tempo normal. Quando desativado, eles ficam imunes a todo dano.
 				}
 
 				CompanionsAutoCollectWorldItems: {
@@ -61,6 +61,8 @@ Mods: {
 				}
 			}
 		}
+
+		Keybinds.CompanionRescue.DisplayName: Chamada de emergência dos companheiros
 
 		Items: {
 			DamageTestDummy: {
@@ -125,6 +127,8 @@ Mods: {
 					Como este sistema é relativamente incomum, por enquanto ele só funciona no modo solo.
 					Algumas armas complexas ou avançadas de outros mods podem não ser compatíveis. Não há uma lista completa; experimente aos poucos.
 					'''
+				RescueShortcut: Clique duas vezes em [{0}] para chamar rapidamente todos os companheiros para perto de você.
+				RescueDefaultKey: Botão direito do mouse
 			}
 
 			CompanionCommandBook: {
@@ -197,6 +201,30 @@ Mods: {
 			RenameSave: Salvar
 			RenameCancel: Cancelar
 			RenameEmpty: Um companheiro precisa de um nome.
+			Appearance: Aparência
+			AppearanceTitle: "{0} · Penteadeira"
+			AppearanceBack: Voltar
+			AppearanceHint: As mudanças são salvas na hora e aparecem no companheiro invocado.
+			AppearanceGender: Gênero
+			AppearanceMale: Homem
+			AppearanceFemale: Mulher
+			AppearanceChange: Alterar
+			AppearanceSkin: Estilo de pele
+			AppearanceVariantValue: Estilo {0}
+			AppearanceHair: Penteado
+			AppearanceHairValue: Cabelo {0}
+			AppearanceHairColor: Cor do cabelo
+			AppearanceSkinColor: Cor da pele
+			AppearanceEyeColor: Cor dos olhos
+			AppearanceShirtColor: Cor da camisa
+			AppearanceUnderShirtColor: Cor da camiseta
+			AppearancePantsColor: Cor da calça
+			AppearanceShoeColor: Cor dos sapatos
+			AppearanceColorHint: Aplicar cor
+			AppearanceFineColor: Cor fina: {0}
+			AppearanceRed: R
+			AppearanceGreen: G
+			AppearanceBlue: B
 			Armor: Armadura
 			Vanity: Visual
 			Dye: Corante

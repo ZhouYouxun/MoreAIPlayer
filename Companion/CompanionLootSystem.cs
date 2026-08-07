@@ -49,7 +49,7 @@ public static class CompanionLootSystem
     /// new or migrated save must remain inert until its owner explicitly enables this feature.
     /// </summary>
     public static bool WorldItemCollectionEnabled =>
-        MoreAIPlayerClientConfig.Instance?.CompanionsAutoCollectWorldItems == true &&
+        MoreAIPlayerClientConfig.Current?.CompanionsAutoCollectWorldItems == true &&
         CompanionFaultGuard.IsAvailable(CompanionFaultGuard.WorldItemCollectionLane);
 
     private const float PickupReach = 48f;
@@ -188,7 +188,7 @@ public static class CompanionLootSystem
         // World-item creation is the one manual backpack action most likely to encounter a
         // foreign GlobalItem hook. Keep it opt-in until the player has confirmed the save is
         // compatible; refusing the click preserves every item in the backpack.
-        if (MoreAIPlayerClientConfig.Instance?.CompanionsAllowBackpackWorldDrops != true)
+        if (MoreAIPlayerClientConfig.Current?.CompanionsAllowBackpackWorldDrops != true)
         {
             CompanionFaultGuard.AnnounceSafetyBlock("BackpackDropBlocked");
             return 0;

@@ -47,7 +47,7 @@ Mods: {
 
 				CompanionsTakeDamage: {
 					Label: "[i:CobaltShield] Begleiter erleiden Schaden"
-					Tooltip: Standardmäßig aktiviert. Begleiter können Schaden erleiden, sterben und nach ihrer normalen Wartezeit wiederbelebt werden. Deaktivieren macht sie gegen allen Schaden immun.
+					Tooltip: Standardmäßig deaktiviert. Aktivieren, damit Begleiter normalen Schaden erleiden, sterben und nach ihrer normalen Wartezeit wiederbelebt werden. Deaktiviert sind sie gegen allen Schaden immun.
 				}
 
 				CompanionsAutoCollectWorldItems: {
@@ -61,6 +61,8 @@ Mods: {
 				}
 			}
 		}
+
+		Keybinds.CompanionRescue.DisplayName: Begleiter-Notruf
 
 		Items: {
 			DamageTestDummy: {
@@ -125,6 +127,8 @@ Mods: {
 					Da dieses System recht ungewöhnlich ist, wird derzeit nur Einzelspieler unterstützt.
 					Einige komplexe oder fortgeschrittene Mod-Waffen sind möglicherweise nicht kompatibel. Eine vollständige Liste gibt es nicht; probiere sie bitte nach und nach aus.
 					'''
+				RescueShortcut: Doppelklicke auf [{0}], um alle Begleiter schnell zu dir zu rufen.
+				RescueDefaultKey: Rechte Maustaste
 			}
 
 			CompanionCommandBook: {
@@ -197,6 +201,30 @@ Mods: {
 			RenameSave: Speichern
 			RenameCancel: Abbrechen
 			RenameEmpty: Ein Begleiter braucht einen Namen.
+			Appearance: Aussehen
+			AppearanceTitle: "{0} · Kommode"
+			AppearanceBack: Zurück
+			AppearanceHint: Änderungen werden sofort gespeichert und am beschworenen Begleiter angezeigt.
+			AppearanceGender: Geschlecht
+			AppearanceMale: Männlich
+			AppearanceFemale: Weiblich
+			AppearanceChange: Ändern
+			AppearanceSkin: Hautstil
+			AppearanceVariantValue: Stil {0}
+			AppearanceHair: Frisur
+			AppearanceHairValue: Frisur {0}
+			AppearanceHairColor: Haarfarbe
+			AppearanceSkinColor: Hautfarbe
+			AppearanceEyeColor: Augenfarbe
+			AppearanceShirtColor: Hemdfarbe
+			AppearanceUnderShirtColor: Unterhemdfarbe
+			AppearancePantsColor: Hosenfarbe
+			AppearanceShoeColor: Schuhfarbe
+			AppearanceColorHint: Farbe anwenden
+			AppearanceFineColor: Feinfarbe: {0}
+			AppearanceRed: R
+			AppearanceGreen: G
+			AppearanceBlue: B
 			Armor: Rüstung
 			Vanity: Kosmetik
 			Dye: Farbe

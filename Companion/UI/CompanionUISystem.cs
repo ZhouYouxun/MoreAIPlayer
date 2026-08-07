@@ -15,7 +15,7 @@ public sealed class CompanionUISystem : ModSystem
     private static CompanionUISystem instance;
 
     private UserInterface userInterface;
-    private CompanionInventoryUI inventoryUI;
+    private UIState inventoryUI;
     private int targetSlot = -1;
     private Vector2? inventoryPanelPosition;
 
@@ -69,7 +69,7 @@ public sealed class CompanionUISystem : ModSystem
         // whatever it was holding the moment the panel opened.
         companion.ForceReleaseChanneledWeapon();
 
-        instance.inventoryPanelPosition = instance.inventoryUI?.PanelPosition ?? instance.inventoryPanelPosition;
+        instance.inventoryPanelPosition = (instance.inventoryUI as ICompanionPanelState)?.PanelPosition ?? instance.inventoryPanelPosition;
         instance.inventoryUI = new CompanionInventoryUI(profile, companionSlot, instance.inventoryPanelPosition);
         instance.inventoryUI.Activate();
         instance.userInterface.SetState(instance.inventoryUI);
@@ -83,9 +83,28 @@ public sealed class CompanionUISystem : ModSystem
             return;
 
         instance.userInterface.SetState(null);
-        instance.inventoryPanelPosition = instance.inventoryUI?.PanelPosition ?? instance.inventoryPanelPosition;
+        instance.inventoryPanelPosition = (instance.inventoryUI as ICompanionPanelState)?.PanelPosition ?? instance.inventoryPanelPosition;
         instance.inventoryUI = null;
         instance.targetSlot = -1;
+    }
+
+    /// <summary>Replaces the equipment/backpack page with the companion's dresser page.</summary>
+    internal static void OpenAppearance(int companionSlot, Vector2? panelPosition)
+    {
+        if (instance?.userInterface is null || Main.gameMenu)
+            return;
+
+        CompanionInstance companion = CompanionEntitySystem.GetBySlot(companionSlot);
+        if (companion is null || !companion.TryGetContext(out _, out CompanionProfile profile))
+            return;
+
+        instance.inventoryPanelPosition = panelPosition ?? (instance.inventoryUI as ICompanionPanelState)?.PanelPosition;
+        instance.inventoryUI?.Deactivate();
+        instance.inventoryUI = new CompanionAppearanceUI(profile, companionSlot, instance.inventoryPanelPosition);
+        instance.inventoryUI.Activate();
+        instance.userInterface.SetState(instance.inventoryUI);
+        instance.targetSlot = companionSlot;
+        Main.playerInventory = true;
     }
 
     public override void UpdateUI(GameTime gameTime)
@@ -115,11 +134,11 @@ public sealed class CompanionUISystem : ModSystem
     /// "nothing I changed had any effect" can be told apart from "the change did not help" —
     /// three rounds of fixes were evaluated without that distinction being available.
     /// </summary>
-    public const string BuildStamp = "2026-08-04 #26 logistics-fishing-mining";
+    public const string BuildStamp = "2026-08-07 #33 native-contact-damage";
 
     /// <summary>Draws a live decision readout over each companion only when the player has
     /// explicitly enabled the client-side diagnostic configuration.</summary>
-    public static bool ShowDiagnostics => MoreAIPlayerClientConfig.Instance?.EnablePhantomPlayerDebugText == true;
+    public static bool ShowDiagnostics => MoreAIPlayerClientConfig.Current?.EnablePhantomPlayerDebugText == true;
 
     public override void OnWorldLoad()
     {
@@ -226,7 +245,7 @@ public sealed class CompanionUISystem : ModSystem
 
     private static bool CanDrawCompanionHealthBars() =>
         !Main.gameMenu && Main.netMode == NetmodeID.SinglePlayer &&
-        MoreAIPlayerClientConfig.Instance?.ShowCompanionHealthBars == true;
+        MoreAIPlayerClientConfig.Current?.ShowCompanionHealthBars == true;
 
     /// <summary>Small Calamity-style stealth meter under each companion wearing rogue armor.</summary>
     private static void DrawStealthBars()

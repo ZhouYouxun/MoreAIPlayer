@@ -47,7 +47,7 @@ Mods: {
 
 				CompanionsTakeDamage: {
 					Label: "[i:CobaltShield] I compagni subiscono danni"
-					Tooltip: Attivo per impostazione predefinita. I compagni subiscono danni, possono morire e tornano dopo il normale tempo di attesa. Disattivalo per renderli immuni a tutti i danni.
+					Tooltip: Disattivato per impostazione predefinita. Attivalo perché i compagni subiscano danni normali, possano morire e tornino dopo il normale tempo di attesa. Se disattivato, sono immuni a tutti i danni.
 				}
 
 				CompanionsAutoCollectWorldItems: {
@@ -61,6 +61,8 @@ Mods: {
 				}
 			}
 		}
+
+		Keybinds.CompanionRescue.DisplayName: Richiamo d'emergenza dei compagni
 
 		Items: {
 			DamageTestDummy: {
@@ -125,6 +127,8 @@ Mods: {
 					Poiché questo sistema è piuttosto insolito, al momento supporta solo il giocatore singolo.
 					Alcune armi complesse o avanzate di altri mod potrebbero non essere compatibili. Non esiste un elenco completo: provale gradualmente.
 					'''
+				RescueShortcut: Fai doppio clic su [{0}] per richiamare rapidamente tutti i compagni al tuo fianco.
+				RescueDefaultKey: Pulsante destro del mouse
 			}
 
 			CompanionCommandBook: {
@@ -197,6 +201,30 @@ Mods: {
 			RenameSave: Salva
 			RenameCancel: Annulla
 			RenameEmpty: Un compagno ha bisogno di un nome.
+			Appearance: Aspetto
+			AppearanceTitle: "{0} · Toeletta"
+			AppearanceBack: Indietro
+			AppearanceHint: Le modifiche si salvano subito e appaiono sul compagno evocato.
+			AppearanceGender: Genere
+			AppearanceMale: Maschio
+			AppearanceFemale: Femmina
+			AppearanceChange: Cambia
+			AppearanceSkin: Stile pelle
+			AppearanceVariantValue: Stile {0}
+			AppearanceHair: Acconciatura
+			AppearanceHairValue: Capelli {0}
+			AppearanceHairColor: Colore capelli
+			AppearanceSkinColor: Colore pelle
+			AppearanceEyeColor: Colore occhi
+			AppearanceShirtColor: Colore maglia
+			AppearanceUnderShirtColor: Colore sottogiacca
+			AppearancePantsColor: Colore pantaloni
+			AppearanceShoeColor: Colore scarpe
+			AppearanceColorHint: Applica colore
+			AppearanceFineColor: Colore fine: {0}
+			AppearanceRed: R
+			AppearanceGreen: V
+			AppearanceBlue: B
 			Armor: Armatura
 			Vanity: Aspetto
 			Dye: Tintura

@@ -167,7 +167,14 @@ public sealed class CompanionNavigator
         else if (toGoal.X < -12f)
             me.controlLeft = true;
 
-        bool blocked = (me.controlLeft || me.controlRight) && me.velocity.Y == 0f &&
+        int movementDirection = me.controlRight ? 1 : me.controlLeft ? -1 : 0;
+        bool onHammeredPlatformStair = movementDirection != 0 &&
+            CompanionPathfinder.IsNearHammeredPlatformStair(me, movementDirection);
+
+        // A hammered platform briefly reduces horizontal speed while vanilla resolves the
+        // one-way slope. That is normal stair contact, not a wall. Treating it as blocked made
+        // the old fallback spam fresh jumps and wedge the companion on the next sloped piece.
+        bool blocked = !onHammeredPlatformStair && (me.controlLeft || me.controlRight) && me.velocity.Y == 0f &&
                        System.Math.Abs(me.velocity.X) < 0.35f && stuckTicks > 10;
         bool needUp = toGoal.Y < -48f || blocked;
 
@@ -325,17 +332,21 @@ public sealed class CompanionNavigator
         if (me.velocity.Y != 0f)
             return false;
 
-        int feetRow = (int)((me.Bottom.Y + 2f) / 16f);
+        // The top surface of a hammered platform travels through its tile. Scan the short
+        // contact band rather than only Bottom+2, which misses one side of a sloped platform
+        // and prevents the normal down-to-drop behavior from ever engaging.
+        int firstRow = (int)((me.Bottom.Y - 3f) / 16f) - 1;
+        int lastRow = (int)((me.Bottom.Y + 3f) / 16f) + 1;
         int left = (int)(me.position.X / 16f);
         int right = (int)((me.position.X + me.width - 1f) / 16f);
-        bool sawPlatform = false;
-        for (int x = left; x <= right; x++)
+        for (int y = firstRow; y <= lastRow; y++)
         {
-            if (CompanionPathfinder.IsSolid(x, feetRow))
-                return false;
-            if (CompanionPathfinder.IsPlatform(x, feetRow))
-                sawPlatform = true;
+            for (int x = left; x <= right; x++)
+            {
+                if (CompanionPathfinder.IsPlatform(x, y))
+                    return true;
+            }
         }
-        return sawPlatform;
+        return false;
     }
 }

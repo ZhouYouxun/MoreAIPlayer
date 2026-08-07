@@ -47,7 +47,7 @@ Mods: {
 
 				CompanionsTakeDamage: {
 					Label: "[i:CobaltShield] 伙伴会受到伤害"
-					Tooltip: 默认开启。伙伴会正常受伤、死亡，并在原有等待时间后复活；关闭后伙伴免疫所有伤害。
+					Tooltip: 默认关闭。开启后伙伴会正常受伤、死亡，并在原有等待时间后复活；关闭时伙伴免疫所有伤害。
 				}
 
 				CompanionsAutoCollectWorldItems: {
@@ -61,6 +61,8 @@ Mods: {
 				}
 			}
 		}
+
+		Keybinds.CompanionRescue.DisplayName: 伙伴紧急呼唤
 
 		Items: {
 			DamageTestDummy: {
@@ -125,6 +127,8 @@ Mods: {
 					由于这涉及的技术相对抽象，因此目前仅支持单人模式
 					一些比较复杂或高级的模组武器不一定支持，具体不支持列表我没法给出，只能慢慢尝试
 					'''
+				RescueShortcut: 双击【{0}】可以将所有伙伴快速呼唤至自己身边
+				RescueDefaultKey: 鼠标右键
 			}
 
 			CompanionCommandBook: {
@@ -202,6 +206,30 @@ Mods: {
 			RenameSave: 保存
 			RenameCancel: 取消
 			RenameEmpty: 伙伴的名字不能为空。
+			Appearance: 外观
+			AppearanceTitle: "{0} · 梳妆台"
+			AppearanceBack: 返回背包
+			AppearanceHint: 修改会立刻保存，并实时显示在已召唤的伙伴身上。
+			AppearanceGender: 性别
+			AppearanceMale: 男
+			AppearanceFemale: 女
+			AppearanceChange: 更改
+			AppearanceSkin: 皮肤样式
+			AppearanceVariantValue: 样式 {0}
+			AppearanceHair: 发型
+			AppearanceHairValue: 发型 {0}
+			AppearanceHairColor: 头发颜色
+			AppearanceSkinColor: 皮肤颜色
+			AppearanceEyeColor: 眼睛颜色
+			AppearanceShirtColor: 上衣颜色
+			AppearanceUnderShirtColor: 内衣颜色
+			AppearancePantsColor: 裤子颜色
+			AppearanceShoeColor: 鞋子颜色
+			AppearanceColorHint: 应用该颜色
+			AppearanceFineColor: 精细调色：{0}
+			AppearanceRed: 红
+			AppearanceGreen: 绿
+			AppearanceBlue: 蓝
 			Armor: 盔甲
 			Vanity: 时装
 			Dye: 染料

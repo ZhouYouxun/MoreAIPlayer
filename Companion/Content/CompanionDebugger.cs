@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using Microsoft.Xna.Framework;
 using MoreAIPlayer.Companion.UI;
 using Terraria;
@@ -25,6 +26,21 @@ public sealed class CompanionDebugger : ModItem
     }
 
     public override bool AltFunctionUse(Player player) => true;
+
+    public override void ModifyTooltips(List<TooltipLine> tooltips)
+    {
+        string rescueText = Language.GetTextValue(
+            "Mods.MoreAIPlayer.Items.CompanionDebugger.RescueShortcut",
+            MoreAIPlayer.CompanionRescueKeyDisplayName());
+
+        // Tooltip0-4 are the five existing usage lines; Tooltip5 begins the weapon line.
+        // Insert before it so this remains exactly between the fifth and sixth lines in every
+        // language, not tacked onto the end of the book.
+        int insertAt = tooltips.FindIndex(line => line.Name == "Tooltip5");
+        if (insertAt < 0)
+            insertAt = tooltips.Count;
+        tooltips.Insert(insertAt, new TooltipLine(Mod, "RescueShortcut", rescueText));
+    }
 
     public override bool? UseItem(Player player)
     {

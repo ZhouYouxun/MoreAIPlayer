@@ -47,7 +47,7 @@ Mods: {
 
 				CompanionsTakeDamage: {
 					Label: "[i:CobaltShield] Los compañeros reciben daño"
-					Tooltip: Activado por defecto. Los compañeros reciben daño, pueden morir y reviven tras la espera normal. Desactívalo para volverlos inmunes a todo daño.
+					Tooltip: Desactivado por defecto. Actívalo para que los compañeros reciban daño normal, puedan morir y revivan tras la espera normal. Mientras esté desactivado, son inmunes a todo daño.
 				}
 
 				CompanionsAutoCollectWorldItems: {
@@ -61,6 +61,8 @@ Mods: {
 				}
 			}
 		}
+
+		Keybinds.CompanionRescue.DisplayName: Llamada de emergencia de compañeros
 
 		Items: {
 			DamageTestDummy: {
@@ -125,6 +127,8 @@ Mods: {
 					Como este sistema es bastante inusual, por ahora solo funciona en un jugador.
 					Algunas armas complejas o avanzadas de otros mods podrían no ser compatibles. No hay una lista completa; pruébalas poco a poco.
 					'''
+				RescueShortcut: Haz doble clic en [{0}] para llamar rápidamente a todos los compañeros a tu lado.
+				RescueDefaultKey: Botón derecho del ratón
 			}
 
 			CompanionCommandBook: {
@@ -197,6 +201,30 @@ Mods: {
 			RenameSave: Guardar
 			RenameCancel: Cancelar
 			RenameEmpty: Un compañero necesita un nombre.
+			Appearance: Apariencia
+			AppearanceTitle: "{0} · Tocador"
+			AppearanceBack: Volver
+			AppearanceHint: Los cambios se guardan al instante y se ven en el compañero invocado.
+			AppearanceGender: Género
+			AppearanceMale: Hombre
+			AppearanceFemale: Mujer
+			AppearanceChange: Cambiar
+			AppearanceSkin: Estilo de piel
+			AppearanceVariantValue: Estilo {0}
+			AppearanceHair: Peinado
+			AppearanceHairValue: Peinado {0}
+			AppearanceHairColor: Color de pelo
+			AppearanceSkinColor: Color de piel
+			AppearanceEyeColor: Color de ojos
+			AppearanceShirtColor: Color de camisa
+			AppearanceUnderShirtColor: Color de camiseta
+			AppearancePantsColor: Color de pantalón
+			AppearanceShoeColor: Color de zapatos
+			AppearanceColorHint: Aplicar color
+			AppearanceFineColor: Color fino: {0}
+			AppearanceRed: R
+			AppearanceGreen: G
+			AppearanceBlue: B
 			Armor: Armadura
 			Vanity: Apariencia
 			Dye: Tinte

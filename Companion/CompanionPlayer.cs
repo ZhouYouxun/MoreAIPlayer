@@ -49,7 +49,7 @@ public sealed class CompanionPlayer : ModPlayer
     /// <summary>Ticks remaining on the "come guard me" signal. Companions read their owner's
     /// copy to decide whether to teleport in and guard (see CompanionBrain's rescue policy).
     /// Raised both automatically when this player is hurt and manually by a quick double
-    /// right-click. The window spans a few ticks so every companion sees the same signal
+    /// rescue binding. The window spans a few ticks so every companion sees the same signal
     /// during its own update, rather than only the first one to run.</summary>
     public int RescueSignalTime;
 
@@ -62,7 +62,7 @@ public sealed class CompanionPlayer : ModPlayer
     /// companions teleport to this player's side on their next update.</summary>
     public void SignalRescue() => RescueSignalTime = RescueSignalWindow;
 
-    /// <summary>Raises the manual recall order (double right-click); stronger than <see cref="SignalRescue"/>.</summary>
+    /// <summary>Raises the manual recall order (double rescue binding); stronger than <see cref="SignalRescue"/>.</summary>
     public void SignalManualRescue() => ManualRescueTime = RescueSignalWindow;
 
     public int ObservedTileX = -1;
@@ -271,17 +271,64 @@ public sealed class CompanionPlayer : ModPlayer
 
         if (CompanionEntitySystem.IsCompanion(Player))
         {
+            // BindProfile runs before vanilla's player-stat pass. That pass rebuilds
+            // statLifeMax2 from this synthetic player's own (empty) Life Crystal history and
+            // used to put a companion straight back at 100 max life. Reapply the owner's final
+            // already-calculated maximum after the pass, which covers life crystals, fruit,
+            // accessories, buffs and modded max-life effects without any item-ID special cases.
+            CompanionInstance instance = CompanionEntitySystem.GetBySlot(Player.whoAmI);
+            if (instance is not null && instance.TryGetContext(out Player owner, out _))
+            {
+                SynchronizeCompanionLife(instance, owner);
+            }
+
             Player.statMana = Player.statManaMax2;
             if (!Player.dead && Player.potionDelay <= 0 && Player.statLife <= Player.statLifeMax2 - 100)
             {
-                TryUseHealingPotion();
+                int lifeBeforeHealing = Player.statLife;
+                TryUseHealingPotion(instance);
+                if (Player.statLife > lifeBeforeHealing)
+                    instance.PersistentLife = System.Math.Clamp(Player.statLife, 1, Player.statLifeMax2);
             }
         }
 
         ObserveMiningAndTrees();
     }
 
-    private void TryUseHealingPotion()
+    private void SynchronizeCompanionLife(CompanionInstance instance, Player owner)
+    {
+        int sharedMaxLife = System.Math.Max(100, System.Math.Max(owner.statLifeMax, owner.statLifeMax2));
+        Player.statLifeMax = sharedMaxLife;
+        Player.statLifeMax2 = sharedMaxLife;
+
+        if (Player.dead || Player.statLife <= 0)
+        {
+            instance.PersistentLife = 0;
+            instance.PersistentLifeInitialized = true;
+            instance.LastSharedLifeMax = sharedMaxLife;
+            return;
+        }
+
+        if (!instance.PersistentLifeInitialized)
+        {
+            // A new summon always begins healthy. Do not seed from Player.statLife: vanilla
+            // has already reduced that synthetic player's empty life-crystal state to 100.
+            instance.PersistentLife = sharedMaxLife;
+            instance.PersistentLifeInitialized = true;
+        }
+        else if (instance.PersistentLife >= instance.LastSharedLifeMax)
+        {
+            // Preserve the useful invariant "fully healed stays fully healed" when the owner
+            // gains or loses max life through crystals, fruit, equipment, buffs, or another mod.
+            instance.PersistentLife = sharedMaxLife;
+        }
+
+        instance.PersistentLife = System.Math.Clamp(instance.PersistentLife, 1, sharedMaxLife);
+        instance.LastSharedLifeMax = sharedMaxLife;
+        Player.statLife = instance.PersistentLife;
+    }
+
+    private void TryUseHealingPotion(CompanionInstance instance)
     {
         // Do not maintain a mod-name/item-ID table here. QuickHeal is vanilla's generic
         // healing-potion path: it recognises Item.potion and Item.healLife, runs dynamic
@@ -292,6 +339,15 @@ public sealed class CompanionPlayer : ModPlayer
         // A third-party potion hook can still assume that its consumer is a real player.
         // Contain that compatibility failure to auto-healing instead of letting one item
         // repeatedly fault the main player-update loop.
+        // QuickHeal's ordinary implementation is local-player gated. Enter the same tightly
+        // restored virtual-player scope used for companion ItemCheck so it consumes from this
+        // companion's own backpack/hotbar and applies the normal healing result to this player.
+        Vector2 healAim = instance.AimWorld;
+        if (healAim == Vector2.Zero)
+            healAim = Player.Center + new Vector2(Player.direction * 160f, 0f);
+
+        using VirtualPlayerExecutionContext.Scope scope =
+            VirtualPlayerExecutionContext.Enter(Player, healAim, false, false, null);
         CompanionFaultGuard.RunCritical(CompanionFaultGuard.HealingPotionLane, Player.QuickHeal);
     }
 
@@ -304,14 +360,19 @@ public sealed class CompanionPlayer : ModPlayer
     }
 
     /// <summary>
-    /// When survival is disabled, use a free dodge instead of only reducing damage: tML keeps a
-    /// minimum of one damage after damage modifiers, while a dodge cleanly covers NPC attacks,
-    /// projectiles, fall damage and environmental damage. The default remains false here, so
-    /// companions normally take real damage and use the brain's existing death/revive flow.
+    /// When survival is disabled, reject the hit at the earliest player-wide immunity hook.
+    /// FreeDodge is only queried for Main.myPlayer, so it silently never ran for our synthetic
+    /// player slots. ImmuneTo is checked before that local-player branch and therefore covers
+    /// NPC contact, projectiles, fall damage and environmental damage for companions as well.
+    /// With the option enabled this returns false and vanilla applies ordinary damage normally.
     /// </summary>
-    public override bool FreeDodge(Player.HurtInfo info) =>
+    public override bool ImmuneTo(PlayerDeathReason damageSource, int cooldownCounter, bool dodgeable) =>
         CompanionEntitySystem.IsCompanion(Player) &&
-        MoreAIPlayerClientConfig.Instance?.CompanionsTakeDamage == false;
+        // Fail closed while the client config is still loading: the documented default is
+        // invulnerability, so a null config must not create one frame where a freshly spawned
+        // companion can unexpectedly take damage. Once the user explicitly enables damage,
+        // return false and leave every vanilla damage source intact.
+        !MoreAIPlayerClientConfig.CompanionDamageEnabled;
 
     public override void OnHurt(Player.HurtInfo info)
     {
@@ -331,6 +392,16 @@ public sealed class CompanionPlayer : ModPlayer
 
         if (CompanionEntitySystem.IsCompanion(Player))
         {
+            // Player.Hurt has already applied the final vanilla damage here, including the
+            // companion's own defence, endurance and any modded damage hooks. Snapshot that
+            // result before the next stat rebuild so enabled damage cannot be silently healed.
+            CompanionInstance companion = CompanionEntitySystem.GetBySlot(Player.whoAmI);
+            if (companion is not null)
+            {
+                companion.PersistentLife = System.Math.Max(0, Player.statLife);
+                companion.PersistentLifeInitialized = true;
+            }
+
             int projIndex = info.DamageSource.SourceProjectileLocalIndex;
             if (projIndex >= 0 && projIndex < Main.maxProjectiles)
             {

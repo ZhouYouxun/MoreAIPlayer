@@ -47,7 +47,7 @@ Mods: {
 
 				CompanionsTakeDamage: {
 					Label: "[i:CobaltShield] Companions take damage"
-					Tooltip: Enabled by default. Companions take normal damage and can die, then revive after their normal delay. Disable to make companions immune to all damage.
+					Tooltip: Disabled by default. Enable for companions to take normal damage, die, and revive after their normal delay. While disabled, companions are immune to all damage.
 				}
 
 				CompanionsAutoCollectWorldItems: {
@@ -61,6 +61,8 @@ Mods: {
 				}
 			}
 		}
+
+		Keybinds.CompanionRescue.DisplayName: Companion Emergency Recall
 
 		Items: {
 			DamageTestDummy: {
@@ -125,6 +127,8 @@ Mods: {
 					Because this system is fairly unconventional, it currently supports single-player only.
 					Some complex or advanced mod weapons may not be compatible. There is no complete incompatibility list, so please try them gradually.
 					'''
+				RescueShortcut: Double-click [{0}] to quickly call all companions to your side.
+				RescueDefaultKey: Right Mouse Button
 			}
 
 			CompanionCommandBook: {
@@ -202,6 +206,30 @@ Mods: {
 			RenameSave: Save
 			RenameCancel: Cancel
 			RenameEmpty: A companion needs a name.
+			Appearance: Appearance
+			AppearanceTitle: "{0} · Dresser"
+			AppearanceBack: Back
+			AppearanceHint: Changes save immediately and are shown on the summoned companion.
+			AppearanceGender: Gender
+			AppearanceMale: Male
+			AppearanceFemale: Female
+			AppearanceChange: Change
+			AppearanceSkin: Skin style
+			AppearanceVariantValue: Style {0}
+			AppearanceHair: Hairstyle
+			AppearanceHairValue: Hair {0}
+			AppearanceHairColor: Hair color
+			AppearanceSkinColor: Skin color
+			AppearanceEyeColor: Eye color
+			AppearanceShirtColor: Shirt color
+			AppearanceUnderShirtColor: Undershirt color
+			AppearancePantsColor: Pants color
+			AppearanceShoeColor: Shoe color
+			AppearanceColorHint: Apply color
+			AppearanceFineColor: Fine color: {0}
+			AppearanceRed: R
+			AppearanceGreen: G
+			AppearanceBlue: B
 			Armor: Armor
 			Vanity: Vanity
 			Dye: Dye
