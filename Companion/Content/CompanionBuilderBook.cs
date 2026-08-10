@@ -8,8 +8,9 @@ using Terraria.ModLoader;
 namespace MoreAIPlayer.Companion.Content;
 
 /// <summary>
-/// Fourth companion book. Right click selects a construction plan; left click toggles smart
-/// assistance or assigns the selected plan at the cursor. Down + left click cancels the queue.
+/// Fourth companion book. Holding right click opens the tactic wheel; a left click switches the
+/// selected tactic on or off. The three tactics act on their own while switched on, so there is
+/// no cursor-targeted "use" — the book is a mode toggle, not a build command.
 /// </summary>
 public sealed class CompanionBuilderBook : ModItem
 {
@@ -28,7 +29,15 @@ public sealed class CompanionBuilderBook : ModItem
         Item.autoReuse = false;
     }
 
+    // Right click still counts as an alt function so vanilla treats it as "not a left-click use".
+    // The tactic wheel reads the raw right button itself; CanUseItem then refuses the alt so the
+    // book never animates or acts on right click.
     public override bool AltFunctionUse(Player player) => true;
+
+    // Only a left click, and only while the wheel is closed, is a real use. That single left
+    // click toggles the selected tactic.
+    public override bool CanUseItem(Player player) =>
+        player.altFunctionUse != 2 && !UI.CompanionBuilderModeWheel.Active;
 
     public override bool? UseItem(Player player)
     {
@@ -41,24 +50,8 @@ public sealed class CompanionBuilderBook : ModItem
             return true;
         }
 
-        CompanionPlayer data = player.GetModPlayer<CompanionPlayer>();
-        if (player.altFunctionUse == 2)
-        {
-            data.BuildMode = (CompanionBuildMode)(((int)data.BuildMode + 1) % 5);
-            Main.NewText(Language.GetTextValue(
-                "Mods.MoreAIPlayer.CompanionCommand.BuilderModeChanged",
-                ModeName(data.BuildMode)), 120, 255, 170);
+        if (UI.CompanionBuilderModeWheel.Active || player.altFunctionUse == 2)
             return true;
-        }
-
-        if (player.controlDown)
-        {
-            int cancelled = CompanionBuildingSystem.CancelAll(player);
-            Main.NewText(Language.GetTextValue(
-                "Mods.MoreAIPlayer.CompanionCommand.BuilderCancelled",
-                cancelled), 255, 210, 120);
-            return true;
-        }
 
         if (CompanionCommandBook.OwnedActiveCompanions(player.whoAmI).Count == 0)
         {
@@ -66,29 +59,28 @@ public sealed class CompanionBuilderBook : ModItem
             return true;
         }
 
-        if (data.BuildMode == CompanionBuildMode.SmartAssist)
-        {
-            data.SmartBuildEnabled = !data.SmartBuildEnabled;
-            Message(data.SmartBuildEnabled ? "BuilderSmartEnabled" : "BuilderSmartDisabled",
-                data.SmartBuildEnabled ? new Color(120, 255, 170) : new Color(210, 210, 210));
-            return true;
-        }
+        CompanionPlayer data = player.GetModPlayer<CompanionPlayer>();
+        data.BuildTacticActive = !data.BuildTacticActive;
 
-        Point target = Main.MouseWorld.ToTileCoordinates();
-        if (CompanionBuildingSystem.TrySchedulePlan(
-            player, data.BuildMode, target, out int queued, out string failureKey))
+        if (data.BuildTacticActive)
         {
+            CompanionBuildingSystem.ResetSmartObservation(player);
             Main.NewText(Language.GetTextValue(
-                "Mods.MoreAIPlayer.CompanionCommand.BuilderQueued",
-                ModeName(data.BuildMode), queued), 120, 255, 170);
+                "Mods.MoreAIPlayer.CompanionCommand.BuilderTacticOn",
+                ModeName(data.BuildMode)), 120, 255, 170);
         }
         else
-            Message(failureKey, new Color(255, 180, 120));
+        {
+            CompanionBuildingSystem.CancelAll(player);
+            Main.NewText(Language.GetTextValue(
+                "Mods.MoreAIPlayer.CompanionCommand.BuilderTacticOff",
+                ModeName(data.BuildMode)), 210, 210, 210);
+        }
 
         return true;
     }
 
-    private static string ModeName(CompanionBuildMode mode) =>
+    internal static string ModeName(CompanionBuildMode mode) =>
         Language.GetTextValue($"Mods.MoreAIPlayer.CompanionCommand.BuilderMode{mode}");
 
     private static void Message(string key, Color color) =>

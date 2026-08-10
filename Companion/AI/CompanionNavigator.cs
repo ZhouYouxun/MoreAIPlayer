@@ -26,6 +26,19 @@ public sealed class CompanionNavigator
     private int stuckTicks;
     private Vector2 lastPosition;
     private bool jumpHeldLastTick;
+    private readonly List<OpenedDoor> openedDoors = [];
+
+    // A door is remembered only when this navigator successfully opened it. This keeps the
+    // companion from acting as a global auto-close switch for doors opened by the owner, wiring,
+    // or another companion.
+    private readonly record struct OpenedDoor(
+        Point ClosedTile,
+        int TravelDirection,
+        int OpenedTileType,
+        bool TallGate,
+        int Age);
+
+    private const int DoorRecordLifetimeTicks = 600;
 
     /// <summary>True when the most recent search could not find a route to the goal.</summary>
     public bool LastPathFailed { get; private set; }
@@ -44,6 +57,64 @@ public sealed class CompanionNavigator
         stuckTicks = 0;
         LastPathFailed = false;
         jumpHeldLastTick = false;
+        openedDoors.Clear();
+    }
+
+    /// <summary>
+    /// Closes doors this companion opened after its whole body has crossed to the far side.
+    /// Call once per brain tick even when pathfinding is not currently steering the companion,
+    /// because combat or an idle branch may take over immediately after it walks through.
+    /// </summary>
+    public void UpdateOwnedDoors(Player me)
+    {
+        if (me is null || Main.netMode == NetmodeID.MultiplayerClient)
+            return;
+
+        for (int i = openedDoors.Count - 1; i >= 0; i--)
+        {
+            OpenedDoor pending = openedDoors[i] with { Age = openedDoors[i].Age + 1 };
+            openedDoors[i] = pending;
+
+            if (pending.Age > DoorRecordLifetimeTicks)
+            {
+                openedDoors.RemoveAt(i);
+                continue;
+            }
+
+            float closedDoorLeft = pending.ClosedTile.X * 16f;
+            bool crossed = pending.TravelDirection > 0
+                ? me.Left.X > closedDoorLeft + 20f
+                : me.Right.X < closedDoorLeft - 4f;
+            if (!crossed)
+                continue;
+
+            if (!TryFindOpenedDoor(pending, out Point openTile))
+            {
+                // It was already closed, destroyed, or changed by somebody else.
+                openedDoors.RemoveAt(i);
+                continue;
+            }
+
+            bool closed = pending.TallGate
+                ? WorldGen.ShiftTallGate(openTile.X, openTile.Y, closing: true)
+                : WorldGen.CloseDoor(openTile.X, openTile.Y);
+            if (!closed)
+                continue; // another player/NPC is still in the doorway; retry later
+
+            if (Main.netMode == NetmodeID.Server)
+            {
+                NetMessage.SendData(
+                    MessageID.ToggleDoorState,
+                    -1,
+                    -1,
+                    null,
+                    pending.TallGate ? 5 : 1,
+                    openTile.X,
+                    openTile.Y,
+                    pending.TravelDirection);
+            }
+            openedDoors.RemoveAt(i);
+        }
     }
 
     /// <summary>Writes movement controls onto the player to travel toward the goal.</summary>
@@ -191,7 +262,7 @@ public sealed class CompanionNavigator
         TryOpenDoorForCurrentMovement(me);
     }
 
-    private static void TryOpenDoorForCurrentMovement(Player me)
+    private void TryOpenDoorForCurrentMovement(Player me)
     {
         int direction = me.controlRight && !me.controlLeft ? 1
             : me.controlLeft && !me.controlRight ? -1
@@ -205,7 +276,7 @@ public sealed class CompanionNavigator
     /// direction first makes the door swing away from the companion; the opposite direction
     /// is the vanilla fallback when furniture or another entity blocks that side.
     /// </summary>
-    private static bool TryOpenDoorAhead(Player me, int direction)
+    private bool TryOpenDoorAhead(Player me, int direction)
     {
         // Never let a multiplayer client change tiles optimistically. Companions are currently
         // singleplayer-only, but keeping the mutation authority-safe here prevents this helper
@@ -233,6 +304,7 @@ public sealed class CompanionNavigator
 
                 if (TileLoader.OpenDoorID(tile) >= 0)
                 {
+                    int openedTileType = TileLoader.OpenDoorID(tile);
                     int openedDirection = direction;
                     bool opened = WorldGen.OpenDoor(tileX, tileY, openedDirection);
                     if (!opened)
@@ -243,6 +315,7 @@ public sealed class CompanionNavigator
 
                     if (opened)
                     {
+                        RememberOpenedDoor(tileX, tileY, openedDirection, openedTileType, tallGate: false);
                         if (Main.netMode == NetmodeID.Server)
                         {
                             NetMessage.SendData(
@@ -261,6 +334,7 @@ public sealed class CompanionNavigator
                 else if (tile.TileType == TileID.TallGateClosed &&
                     WorldGen.ShiftTallGate(tileX, tileY, closing: false))
                 {
+                    RememberOpenedDoor(tileX, tileY, direction, TileID.TallGateOpen, tallGate: true);
                     if (Main.netMode == NetmodeID.Server)
                     {
                         NetMessage.SendData(
@@ -277,6 +351,74 @@ public sealed class CompanionNavigator
             }
         }
 
+        return false;
+    }
+
+    private void RememberOpenedDoor(
+        int tileX,
+        int tileY,
+        int travelDirection,
+        int openedTileType,
+        bool tallGate)
+    {
+        Point closedTile = new(tileX, tileY);
+        for (int i = 0; i < openedDoors.Count; i++)
+        {
+            if (openedDoors[i].ClosedTile == closedTile)
+            {
+                openedDoors[i] = new OpenedDoor(
+                    closedTile, travelDirection, openedTileType, tallGate, 0);
+                return;
+            }
+        }
+        openedDoors.Add(new OpenedDoor(
+            closedTile, travelDirection, openedTileType, tallGate, 0));
+    }
+
+    /// <summary>
+    /// Finds any active segment of the opened object. TileLoader.CloseDoorID is the inverse of
+    /// TileLoader.OpenDoorID and therefore covers properly registered modded doors as well as
+    /// vanilla doors; no concrete mod tile IDs are hard-coded here.
+    /// </summary>
+    private static bool TryFindOpenedDoor(OpenedDoor pending, out Point openTile)
+    {
+        int firstX = pending.TallGate
+            ? pending.ClosedTile.X
+            : pending.TravelDirection > 0 ? pending.ClosedTile.X : pending.ClosedTile.X - 1;
+        int lastX = pending.TallGate ? firstX : firstX + 1;
+        int verticalRadius = pending.TallGate ? 6 : 3;
+
+        for (int x = firstX; x <= lastX; x++)
+        {
+            for (int y = pending.ClosedTile.Y - verticalRadius;
+                y <= pending.ClosedTile.Y + verticalRadius;
+                y++)
+            {
+                if (!WorldGen.InWorld(x, y, 2))
+                    continue;
+
+                Tile tile = Main.tile[x, y];
+                if (!tile.HasTile || tile.IsActuated)
+                    continue;
+
+                if (tile.TileType != pending.OpenedTileType)
+                    continue;
+
+                if (!pending.TallGate && TileLoader.CloseDoorID(tile) >= 0)
+                {
+                    openTile = new Point(x, y);
+                    return true;
+                }
+
+                if (pending.TallGate && tile.TileType == TileID.TallGateOpen)
+                {
+                    openTile = new Point(x, y);
+                    return true;
+                }
+            }
+        }
+
+        openTile = default;
         return false;
     }
 

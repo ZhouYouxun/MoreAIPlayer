@@ -50,6 +50,11 @@ Mods: {
 					Tooltip: Désactivé par défaut. Activez-le pour que les compagnons subissent des dégâts normaux, puissent mourir et reviennent après leur délai normal. Désactivé, ils sont immunisés contre tous les dégâts.
 				}
 
+				CompanionsRescueWhenOwnerHurt: {
+					Label: "[i:MagicMirror] Rappeler les compagnons quand vous êtes blessé"
+					Tooltip: Désactivé par défaut. Les compagnons se téléportent près de vous sur des emplacements sûrs et distincts.
+				}
+
 				CompanionsAutoCollectWorldItems: {
 					Label: "[i:TreasureMagnet] Les compagnons ramassent automatiquement les objets du monde"
 					Tooltip: Désactivé par défaut. Lorsqu'elle est désactivée, les compagnons ne cherchent, ne réservent, ne poursuivent et ne ramassent aucun objet du monde. Activez-la seulement après avoir vérifié la compatibilité avec votre sauvegarde et vos mods.
@@ -169,14 +174,24 @@ Mods: {
 				DisplayName: Grimoire de l'architecte
 				Tooltip:
 					'''
-					Clic droit : alterner entre cinq plans. Clic gauche : exécuter le plan choisi. Bas + clic gauche : annuler tous les travaux.
-					· Assistance intelligente : active l'aide continue. Les compagnons apprennent les blocs et murs que vous posez et prolongent les motifs courts et clairs.
-					· Pont : construit un pont horizontal de plateformes jusqu'à 160 cases vers le curseur.
-					· Abri : construit une structure de 11 × 7 avec une ouverture de trois cases, puis ajoute murs et éclairage si les matériaux sont disponibles.
-					· Arène : construit trois rangées de 61 plateformes espacées de dix cases, avec l'éclairage disponible.
-					· Puits de corde : pose jusqu'à 120 cases de corde verticale et des lumières là où elles ont un support.
-					Les matériaux non favoris sont pris d'abord dans les sacs des compagnons actifs, puis dans votre inventaire. Le chantier se met en pause sans matériaux.
-					Les compagnons ne minent ni ne remplacent jamais de blocs. Combat, secours, balises et modes spécialisés restent prioritaires. Uniquement en solo.
+					Hold right click: open the tactic wheel. Left click: switch the selected tactic on or off.
+					· Smart Build: while you place the same block along a line, companions continue that block in the same direction from their own or your inventory.
+					· Defensive Build: when an enemy is near, companions raise a short blocking pillar between you and the nearest threat.
+					· Battle Platform: while you stand on a platform whose facing edge breaks off ahead, companions extend flat platforms across the gap — about six tiles ahead, so keep walking to keep bridging. They will not drop off the bridge, and return to your side if knocked off.
+					Builders take non-favourited materials from active companion backpacks first, then your inventory. Work pauses safely if supplies run out.
+					Companions never mine or replace blocks. Combat, rescue calls, waypoints and specialist modes always take priority. Single-player only.
+					'''
+			}
+
+			CompanionAutomationBook: {
+				DisplayName: Grimoire automatique
+				Tooltip:
+					'''
+					[Pour le divertissement uniquement ; cette fonction est encore en phase de test]
+					Clic gauche : invoque votre unique compagnon automatique (un compagnon existant n'est jamais réinitialisé ni remplacé)
+					Clic droit : ouvre son sac
+					Il tentera d'explorer, récolter, construire, combattre et progresser de manière autonome ; une fois terminé, il deviendra un compagnon fantôme normal
+					Il peut encore se bloquer, se tromper ou rencontrer d'autres bugs. Sauvegardez le monde d'abord. Solo uniquement.
 					'''
 			}
 
@@ -338,6 +353,16 @@ Mods: {
 		}
 
 		CompanionCommand: {
+			AutomationSingleplayerOnly: Le Grimoire automatique est pour l'instant réservé au solo.
+			AutomationAlreadyActive: Ce compagnon automatique est déjà occupé ; recliquer ne le réinitialise pas.
+			AutomationNoFreeSlot: Aucun emplacement libre n'est disponible pour le compagnon automatique.
+			AutomationNotCreated: Ce monde n'a pas encore de compagnon automatique. Faites un clic gauche pour en invoquer un.
+			AutomationSummoned: "{0} a été invoqué et commencera à progresser dans le monde tout seul."
+			AutomationBlocked: Le compagnon automatique est bloqué sur « {0} » : {1}. Il réessaiera régulièrement de lui-même.
+			AutomationCompleted: "{0} a vaincu le Seigneur de la Lune. Le parcours automatique est terminé ; c'est désormais un compagnon fantôme normal."
+			AutomationUnsupportedWorld: Ce monde spécial n'a pas encore de stratégie automatique ; le compagnon automatique s'est arrêté en toute sécurité.
+			AutomationUnsupportedMod: La progression de ce mod n'a pas de fournisseur d'automatisation ; le compagnon suit uniquement le parcours d'origine.
+			AutomationBackpackUnavailable: Le sac du compagnon automatique est indisponible pour le moment.
 			ModeAttack: Mode Attaque
 			ModeDefense: Mode Défense
 			ModeGarrison: Mode Garnison
@@ -392,21 +417,17 @@ Mods: {
 			HunterPanelHunting: · {0} : se rapproche pour vous abattre !
 			HunterRefresh: 🔄 Reconstruire et déployer l'escouade de chasseurs
 			HunterRefreshed: L'escouade de chasseurs a été reconstruite et redéployée !
-			BuilderModeSmartAssist: Assistance intelligente
-			BuilderModeBridge: Pont
-			BuilderModeShelter: Abri
-			BuilderModeArena: Arène de combat
-			BuilderModeRopeShaft: Puits de corde
-			BuilderModeChanged: Plan de construction → {0}
-			BuilderSmartEnabled: Assistance de construction activée. Posez normalement vos blocs et les compagnons prolongeront les motifs clairs.
-			BuilderSmartDisabled: Assistance de construction désactivée. Les travaux déjà planifiés sont conservés.
-			BuilderQueued: "{0} : {1} cases de construction planifiées. Les compagnons bâtiront dès que la zone sera sûre."
-			BuilderCancelled: "{0} cases de construction annulées."
-			BuilderInvalidTarget: Cette cible se trouve hors de la zone sûre du monde.
-			BuilderNeedPlatforms: Ce plan exige des plateformes non favorites dans le sac d'un compagnon actif ou votre inventaire.
-			BuilderNeedBlocks: Ce plan exige des blocs de construction solides non favoris dans le sac d'un compagnon actif ou votre inventaire.
-			BuilderNeedRope: Ce plan exige de la corde non favorite dans le sac d'un compagnon actif ou votre inventaire.
-			BuilderNothingToBuild: Toutes les cases sont déjà occupées ou planifiées ; rien n'a été modifié.
+			BuilderModeSmartBuild: Smart Build
+			BuilderModeDefensiveBuild: Defensive Build
+			BuilderModeBattlePlatform: Battle Platform
+			BuilderStateOn: on
+			BuilderStateOff: off
+			BuilderModeChanged: Tactic → {0} ({1})
+			BuilderTacticOn: "{0} switched on. Left click again to switch it off."
+			BuilderTacticOff: "{0} switched off. Any queued construction was cleared."
+			BuilderWheelTitle: Select construction tactic
+			BuilderWheelStateOn: Hold right: switch tactic  •  Left click: turn off
+			BuilderWheelStateOff: Hold right: switch tactic  •  Left click: turn on
 		}
 
 		NPCs.DamageTestDummyNPC.DisplayName: Mannequin de test de dégâts

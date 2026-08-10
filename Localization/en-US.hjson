@@ -50,6 +50,11 @@ Mods: {
 					Tooltip: Disabled by default. Enable for companions to take normal damage, die, and revive after their normal delay. While disabled, companions are immune to all damage.
 				}
 
+				CompanionsRescueWhenOwnerHurt: {
+					Label: "[i:MagicMirror] Rescue companions when you are hurt"
+					Tooltip: Disabled by default. When enabled, being hurt recalls companions to separate nearby spots that are clear of terrain, hazards, and nearby threats. If no safe spot is found, they stay put.
+				}
+
 				CompanionsAutoCollectWorldItems: {
 					Label: "[i:TreasureMagnet] Companions automatically collect world items"
 					Tooltip: Disabled by default. When off, companions do not scan, reserve, approach, or collect world drops. Enable only after confirming compatibility with your save and other mods.
@@ -168,14 +173,24 @@ Mods: {
 				DisplayName: Architect's Tome
 				Tooltip:
 					'''
-					Right click: cycle through five construction plans. Left click: use the selected plan. Down + left click: cancel all queued work.
-					· Smart Assist: toggle continuous assistance. Companions learn your real blocks and walls, then extend short, clear patterns.
-					· Bridge: extend a continuous platform bridge from the ground or platform at your feet, up to 160 tiles toward the cursor.
-					· Shelter: build an 11 × 7 frame on the nearest ground below the cursor, with a three-tile doorway, walls and lights when supplies are available.
-					· Arena: build three 61-tile platform rows upward from the ground below the cursor, spaced ten tiles apart, with available lighting.
-					· Rope Shaft: run rope downward from your feet for up to 120 tiles and place supported lights along the route.
+					Hold right click: open the tactic wheel. Left click: switch the selected tactic on or off.
+					· Smart Build: while you place the same block along a line, companions continue that block in the same direction from their own or your inventory.
+					· Defensive Build: when an enemy is near, companions raise a short blocking pillar between you and the nearest threat.
+					· Battle Platform: while you stand on a platform whose facing edge breaks off ahead, companions extend flat platforms across the gap — about six tiles ahead, so keep walking to keep bridging. They will not drop off the bridge, and return to your side if knocked off.
 					Builders take non-favourited materials from active companion backpacks first, then your inventory. Work pauses safely if supplies run out.
 					Companions never mine or replace blocks. Combat, rescue calls, waypoints and specialist modes always take priority. Single-player only.
+					'''
+			}
+
+			CompanionAutomationBook: {
+				DisplayName: Automation Tome
+				Tooltip:
+					'''
+					[For entertainment only; this feature is still in testing]
+					Left click: summon your one automation companion (an existing one is never reset or replaced)
+					Right click: open its backpack
+					It will try to explore, gather, build, fight, and progress the world independently; after finishing, it becomes a normal phantom companion
+					It may still get stuck, make mistakes, or encounter other bugs. Back up your world first. Single-player only.
 					'''
 			}
 
@@ -343,6 +358,16 @@ Mods: {
 		}
 
 		CompanionCommand: {
+			AutomationSingleplayerOnly: The Automation Tome is single-player only for now.
+			AutomationAlreadyActive: This automation companion is already busy; clicking again will not refresh it.
+			AutomationNoFreeSlot: No free slot is available for the automation companion right now.
+			AutomationNotCreated: This world has no automation companion yet. Left-click to summon one first.
+			AutomationSummoned: "{0} has been summoned and will start progressing the world on its own."
+			AutomationBlocked: The automation companion is stuck on "{0}": {1}. It will keep retrying on its own.
+			AutomationCompleted: "{0} has defeated the Moon Lord. The automation run is over; it is now a normal phantom companion."
+			AutomationUnsupportedWorld: This special world has no automation strategy yet; the automation companion stopped safely.
+			AutomationUnsupportedMod: This mod's progression has no automation provider; the automation companion follows only the vanilla path.
+			AutomationBackpackUnavailable: The automation companion's backpack is unavailable right now.
 			ModeAttack: Attack Mode
 			ModeDefense: Defense Mode
 			ModeGarrison: Garrison Mode
@@ -397,21 +422,17 @@ Mods: {
 			HunterPanelHunting: · {0}: closing in for the kill!
 			HunterRefresh: 🔄 Rebuild and deploy the hunter squad
 			HunterRefreshed: Hunter squad rebuilt and redeployed!
-			BuilderModeSmartAssist: Smart Assist
-			BuilderModeBridge: Bridge
-			BuilderModeShelter: Shelter
-			BuilderModeArena: Battle Arena
-			BuilderModeRopeShaft: Rope Shaft
-			BuilderModeChanged: Construction plan → {0}
-			BuilderSmartEnabled: Smart construction assistance enabled. Place blocks normally and your companions will extend clear patterns.
-			BuilderSmartDisabled: Smart construction assistance disabled. Existing queued work is unchanged.
-			BuilderQueued: "{0}: {1} construction cells queued. Companions will build when it is safe."
-			BuilderCancelled: Cancelled {0} queued construction cells.
-			BuilderInvalidTarget: That construction target is outside the safe world area.
-			BuilderNeedPlatforms: This plan needs non-favourited platforms in an active companion backpack or your inventory.
-			BuilderNeedBlocks: This plan needs non-favourited solid building blocks in an active companion backpack or your inventory.
-			BuilderNeedRope: This plan needs non-favourited rope in an active companion backpack or your inventory.
-			BuilderNothingToBuild: Every target cell is already occupied or already queued; nothing was changed.
+			BuilderModeSmartBuild: Smart Build
+			BuilderModeDefensiveBuild: Defensive Build
+			BuilderModeBattlePlatform: Battle Platform
+			BuilderStateOn: on
+			BuilderStateOff: off
+			BuilderModeChanged: Tactic → {0} ({1})
+			BuilderTacticOn: "{0} switched on. Left click again to switch it off."
+			BuilderTacticOff: "{0} switched off. Any queued construction was cleared."
+			BuilderWheelTitle: Select construction tactic
+			BuilderWheelStateOn: Hold right: switch tactic  •  Left click: turn off
+			BuilderWheelStateOff: Hold right: switch tactic  •  Left click: turn on
 		}
 
 		NPCs.DamageTestDummyNPC.DisplayName: Damage Test Dummy N P C

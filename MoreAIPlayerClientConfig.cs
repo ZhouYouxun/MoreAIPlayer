@@ -17,6 +17,8 @@ public sealed class MoreAIPlayerClientConfig : ModConfig
 
     public static bool CompanionDamageEnabled => Current?.CompanionsTakeDamage == true;
 
+    public static bool CompanionsRescueOnOwnerHurt => Current?.CompanionsRescueWhenOwnerHurt == true;
+
     public override ConfigScope Mode => ConfigScope.ClientSide;
 
     // Values are intentionally read through Current at the point of use. OnChanged needs no
@@ -43,6 +45,11 @@ public sealed class MoreAIPlayerClientConfig : ModConfig
     // must babysit; enabling this turns on the full vanilla damage-and-revive loop.
     [DefaultValue(false)]
     public bool CompanionsTakeDamage;
+
+    // Off by default: being hit should not pull every companion onto the same dangerous tile.
+    // When enabled, the automatic rescue finds each companion a nearby, open landing spot.
+    [DefaultValue(false)]
+    public bool CompanionsRescueWhenOwnerHurt;
 
     [DefaultValue(false)]
     public bool CompanionsAutoCollectWorldItems;

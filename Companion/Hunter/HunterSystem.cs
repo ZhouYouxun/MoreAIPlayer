@@ -15,6 +15,8 @@ public sealed class HunterSystem : ModSystem
     private const int ReinforcementDelayTicks = 105;
     private const float MinimumRemoteSpawnDistance = 2400f;
     private const float MaximumRemoteSpawnDistance = 3000f;
+    private const float MinimumRecoverySpawnDistance = 720f;
+    private const float MaximumRecoverySpawnDistance = 1040f;
 
     public const float CatchUpTeleportDistance = 5600f;
 
@@ -156,25 +158,113 @@ public sealed class HunterSystem : ModSystem
             OriginalPlayer = original
         };
         BySlot[slot] = instance;
-        instance.BindLoadout(targetPlayer, hunterName, ActiveStage, TargetHunterCount);
-
-        entity.Center = FindRemoteSpawnPosition(targetPlayer);
-        entity.velocity = Vector2.Zero;
-        entity.fallStart = (int)(entity.position.Y / 16f);
+        try
+        {
+            instance.BindLoadout(targetPlayer, hunterName, ActiveStage, TargetHunterCount);
+            entity.Center = FindRemoteSpawnPosition(targetPlayer, entity);
+            entity.velocity = Vector2.Zero;
+            entity.fallStart = (int)(entity.position.Y / 16f);
+        }
+        catch (Exception exception)
+        {
+            // Spawning replaces one Main.player slot before the loadout and terrain search run.
+            // Roll that reservation back atomically if either step faults so an invisible hunter
+            // can never remain in the player array.
+            BySlot.Remove(slot);
+            entity.active = false;
+            if (ReferenceEquals(Main.player[slot], entity))
+                Main.player[slot] = original;
+            CompanionFaultGuard.Report($"hunter spawn #{slot}", exception);
+            return false;
+        }
 
         CompanionEntitySystem.SpawnRecallDustBurst(entity.Center);
         Main.NewText(Text("HunterSpawned", entity.name), 255, 100, 100);
         return true;
     }
 
-    public static Vector2 FindRemoteSpawnPosition(Player targetPlayer)
+    public static Vector2 FindRemoteSpawnPosition(Player targetPlayer, Player hunter = null) =>
+        FindSafeSpawnPosition(targetPlayer, hunter, MinimumRemoteSpawnDistance, MaximumRemoteSpawnDistance);
+
+    public static Vector2 FindRecoverySpawnPosition(Player targetPlayer, Player hunter) =>
+        FindSafeSpawnPosition(targetPlayer, hunter, MinimumRecoverySpawnDistance, MaximumRecoverySpawnDistance);
+
+    private static Vector2 FindSafeSpawnPosition(Player targetPlayer, Player hunter, float minimumDistance, float maximumDistance)
     {
-        float direction = Main.rand.NextBool() ? -1f : 1f;
-        float distance = Main.rand.NextFloat(MinimumRemoteSpawnDistance, MaximumRemoteSpawnDistance);
-        Vector2 position = targetPlayer.Center + new Vector2(direction * distance, Main.rand.NextFloat(-320f, 160f));
-        position.X = MathHelper.Clamp(position.X, 240f, Main.maxTilesX * 16f - 240f);
-        position.Y = MathHelper.Clamp(position.Y, 240f, Main.maxTilesY * 16f - 240f);
-        return position;
+        int width = System.Math.Max(20, hunter?.width ?? 20);
+        int height = System.Math.Max(42, hunter?.height ?? 42);
+        int preferredDirection = Main.rand.NextBool() ? -1 : 1;
+        const float worldMargin = 240f;
+        float worldRight = Main.maxTilesX * 16f - worldMargin;
+        bool hasRoomLeft = targetPlayer.Center.X - minimumDistance >= worldMargin;
+        bool hasRoomRight = targetPlayer.Center.X + minimumDistance <= worldRight;
+        if (!hasRoomLeft && hasRoomRight)
+            preferredDirection = 1;
+        else if (hasRoomLeft && !hasRoomRight)
+            preferredDirection = -1;
+        int targetTileY = System.Math.Clamp((int)(targetPlayer.Center.Y / 16f), 20, Main.maxTilesY - 20);
+
+        // Probe several columns on both sides. At each column descend from slightly above the
+        // target's elevation until a real, hazard-free standing surface is found.
+        for (int attempt = 0; attempt < 24; attempt++)
+        {
+            int direction = attempt % 4 == 3 ? -preferredDirection : preferredDirection;
+            float distance = Main.rand.NextFloat(minimumDistance, maximumDistance);
+            float worldX = MathHelper.Clamp(
+                targetPlayer.Center.X + direction * distance,
+                worldMargin,
+                worldRight);
+            if (System.MathF.Abs(worldX - targetPlayer.Center.X) < minimumDistance * 0.8f)
+                continue;
+            int tileX = System.Math.Clamp((int)(worldX / 16f), 20, Main.maxTilesX - 20);
+            int firstFloorRow = System.Math.Max(20, targetTileY - 24);
+            int lastFloorRow = System.Math.Min(Main.maxTilesY - 20, targetTileY + 96);
+
+            for (int floorRow = firstFloorRow; floorRow <= lastFloorRow; floorRow++)
+            {
+                Vector2 center = new(tileX * 16f + 8f, floorRow * 16f - height * 0.5f);
+                if (IsSafeLanding(center, width, height))
+                    return center;
+            }
+        }
+
+        // A heavily modified world may not have a usable floor in the search band. Keep the
+        // promised horizontal separation, but at least choose open, dry, non-hurting space so
+        // the hunter can fall onto terrain instead of materialising inside it.
+        float fallbackDirection = preferredDirection;
+        float fallbackX = MathHelper.Clamp(
+            targetPlayer.Center.X + fallbackDirection * minimumDistance,
+            worldMargin,
+            worldRight);
+        for (int offset = 0; offset <= 120; offset++)
+        {
+            int signedOffset = offset == 0 ? 0 : (offset % 2 == 0 ? offset / 2 : -(offset + 1) / 2);
+            float y = MathHelper.Clamp(targetPlayer.Center.Y + signedOffset * 16f, 240f, Main.maxTilesY * 16f - 240f);
+            Vector2 center = new(fallbackX, y);
+            if (IsSafeOpenSpace(center, width, height))
+                return center;
+        }
+
+        return new Vector2(
+            fallbackX,
+            MathHelper.Clamp(targetPlayer.Center.Y - 160f, 240f, Main.maxTilesY * 16f - 240f));
+    }
+
+    private static bool IsSafeLanding(Vector2 center, int width, int height)
+    {
+        if (!IsSafeOpenSpace(center, width, height))
+            return false;
+
+        Vector2 topLeft = center - new Vector2(width * 0.5f, height * 0.5f);
+        return Collision.SolidCollision(topLeft + new Vector2(0f, 4f), width, height, acceptTopSurfaces: true);
+    }
+
+    private static bool IsSafeOpenSpace(Vector2 center, int width, int height)
+    {
+        Vector2 topLeft = center - new Vector2(width * 0.5f, height * 0.5f);
+        return !Collision.SolidCollision(topLeft, width, height) &&
+               !Collision.WetCollision(topLeft, width, height) &&
+               !Collision.AnyHurtingTiles(topLeft, width, height);
     }
 
     private static int FindFreeSlot()
@@ -208,10 +298,23 @@ public sealed class HunterSystem : ModSystem
         {
             foreach ((int slot, HunterInstance instance) in BySlot)
             {
-                CompanionEntitySystem.KillOwnedProjectiles(slot);
-                instance.Entity.active = false;
-                if (slot >= 0 && slot < Main.player.Length && Main.player[slot] == instance.Entity)
-                    Main.player[slot] = instance.OriginalPlayer;
+                try
+                {
+                    CompanionEntitySystem.KillOwnedProjectiles(slot);
+                }
+                catch (Exception exception)
+                {
+                    // One modded projectile must not prevent the remaining hunters or the
+                    // local player's hostile flag from being restored.
+                    CompanionFaultGuard.Report($"hunter cleanup #{slot}", exception);
+                }
+                finally
+                {
+                    HaltHunterInput(instance.Entity);
+                    instance.Entity.active = false;
+                    if (slot >= 0 && slot < Main.player.Length && Main.player[slot] == instance.Entity)
+                        Main.player[slot] = instance.OriginalPlayer;
+                }
             }
 
             if (restoreHostileState && Main.netMode == NetmodeID.SinglePlayer && Main.LocalPlayer is not null && previousHostileStateValid)
@@ -353,7 +456,16 @@ public sealed class HunterSystem : ModSystem
 
         Player localPlayer = Main.LocalPlayer;
         if (localPlayer is null || !localPlayer.active || localPlayer.dead)
+        {
+            foreach (HunterInstance hunter in BySlot.Values)
+            {
+                hunter.WantsUseItem = false;
+                hunter.WantsAltUse = false;
+                hunter.ItemCheckPreparedFrame = ulong.MaxValue;
+                HaltHunterInput(hunter.Entity);
+            }
             return;
+        }
 
         RememberHostileState();
         localPlayer.hostile = true;
@@ -390,7 +502,7 @@ public sealed class HunterSystem : ModSystem
                 {
                     instance.ReviveTicksLeft = 0;
                     instance.BindLoadout(localPlayer, me.name, ActiveStage, TargetHunterCount);
-                    me.Center = FindRemoteSpawnPosition(localPlayer);
+                    me.Center = FindRemoteSpawnPosition(localPlayer, me);
                     CompanionEntitySystem.SpawnRecallDustBurst(me.Center);
                     Main.NewText(Text("HunterRespawned", me.name), 255, 100, 100);
                 }
@@ -440,6 +552,14 @@ public sealed class HunterSystem : ModSystem
 
     private static void HaltHunterInput(Player player)
     {
+        if (player is null)
+            return;
+
+        player.controlLeft = false;
+        player.controlRight = false;
+        player.controlUp = false;
+        player.controlDown = false;
+        player.controlJump = false;
         player.controlUseItem = false;
         player.controlUseTile = false;
         player.controlHook = false;

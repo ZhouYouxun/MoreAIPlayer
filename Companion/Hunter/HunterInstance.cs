@@ -45,14 +45,32 @@ public sealed class HunterInstance
         me.team = 0; // Independent team or neutral
         me.difficulty = 0;
         me.ghost = false;
+        me.immune = false;
+        me.immuneNoBlink = false;
+        me.immuneTime = 0;
         me.immuneAlpha = 0;
+        me.potionDelay = 0;
+        me.itemAnimation = 0;
+        me.itemAnimationMax = 0;
+        me.itemTime = 0;
+        me.itemTimeMax = 0;
+        me.channel = false;
+        System.Array.Clear(me.hurtCooldowns, 0, me.hurtCooldowns.Length);
 
         // A hunter's health is derived from the target's life only; its explicit game-stage and
         // group multiplier keeps three hunters from being three full-strength copies.
         int targetHp = playerTarget.statLifeMax2 > 0 ? playerTarget.statLifeMax2 : playerTarget.statLifeMax;
         Loadout = HunterGearPool.GenerateLoadout(stage, HuntIndex, hunterCount);
         me.statLifeMax = System.Math.Max(140, (int)System.MathF.Round(targetHp * Loadout.LifeMultiplier));
+        me.statLifeMax2 = me.statLifeMax;
         me.statLife = me.statLifeMax;
         HunterGearPool.ApplyLoadout(me, Loadout);
+
+        WantsUseItem = false;
+        WantsAltUse = false;
+        ItemCheckPreparedFrame = ulong.MaxValue;
+        ItemCheckDetourFrame = ulong.MaxValue;
+        ConsecutiveItemCheckMisses = 0;
+        Brain.ResetForNewLife(me);
     }
 }

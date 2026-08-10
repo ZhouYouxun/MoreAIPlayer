@@ -35,6 +35,7 @@ public sealed class CompanionUISystem : ModSystem
         userInterface?.SetState(null);
         inventoryUI?.Deactivate();
         CompanionModeWheel.Close();
+        CompanionBuilderModeWheel.Close();
         CompanionManagerPanel.CloseInstant();
         HunterConfigPanel.CloseInstant();
         PlayerScaleMatrixPanel.CloseInstant();
@@ -49,6 +50,7 @@ public sealed class CompanionUISystem : ModSystem
     {
         Close();
         CompanionModeWheel.Close();
+        CompanionBuilderModeWheel.Close();
         CompanionManagerPanel.CloseInstant();
         HunterConfigPanel.CloseInstant();
         PlayerScaleMatrixPanel.CloseInstant();
@@ -110,6 +112,7 @@ public sealed class CompanionUISystem : ModSystem
     public override void UpdateUI(GameTime gameTime)
     {
         CompanionModeWheel.UpdateInput();
+        CompanionBuilderModeWheel.UpdateInput();
 
         if (inventoryUI is null || userInterface is null)
             return;
@@ -134,7 +137,7 @@ public sealed class CompanionUISystem : ModSystem
     /// "nothing I changed had any effect" can be told apart from "the change did not help" —
     /// three rounds of fixes were evaluated without that distinction being available.
     /// </summary>
-    public const string BuildStamp = "2026-08-07 #33 native-contact-damage";
+    public const string BuildStamp = "2026-08-07 #37 damage-builder-hunter-hardening";
 
     /// <summary>Draws a live decision readout over each companion only when the player has
     /// explicitly enabled the client-side diagnostic configuration.</summary>
@@ -395,6 +398,15 @@ public sealed class CompanionUISystem : ModSystem
             () =>
             {
                 CompanionModeWheel.Draw();
+                return true;
+            },
+            InterfaceScaleType.UI));
+
+        layers.Insert(mouseTextIndex, new LegacyGameInterfaceLayer(
+            "MoreAIPlayer: Companion Builder Wheel",
+            () =>
+            {
+                CompanionBuilderModeWheel.Draw();
                 return true;
             },
             InterfaceScaleType.UI));

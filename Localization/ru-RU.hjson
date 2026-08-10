@@ -50,6 +50,11 @@ Mods: {
 					Tooltip: По умолчанию выключено. Включите, чтобы спутники получали обычный урон, могли погибнуть и возрождались после обычной задержки. Пока выключено, они неуязвимы для любого урона.
 				}
 
+				CompanionsRescueWhenOwnerHurt: {
+					Label: "[i:MagicMirror] Призывать спутников при получении урона"
+					Tooltip: По умолчанию выключено. Спутники телепортируются на отдельные безопасные места рядом с вами.
+				}
+
 				CompanionsAutoCollectWorldItems: {
 					Label: "[i:TreasureMagnet] Спутники автоматически собирают предметы мира"
 					Tooltip: По умолчанию выключено. Пока опция выключена, спутники не ищут, не резервируют, не преследуют и не собирают предметы мира. Включайте её только после проверки совместимости с сохранением и другими модами.
@@ -169,14 +174,24 @@ Mods: {
 				DisplayName: Книга зодчего
 				Tooltip:
 					'''
-					ПКМ: переключать пять чертежей. ЛКМ: выполнить выбранный. Вниз + ЛКМ: отменить все работы.
-					· Умная помощь: включает постоянную поддержку. Спутники запоминают поставленные блоки и стены и продолжают короткие, понятные узоры.
-					· Мост: строит горизонтальный мост из платформ длиной до 160 клеток к курсору.
-					· Укрытие: строит каркас 11 × 7 с проёмом в три клетки и при наличии материалов добавляет стены и свет.
-					· Арена: строит три ряда по 61 платформе с промежутком в десять клеток и доступным освещением.
-					· Верёвочная шахта: прокладывает до 120 клеток верёвки по вертикали и ставит свет там, где есть опора.
-					Сначала расходуются неизбранные материалы из рюкзаков активных спутников, затем из вашего инвентаря. Без материалов работа безопасно приостанавливается.
-					Спутники никогда не добывают и не заменяют блоки. Бой, спасение, путевые точки и специальные режимы всегда важнее. Только одиночная игра.
+					Hold right click: open the tactic wheel. Left click: switch the selected tactic on or off.
+					· Smart Build: while you place the same block along a line, companions continue that block in the same direction from their own or your inventory.
+					· Defensive Build: when an enemy is near, companions raise a short blocking pillar between you and the nearest threat.
+					· Battle Platform: while you stand on a platform whose facing edge breaks off ahead, companions extend flat platforms across the gap — about six tiles ahead, so keep walking to keep bridging. They will not drop off the bridge, and return to your side if knocked off.
+					Builders take non-favourited materials from active companion backpacks first, then your inventory. Work pauses safely if supplies run out.
+					Companions never mine or replace blocks. Combat, rescue calls, waypoints and specialist modes always take priority. Single-player only.
+					'''
+			}
+
+			CompanionAutomationBook: {
+				DisplayName: Книга автоматизации
+				Tooltip:
+					'''
+					[Только для развлечения; функция всё ещё проходит тестирование]
+					Левая кнопка: призывает единственного автоматического спутника (существующий не сбрасывается и не заменяется)
+					Правая кнопка: открывает его рюкзак
+					Он попытается самостоятельно исследовать мир, собирать ресурсы, строить, сражаться и продвигаться дальше; после завершения станет обычным призрачным спутником
+					Он всё ещё может застревать, ошибаться или сталкиваться с другими сбоями. Сначала сделайте резервную копию мира. Только одиночная игра.
 					'''
 			}
 
@@ -338,6 +353,16 @@ Mods: {
 		}
 
 		CompanionCommand: {
+			AutomationSingleplayerOnly: Книга автоматизации пока только для одиночной игры.
+			AutomationAlreadyActive: Этот автоматический спутник уже занят; повторный клик его не сбросит.
+			AutomationNoFreeSlot: Сейчас нет свободного слота для автоматического спутника.
+			AutomationNotCreated: В этом мире ещё нет автоматического спутника. Сначала призовите его левой кнопкой.
+			AutomationSummoned: "{0} призван и начнёт самостоятельно продвигать мир."
+			AutomationBlocked: Автоматический спутник застрял на «{0}»: {1}. Он будет периодически пытаться сам.
+			AutomationCompleted: "{0} победил Лунного лорда. Автоматический проход завершён; теперь это обычный призрачный спутник."
+			AutomationUnsupportedWorld: Для этого особого мира пока нет автоматической стратегии; автоматический спутник безопасно остановился.
+			AutomationUnsupportedMod: У прогресса этого мода нет поставщика автоматизации; спутник идёт только по ванильному пути.
+			AutomationBackpackUnavailable: Рюкзак автоматического спутника сейчас недоступен.
 			ModeAttack: Режим штурма
 			ModeDefense: Режим обороны
 			ModeGarrison: Режим гарнизона
@@ -392,21 +417,17 @@ Mods: {
 			HunterPanelHunting: · {0}: приближается, чтобы убить вас!
 			HunterRefresh: 🔄 Пересобрать и отправить отряд охотников
 			HunterRefreshed: Отряд охотников пересобран и отправлен!
-			BuilderModeSmartAssist: Умная помощь
-			BuilderModeBridge: Мост
-			BuilderModeShelter: Укрытие
-			BuilderModeArena: Боевая арена
-			BuilderModeRopeShaft: Верёвочная шахта
-			BuilderModeChanged: Чертёж → {0}
-			BuilderSmartEnabled: Умная помощь включена. Ставьте блоки как обычно, и спутники продолжат понятные узоры.
-			BuilderSmartDisabled: Умная помощь выключена. Уже запланированные работы сохранены.
-			BuilderQueued: "{0}: запланировано клеток — {1}. Спутники начнут строить, когда станет безопасно."
-			BuilderCancelled: Отменено клеток строительства: {0}.
-			BuilderInvalidTarget: Цель находится за пределами безопасной области мира.
-			BuilderNeedPlatforms: Для этого плана нужны неизбранные платформы в рюкзаке активного спутника или вашем инвентаре.
-			BuilderNeedBlocks: Для этого плана нужны неизбранные цельные строительные блоки в рюкзаке активного спутника или вашем инвентаре.
-			BuilderNeedRope: Для этого плана нужна неизбранная верёвка в рюкзаке активного спутника или вашем инвентаре.
-			BuilderNothingToBuild: Все клетки уже заняты или запланированы; мир не изменён.
+			BuilderModeSmartBuild: Smart Build
+			BuilderModeDefensiveBuild: Defensive Build
+			BuilderModeBattlePlatform: Battle Platform
+			BuilderStateOn: on
+			BuilderStateOff: off
+			BuilderModeChanged: Tactic → {0} ({1})
+			BuilderTacticOn: "{0} switched on. Left click again to switch it off."
+			BuilderTacticOff: "{0} switched off. Any queued construction was cleared."
+			BuilderWheelTitle: Select construction tactic
+			BuilderWheelStateOn: Hold right: switch tactic  •  Left click: turn off
+			BuilderWheelStateOff: Hold right: switch tactic  •  Left click: turn on
 		}
 
 		NPCs.DamageTestDummyNPC.DisplayName: Манекен для проверки урона

@@ -19,6 +19,25 @@ public sealed class CompanionInstance
     public Player OriginalPlayer { get; init; }
     public CompanionBrain Brain { get; } = new();
 
+    private Automation.AutoCompanionBrain autoBrain;
+
+    /// <summary>The automation brain, created on demand only for the world's automation companion.
+    /// Ordinary companions never allocate it.</summary>
+    public Automation.AutoCompanionBrain AutoBrain => autoBrain ??= new();
+
+    /// <summary>Cheap per-tick cache of <see cref="CompanionProfile.IsAutoRunning"/>, refreshed in
+    /// <see cref="BindProfile"/>. Lets every enumeration hook (squad spread, command book, build
+    /// material sourcing, manager panel, whip buff) exclude the automation companion without
+    /// re-resolving its profile each time.</summary>
+    public bool IsAutoIdentity;
+
+    /// <summary>Independent maximum life/mana for the automation companion, refreshed each tick in
+    /// <see cref="BindProfile"/> from its own crystal/fruit counts. -1 means "not an automation
+    /// companion — use the owner-shared maximum instead." The life-persistence machinery reads
+    /// these so the companion grows from its own progression rather than mirroring the owner.</summary>
+    public int AutoMaxLife = -1;
+    public int AutoMaxMana = -1;
+
     /// <summary>World position the companion aims at while its ItemCheck runs (virtual mouse).</summary>
     public Vector2 AimWorld;
 
@@ -102,6 +121,35 @@ public sealed class CompanionInstance
     /// <summary>The previous shared maximum, used to keep a fully healed companion full when
     /// the owner's maximum life changes.</summary>
     public int LastSharedLifeMax;
+
+    /// <summary>
+    /// Companion-owned general post-hit immunity. It deliberately does not reuse Player.immune:
+    /// that field is maintained by the local-player update and can become permanently stale on
+    /// a synthetic player.
+    /// </summary>
+    public int GeneralDamageImmunityTicks;
+
+    /// <summary>
+    /// Companion-owned immunity counters indexed like ImmunityCooldownID. Slots 0, 1, 3 and 4
+    /// are independent in vanilla; keeping the same shape prevents a boss, spike or lava hit
+    /// from incorrectly sharing the ordinary contact cooldown.
+    /// </summary>
+    public int[] DamageCooldownTicks { get; } = new int[5];
+
+    /// <summary>Frame on which the companion-owned cooldowns were last advanced.</summary>
+    public ulong DamageCooldownFrame = ulong.MaxValue;
+
+    /// <summary>
+    /// Extra guard around automatic healing. It mirrors the potion's vanilla cooldown when one
+    /// exists and still prevents a nonstandard zero-cooldown healing item from being consumed
+    /// every frame.
+    /// </summary>
+    public int AutoHealCooldownTicks;
+
+    /// <summary>Owner/identity of the last friendly whip that granted the companion buff. A whip
+    /// can overlap for several update ticks; this pair makes one swing grant the effect once.</summary>
+    public int LastWhipOwner = -1;
+    public int LastWhipIdentity = -1;
 
     /// <summary>World item currently reserved for this companion's backpack pickup.</summary>
     public int LootTargetItemIndex = -1;
@@ -202,6 +250,17 @@ public sealed class CompanionInstance
     public void BindProfile(Player owner, CompanionProfile profile)
     {
         Player me = Entity;
+        IsAutoIdentity = profile.IsAutoRunning;
+        if (IsAutoIdentity)
+        {
+            AutoMaxLife = profile.AutoState.MaxLife();
+            AutoMaxMana = profile.AutoState.MaxMana();
+        }
+        else
+        {
+            AutoMaxLife = -1;
+            AutoMaxMana = -1;
+        }
         me.active = true;
         me.whoAmI = Slot;
         me.name = string.IsNullOrWhiteSpace(profile.Name)
@@ -241,8 +300,10 @@ public sealed class CompanionInstance
             AssignIfChanged(me.armor, 3 + i, profile.AccessoryForSlot(i, unlockedAccessories));
 
         // Max HP tracks the owner's effective max (Life Fruit, accessories, buffs all folded
-        // into statLifeMax2), so the companion always shares the owner's health pool.
-        me.statLifeMax = System.Math.Max(100, owner.statLifeMax2);
+        // into statLifeMax2), so the companion always shares the owner's health pool — except the
+        // automation companion, which grows its own base from crystals it collects. Accessories
+        // still add on top because vanilla builds statLifeMax2 from this statLifeMax each update.
+        me.statLifeMax = AutoMaxLife > 0 ? AutoMaxLife : System.Math.Max(100, owner.statLifeMax2);
         if (me.statLife > me.statLifeMax)
             me.statLife = me.statLifeMax;
         if (me.statLife < 1 && !me.dead)
@@ -253,10 +314,11 @@ public sealed class CompanionInstance
             me.dead = true;
         }
 
-        // Mana Crystal progression belongs to the owner just like Life Crystal progression.
-        // The brain already keeps a companion's current mana full; copying the owner's maximum
-        // here is what makes the new tooltip truthful instead of merely descriptive.
-        me.statManaMax = System.Math.Max(20, owner.statManaMax2);
+        // Mana Crystal progression belongs to the owner just like Life Crystal progression, again
+        // except the automation companion, which uses its own consumed-crystal count. The brain
+        // already keeps a companion's current mana full; copying the maximum here is what makes the
+        // tooltip truthful instead of merely descriptive.
+        me.statManaMax = AutoMaxMana > 0 ? AutoMaxMana : System.Math.Max(20, owner.statManaMax2);
         if (me.statMana > me.statManaMax)
             me.statMana = me.statManaMax;
     }

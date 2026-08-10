@@ -50,6 +50,11 @@ Mods: {
 					Tooltip: 默认关闭。开启后伙伴会正常受伤、死亡，并在原有等待时间后复活；关闭时伙伴免疫所有伤害。
 				}
 
+				CompanionsRescueWhenOwnerHurt: {
+					Label: "[i:MagicMirror] 受伤时紧急召回伙伴"
+					Tooltip: 默认关闭。开启后，受伤会将伙伴传送到你周围彼此分开、避开实体方块、危险地块和附近威胁的位置；找不到安全落点时，伙伴会留在原地。
+				}
+
 				CompanionsAutoCollectWorldItems: {
 					Label: "[i:TreasureMagnet] 伙伴自动拾取世界掉落物"
 					Tooltip: 默认关闭。关闭时伙伴不会扫描、预约、靠近或拾取地面掉落物；确认存档和其他模组兼容后再手动开启。
@@ -123,7 +128,7 @@ Mods: {
 					技术要点：
 					伙伴是注册在玩家槽位上的真实玩家实体：武器动画、装备效果与移动物理均由原版处理
 					伙伴会寻路跟随（跳跃、飞行、下平台），只有长时间距离过远才会传送
-					受伤或快速双击右键会让伙伴瞬间传送到身边护驾；卡死时也会自动传送回来
+					快速双击右键会让伙伴瞬间传送到身边；若在配置中开启受伤紧急召回，受伤会让伙伴传送到周围的安全位置护驾；卡死时也会自动传送回来
 					由于这涉及的技术相对抽象，因此目前仅支持单人模式
 					一些比较复杂或高级的模组武器不一定支持，具体不支持列表我没法给出，只能慢慢尝试
 					'''
@@ -141,7 +146,7 @@ Mods: {
 					· 镇守：在进入模式的位置立下标记，守在原地作战，被击退也会返回。
 					以及另外三种非战斗模式：「钓鱼 / 捕捉 / 挖矿」
 					左键：在鼠标位置立一个信号标，伙伴会前往该处并镇守；再次左键点击标记附近可取消。
-					信号标最多存在 5 秒，未抵达会自动消失；抵达后伙伴会镇守此处，直到收到新指令或受伤护驾。
+					信号标最多存在 5 秒，未抵达会自动消失；抵达后伙伴会镇守此处，直到收到新指令或触发已开启的受伤紧急召回。
 					无论哪种模式，攻击方式都相同，只是移动方式不同。
 
 					技术要点：
@@ -168,14 +173,24 @@ Mods: {
 				DisplayName: 建造书
 				Tooltip:
 					'''
-					右键：轮换五种营造方案。左键：执行当前方案。按住下键再左键：取消全部施工任务。
-					· 智能跟建：开关持续辅助。伙伴会学习你真正放下的方块与墙，并延伸短小、明确的规律。
-					· 架桥：从你脚下的地面或平台高度，朝鼠标方向连续建造最长 160 格的平台桥。
-					· 安全屋：在鼠标下方最近的地面上建造宽 11 格、高 7 格并留出三格门洞的外框；材料齐全时补墙并照明。
-					· 战斗平台：从鼠标下方的地面开始，向上建造三层、每层 61 格宽、间隔 10 格的平台，并使用现有照明材料。
-					· 绳索井：从你脚下开始向下铺设最长 120 格的绳索，并在沿途有支撑的位置放置照明。
+					按住右键：呼出战术轮盘。点击左键：开启或关闭当前所选战术。
+					· 智能建造：当你沿一条线持续放置同一种方块时，伙伴会用自己或你背包里的同种方块，朝同一方向继续建造。
+					· 防御建造：当附近有敌人时，伙伴会在你与最近的敌人之间竖起一小截方块柱进行阻挡。
+					· 战斗平台：当你站在平台上、且面朝方向前方的平台中断时，伙伴会用水平平台把缺口补上——大约只补你前方六格，所以要继续往前走才会继续铺。伙伴不会自己跳下平台，被打下去时会传送回你身边。
 					伙伴优先消耗已召唤伙伴背包内的非收藏材料，其次才消耗你的背包；材料耗尽时工程会安全暂停。
 					伙伴绝不会挖除或替换方块。战斗、护驾、信号标与专职模式永远优先于施工。目前仅支持单人模式。
+					'''
+			}
+
+			CompanionAutomationBook: {
+				DisplayName: 自动书
+				Tooltip:
+					'''
+					【仅供娱乐，功能仍在测试】
+					左键：召唤唯一一名自动伙伴（已经存在时不会重置或替换）
+					右键：打开它的背包
+					它会尝试独立探索、收集、建造、战斗并推进世界；通关后会变成普通幻影伙伴
+					目前可能卡住、误判或出现其他问题，建议先备份世界。仅限单人模式。
 					'''
 			}
 
@@ -343,6 +358,16 @@ Mods: {
 		}
 
 		CompanionCommand: {
+			AutomationSingleplayerOnly: 自动书暂时仅支持单人模式。
+			AutomationAlreadyActive: 这位自动伙伴已经在忙了，再点也不会刷新它。
+			AutomationNoFreeSlot: 现在没有空余槽位可以召唤自动伙伴。
+			AutomationNotCreated: 这个世界还没有自动伙伴，请先左键召唤。
+			AutomationSummoned: "{0} 已召唤，开始自行推进世界。"
+			AutomationBlocked: 自动伙伴卡在了“{0}”：{1}。它会自己定期重试。
+			AutomationCompleted: "{0} 已经击败月亮领主。自动流程结束，它现在是一名普通幻影伙伴了。"
+			AutomationUnsupportedWorld: 这个特殊世界暂时没有对应的自动策略，自动伙伴已安全停下。
+			AutomationUnsupportedMod: 这个模组的进度没有自动适配器，自动伙伴只会推进原版主线。
+			AutomationBackpackUnavailable: 现在无法打开自动伙伴的背包。
 			ModeAttack: 进攻模式
 			ModeDefense: 防卫模式
 			ModeGarrison: 镇守模式
@@ -397,21 +422,17 @@ Mods: {
 			HunterPanelHunting: · {0}：正在全力追赶并试图击杀你！
 			HunterRefresh: 🔄 重新构建并派遣猎人小队
 			HunterRefreshed: 已重构并重新派遣敌对猎人小队！
-			BuilderModeSmartAssist: 智能跟建
-			BuilderModeBridge: 架桥
-			BuilderModeShelter: 安全屋
-			BuilderModeArena: 战斗平台
-			BuilderModeRopeShaft: 绳索井
-			BuilderModeChanged: 营造方案 → {0}
-			BuilderSmartEnabled: 智能跟建已开启。像平常一样放置方块，伙伴会延伸明确的建造规律。
-			BuilderSmartDisabled: 智能跟建已关闭。已经排入队列的工程不会被取消。
-			BuilderQueued: "{0}：已规划 {1} 个施工格，伙伴会在安全时开始建造。"
-			BuilderCancelled: 已取消 {0} 个施工格。
-			BuilderInvalidTarget: 目标位于世界安全范围之外，无法施工。
-			BuilderNeedPlatforms: 该方案需要在已召唤伙伴背包或你的背包中放入非收藏的平台。
-			BuilderNeedBlocks: 该方案需要在已召唤伙伴背包或你的背包中放入非收藏的实心建筑方块。
-			BuilderNeedRope: 该方案需要在已召唤伙伴背包或你的背包中放入非收藏的绳索。
-			BuilderNothingToBuild: 目标格均已被占用或已经排入队列，本次没有改动世界。
+			BuilderModeSmartBuild: 智能建造
+			BuilderModeDefensiveBuild: 防御建造
+			BuilderModeBattlePlatform: 战斗平台
+			BuilderStateOn: 已开启
+			BuilderStateOff: 已关闭
+			BuilderModeChanged: 建造战术 → {0}（{1}）
+			BuilderTacticOn: "{0} 已开启。再次点击左键即可关闭。"
+			BuilderTacticOff: "{0} 已关闭，已排队的施工已清除。"
+			BuilderWheelTitle: 选择建造战术
+			BuilderWheelStateOn: 按住右键：切换战术　•　点击左键：关闭
+			BuilderWheelStateOff: 按住右键：切换战术　•　点击左键：开启
 		}
 
 		NPCs.DamageTestDummyNPC.DisplayName: 伤害测试傀儡

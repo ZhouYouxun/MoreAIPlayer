@@ -50,6 +50,11 @@ Mods: {
 					Tooltip: Standardmäßig deaktiviert. Aktivieren, damit Begleiter normalen Schaden erleiden, sterben und nach ihrer normalen Wartezeit wiederbelebt werden. Deaktiviert sind sie gegen allen Schaden immun.
 				}
 
+				CompanionsRescueWhenOwnerHurt: {
+					Label: "[i:MagicMirror] Gefährten bei Schaden herbeirufen"
+					Tooltip: Standardmäßig deaktiviert. Bei Schaden werden Gefährten auf getrennte, sichere Plätze in deiner Nähe teleportiert.
+				}
+
 				CompanionsAutoCollectWorldItems: {
 					Label: "[i:TreasureMagnet] Begleiter sammeln Weltgegenstände automatisch ein"
 					Tooltip: Standardmäßig deaktiviert. Ist die Option aus, scannen, reservieren, verfolgen und sammeln Begleiter keine Weltgegenstände. Erst nach einer Kompatibilitätsprüfung mit Spielstand und Mods aktivieren.
@@ -169,14 +174,24 @@ Mods: {
 				DisplayName: Baumeisterbuch
 				Tooltip:
 					'''
-					Rechtsklick: zwischen fünf Bauplänen wechseln. Linksklick: gewählten Plan ausführen. Unten + Linksklick: alle Aufträge abbrechen.
-					· Intelligente Hilfe: fortlaufende Hilfe umschalten. Gefährten lernen deine gesetzten Blöcke und Wände und verlängern klare, kurze Muster.
-					· Brücke: eine waagerechte Plattformbrücke von bis zu 160 Feldern zum Mauszeiger bauen.
-					· Schutzhaus: einen 11 × 7 großen Rahmen mit drei Feldern Türöffnung bauen; Wände und Licht werden bei vorhandenen Vorräten ergänzt.
-					· Kampfarena: drei 61 Felder lange Plattformreihen mit zehn Feldern Abstand und verfügbarer Beleuchtung bauen.
-					· Seilschacht: bis zu 120 Felder Seil senkrecht verlegen und an geeigneten Stellen Licht setzen.
-					Nicht favorisierte Materialien werden zuerst aus Rucksäcken aktiver Gefährten, dann aus deinem Inventar genommen. Ohne Material pausiert der Bau sicher.
-					Gefährten graben oder ersetzen niemals Blöcke. Kampf, Rettung, Wegpunkte und Spezialmodi haben immer Vorrang. Nur Einzelspieler.
+					Hold right click: open the tactic wheel. Left click: switch the selected tactic on or off.
+					· Smart Build: while you place the same block along a line, companions continue that block in the same direction from their own or your inventory.
+					· Defensive Build: when an enemy is near, companions raise a short blocking pillar between you and the nearest threat.
+					· Battle Platform: while you stand on a platform whose facing edge breaks off ahead, companions extend flat platforms across the gap — about six tiles ahead, so keep walking to keep bridging. They will not drop off the bridge, and return to your side if knocked off.
+					Builders take non-favourited materials from active companion backpacks first, then your inventory. Work pauses safely if supplies run out.
+					Companions never mine or replace blocks. Combat, rescue calls, waypoints and specialist modes always take priority. Single-player only.
+					'''
+			}
+
+			CompanionAutomationBook: {
+				DisplayName: Automatisierungsbuch
+				Tooltip:
+					'''
+					[Nur zur Unterhaltung; diese Funktion befindet sich noch im Test]
+					Linksklick: Beschwört deinen einzigen automatischen Begleiter (ein vorhandener wird nie zurückgesetzt oder ersetzt)
+					Rechtsklick: Öffnet seinen Rucksack
+					Er versucht selbstständig zu erkunden, zu sammeln, zu bauen, zu kämpfen und die Welt voranzutreiben; danach wird er zu einem normalen Phantomgefährten
+					Er kann noch stecken bleiben, Fehler machen oder andere Bugs verursachen. Erstelle vorher eine Sicherung der Welt. Nur Einzelspieler.
 					'''
 			}
 
@@ -338,6 +353,16 @@ Mods: {
 		}
 
 		CompanionCommand: {
+			AutomationSingleplayerOnly: Das Automatisierungsbuch ist vorerst nur für Einzelspieler.
+			AutomationAlreadyActive: Dieser automatische Begleiter ist bereits beschäftigt; erneutes Klicken setzt ihn nicht zurück.
+			AutomationNoFreeSlot: Derzeit ist kein freier Platz für den automatischen Begleiter verfügbar.
+			AutomationNotCreated: In dieser Welt gibt es noch keinen automatischen Begleiter. Beschwöre zuerst einen mit Linksklick.
+			AutomationSummoned: "{0} wurde beschworen und beginnt, die Welt selbstständig voranzutreiben."
+			AutomationBlocked: Der automatische Begleiter hängt bei „{0}“ fest: {1}. Er versucht es von selbst regelmäßig erneut.
+			AutomationCompleted: "{0} hat den Mondherrn besiegt. Der Automatiklauf ist beendet; es ist jetzt ein normaler Phantomgefährte."
+			AutomationUnsupportedWorld: Diese besondere Welt hat noch keine Automatikstrategie; der automatische Begleiter hat sicher angehalten.
+			AutomationUnsupportedMod: Der Fortschritt dieser Mod hat keinen Automatik-Anbieter; der Begleiter folgt nur dem Vanilla-Pfad.
+			AutomationBackpackUnavailable: Der Rucksack des automatischen Begleiters ist derzeit nicht verfügbar.
 			ModeAttack: Angriffsmodus
 			ModeDefense: Verteidigungsmodus
 			ModeGarrison: Wachmodus
@@ -392,21 +417,17 @@ Mods: {
 			HunterPanelHunting: · {0}: setzt zur Jagd an!
 			HunterRefresh: 🔄 Jägertrupp neu erstellen und entsenden
 			HunterRefreshed: Jägertrupp wurde neu erstellt und entsandt!
-			BuilderModeSmartAssist: Intelligente Hilfe
-			BuilderModeBridge: Brücke
-			BuilderModeShelter: Schutzhaus
-			BuilderModeArena: Kampfarena
-			BuilderModeRopeShaft: Seilschacht
-			BuilderModeChanged: Bauplan → {0}
-			BuilderSmartEnabled: Intelligente Bauhilfe aktiviert. Baue normal, und deine Gefährten verlängern klare Muster.
-			BuilderSmartDisabled: Intelligente Bauhilfe deaktiviert. Bereits geplante Aufträge bleiben bestehen.
-			BuilderQueued: "{0}: {1} Baufelder eingeplant. Die Gefährten bauen, sobald es sicher ist."
-			BuilderCancelled: "{0} Baufelder abgebrochen."
-			BuilderInvalidTarget: Dieses Bauziel liegt außerhalb des sicheren Weltbereichs.
-			BuilderNeedPlatforms: Dieser Plan benötigt nicht favorisierte Plattformen im Rucksack eines aktiven Gefährten oder in deinem Inventar.
-			BuilderNeedBlocks: Dieser Plan benötigt nicht favorisierte massive Baublöcke im Rucksack eines aktiven Gefährten oder in deinem Inventar.
-			BuilderNeedRope: Dieser Plan benötigt nicht favorisierte Seile im Rucksack eines aktiven Gefährten oder in deinem Inventar.
-			BuilderNothingToBuild: Alle Zielfelder sind bereits belegt oder eingeplant; nichts wurde verändert.
+			BuilderModeSmartBuild: Smart Build
+			BuilderModeDefensiveBuild: Defensive Build
+			BuilderModeBattlePlatform: Battle Platform
+			BuilderStateOn: on
+			BuilderStateOff: off
+			BuilderModeChanged: Tactic → {0} ({1})
+			BuilderTacticOn: "{0} switched on. Left click again to switch it off."
+			BuilderTacticOff: "{0} switched off. Any queued construction was cleared."
+			BuilderWheelTitle: Select construction tactic
+			BuilderWheelStateOn: Hold right: switch tactic  •  Left click: turn off
+			BuilderWheelStateOff: Hold right: switch tactic  •  Left click: turn on
 		}
 
 		NPCs.DamageTestDummyNPC.DisplayName: Schadens-Testpuppe

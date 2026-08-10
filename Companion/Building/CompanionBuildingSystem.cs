@@ -13,6 +13,11 @@ namespace MoreAIPlayer.Companion.Building;
 /// empty target cells: builders never mine, hammer, replace or otherwise revise the world.
 /// Every successful placement consumes one real item from an active companion backpack first,
 /// then from the owner's non-favourited inventory.
+///
+/// The three tactics are persistent: while the builder book has one switched on, this system
+/// re-evaluates the world every tick and queues fresh cells reactively (battle platform and
+/// defensive build) or in response to the owner's own placements (smart build). Turning the
+/// tactic off, switching tactic, or losing every companion clears the queue.
 /// </summary>
 public sealed class CompanionBuildingSystem : ModSystem
 {
@@ -22,6 +27,23 @@ public sealed class CompanionBuildingSystem : ModSystem
     private const int ReservationLeaseTicks = 90;
     private const int RetryDelayTicks = 20;
     private const int MaximumPlacementAttempts = 12;
+    private const int SmartAssistExtensionTiles = 4;
+    private const int NoTilePlacement = -1;
+
+    // Battle platform: only ever look this far ahead of the owner, so a bottomless gap is never
+    // paved in one command — the window slides forward as the owner walks, which is what makes
+    // the bridge extend continuously instead of all at once.
+    private const int BattlePlatformLookaheadTiles = 6;
+
+    // How far below the owner's bridge the companion must drop before it is treated as knocked
+    // off and recalled to the owner's side.
+    private const int BattlePlatformFallTiles = 4;
+
+    // Defensive build tuning.
+    private const int DefensiveScanTiles = 26;
+    private const int DefensiveWallOffsetTiles = 3;
+    private const int DefensiveWallHeight = 4;
+    private const int DefensiveRecomputeTicks = 30;
 
     private static readonly Dictionary<int, OwnerBuildState> States = [];
 
@@ -57,6 +79,7 @@ public sealed class CompanionBuildingSystem : ModSystem
         public int RetryDelay;
         public int Attempts;
         public int PrerequisiteJobId = -1;
+        public bool ForceFlat;
     }
 
     private sealed class OwnerBuildState
@@ -69,6 +92,13 @@ public sealed class CompanionBuildingSystem : ModSystem
         public Point LastObservedPoint = new(-100000, -100000);
         public int LastObservedItemType = -1;
         public bool LastObservationWasWall;
+
+        /// <summary>The tactic the currently queued jobs belong to (null = builder is switched
+        /// off). When the desired tactic changes, the queue is cleared so tactics never blend.</summary>
+        public CompanionBuildMode? CurrentTactic;
+
+        /// <summary>Throttle between defensive-build re-evaluations.</summary>
+        public int DefensiveCooldown;
     }
 
     private sealed class MaterialSource
@@ -102,11 +132,46 @@ public sealed class CompanionBuildingSystem : ModSystem
                 if (job.RetryDelay > 0)
                     job.RetryDelay--;
             }
+            if (state.DefensiveCooldown > 0)
+                state.DefensiveCooldown--;
+        }
+
+        Player owner = Main.LocalPlayer;
+        if (ValidOwner(owner))
+            DriveLocalOwnerTactic(owner);
+    }
+
+    /// <summary>Reactive scheduler for the local owner's currently selected tactic. Runs once per
+    /// tick and keeps the shared queue in sync with the world; the companions drain it.</summary>
+    private static void DriveLocalOwnerTactic(Player owner)
+    {
+        CompanionPlayer data = owner.GetModPlayer<CompanionPlayer>();
+        bool hasCompanions = CompanionEntitySystem.CountActiveOwnedBy(owner.whoAmI) > 0;
+        CompanionBuildMode? desired = data.BuildTacticActive && hasCompanions
+            ? data.BuildMode
+            : null;
+
+        OwnerBuildState state = GetState(owner.whoAmI);
+        if (!Nullable.Equals(state.CurrentTactic, desired))
+        {
+            ClearJobs(state, owner.whoAmI);
+            state.CurrentTactic = desired;
+        }
+
+        switch (desired)
+        {
+            case CompanionBuildMode.BattlePlatform:
+                TickBattlePlatform(owner, state);
+                break;
+            case CompanionBuildMode.DefensiveBuild:
+                TickDefensiveBuild(owner, state);
+                break;
+            // SmartBuild schedules from ObserveOwnerPlacement, not here.
         }
     }
 
-    /// <summary>Records an actual vanilla placement made by the owner and extends its pattern
-    /// when intelligent assistance is enabled.</summary>
+    /// <summary>Records an actual vanilla placement made by the owner and, while Smart Build is on,
+    /// extends its pattern in the direction the owner is demonstrating.</summary>
     public static void ObserveOwnerPlacement(
         Player owner,
         CompanionPlayer ownerData,
@@ -126,139 +191,41 @@ public sealed class CompanionBuildingSystem : ModSystem
         else if (createTile >= 0)
             state.LastTileItemType = itemType;
 
-        if (!ownerData.SmartBuildEnabled || CompanionEntitySystem.CountActiveOwnedBy(owner.whoAmI) <= 0)
+        bool smartActive = ownerData.BuildTacticActive &&
+            ownerData.BuildMode == CompanionBuildMode.SmartBuild;
+        if (!smartActive || CompanionEntitySystem.CountActiveOwnedBy(owner.whoAmI) <= 0)
         {
             RememberObservation(state, point, itemType, isWall);
             return;
         }
 
-        if (isWall)
+        // Smart construction follows a direction the player actually demonstrated. It never
+        // guesses from facing direction after a single click, and it only commits more of the
+        // exact material while the owner's own inventory still contains that material.
+        bool sameSequence = state.LastObservedItemType == itemType &&
+            state.LastObservationWasWall == isWall;
+        if (sameSequence && OwnerHasMaterial(owner, itemType) &&
+            TryGetPlacementDirection(state.LastObservedPoint, point, out Point direction))
         {
-            // One wall placement usually means "fill this room". A compact 5x5 patch assists
-            // without silently consuming a whole stack or leaking through distant rooms.
-            for (int x = point.X - 2; x <= point.X + 2; x++)
-            for (int y = point.Y - 2; y <= point.Y + 2; y++)
-                QueueWall(state, x, y, itemType, createWall);
-        }
-        else if (createTile >= 0 && createTile < TileLoader.TileCount)
-        {
-            Item sample = ContentSamples.ItemsByType[itemType];
-            if (IsPlatform(sample))
+            if (isWall)
             {
-                int direction = owner.direction == 0 ? 1 : owner.direction;
-                if (!state.LastObservationWasWall && state.LastObservedItemType == itemType &&
-                    state.LastObservedPoint.Y == point.Y && state.LastObservedPoint.X != point.X)
-                    direction = Math.Sign(point.X - state.LastObservedPoint.X);
-
-                for (int step = 1; step <= 6; step++)
-                    QueueTile(state, point.X + direction * step, point.Y, itemType, createTile, style);
+                for (int step = 1; step <= SmartAssistExtensionTiles; step++)
+                    QueueWall(state, point.X + direction.X * step, point.Y + direction.Y * step,
+                        itemType, createWall);
             }
-            else if (IsRope(sample))
+            else if (createTile >= 0 && createTile < TileLoader.TileCount)
             {
-                for (int step = 1; step <= 10; step++)
-                    QueueTile(state, point.X, point.Y + step, itemType, createTile, style);
-            }
-            else if (IsTorch(sample))
-            {
-                // Torches are remembered as the preferred light source. Blindly duplicating a
-                // torch beside the original is visual clutter, so template plans use it later.
-            }
-            else if (IsSimpleSolidBlock(sample) && !state.LastObservationWasWall &&
-                state.LastObservedItemType == itemType)
-            {
-                int dx = point.X - state.LastObservedPoint.X;
-                int dy = point.Y - state.LastObservedPoint.Y;
-                if (Math.Abs(dx) + Math.Abs(dy) == 1)
+                Item sample = ContentSamples.ItemsByType[itemType];
+                if (IsSmartRepeatableTile(sample))
                 {
-                    // Two consecutive blocks establish the owner's line. Extend only that
-                    // explicit direction; a single click never guesses and seals a doorway.
-                    for (int step = 1; step <= 4; step++)
-                        QueueTile(state, point.X + dx * step, point.Y + dy * step, itemType, createTile, style);
+                    for (int step = 1; step <= SmartAssistExtensionTiles; step++)
+                        QueueTile(state, point.X + direction.X * step, point.Y + direction.Y * step,
+                            itemType, createTile, style);
                 }
             }
         }
 
         RememberObservation(state, point, itemType, isWall);
-    }
-
-    public static bool TrySchedulePlan(
-        Player owner,
-        CompanionBuildMode mode,
-        Point target,
-        out int queued,
-        out string failureKey)
-    {
-        queued = 0;
-        failureKey = string.Empty;
-        if (!ValidOwner(owner))
-        {
-            failureKey = "SingleplayerOnly";
-            return false;
-        }
-
-        if (!WorldGen.InWorld(target.X, target.Y, 10))
-        {
-            failureKey = "BuilderInvalidTarget";
-            return false;
-        }
-
-        OwnerBuildState state = GetState(owner.whoAmI);
-        int before = state.Jobs.Count;
-
-        switch (mode)
-        {
-            case CompanionBuildMode.Bridge:
-                if (!TryChooseMaterial(owner, state.LastTileItemType, IsPlatform, out int platformItem))
-                {
-                    failureKey = "BuilderNeedPlatforms";
-                    return false;
-                }
-                ScheduleBridge(owner, state, target, platformItem);
-                break;
-
-            case CompanionBuildMode.Shelter:
-                if (!TryChooseMaterial(owner, state.LastTileItemType, IsSimpleSolidBlock, out int blockItem))
-                {
-                    failureKey = "BuilderNeedBlocks";
-                    return false;
-                }
-                TryChooseMaterial(owner, state.LastWallItemType, IsWallItem, out int wallItem);
-                TryChooseMaterial(owner, -1, IsTorch, out int torchItem);
-                ScheduleShelter(owner, state, target, blockItem, wallItem, torchItem);
-                break;
-
-            case CompanionBuildMode.Arena:
-                if (!TryChooseMaterial(owner, state.LastTileItemType, IsPlatform, out int arenaPlatformItem))
-                {
-                    failureKey = "BuilderNeedPlatforms";
-                    return false;
-                }
-                TryChooseMaterial(owner, -1, IsTorch, out int arenaTorchItem);
-                ScheduleArena(state, target, arenaPlatformItem, arenaTorchItem);
-                break;
-
-            case CompanionBuildMode.RopeShaft:
-                if (!TryChooseMaterial(owner, state.LastTileItemType, IsRope, out int ropeItem))
-                {
-                    failureKey = "BuilderNeedRope";
-                    return false;
-                }
-                TryChooseMaterial(owner, -1, IsTorch, out int shaftTorchItem);
-                ScheduleRopeShaft(owner, state, target, ropeItem, shaftTorchItem);
-                break;
-
-            default:
-                failureKey = "BuilderInvalidTarget";
-                return false;
-        }
-
-        queued = state.Jobs.Count - before;
-        if (queued <= 0)
-        {
-            failureKey = "BuilderNothingToBuild";
-            return false;
-        }
-        return true;
     }
 
     public static int CancelAll(Player owner)
@@ -267,14 +234,61 @@ public sealed class CompanionBuildingSystem : ModSystem
             return 0;
 
         int removed = state.Jobs.Count;
-        state.Jobs.Clear();
-        state.Keys.Clear();
+        ClearJobs(state, owner.whoAmI);
+        state.CurrentTactic = null;
+        return removed;
+    }
+
+    private static void ClearJobs(OwnerBuildState state, int ownerWhoAmI)
+    {
+        if (state.Jobs.Count > 0 || state.Keys.Count > 0)
+        {
+            state.Jobs.Clear();
+            state.Keys.Clear();
+        }
         foreach (CompanionInstance instance in CompanionEntitySystem.All)
         {
-            if (instance.OwnerWhoAmI == owner.whoAmI)
+            if (instance.OwnerWhoAmI == ownerWhoAmI)
                 instance.BuildJobId = -1;
         }
-        return removed;
+    }
+
+    /// <summary>Prevents a placement made before toggling Smart Build from being paired with the
+    /// first placement made after the toggle as though they were one continuous line.</summary>
+    public static void ResetSmartObservation(Player owner)
+    {
+        if (owner is null || !States.TryGetValue(owner.whoAmI, out OwnerBuildState state))
+            return;
+
+        state.LastObservedPoint = new Point(-100000, -100000);
+        state.LastObservedItemType = -1;
+        state.LastObservationWasWall = false;
+    }
+
+    /// <summary>
+    /// True when the battle-platform tactic is running, the owner is up on a platform with work
+    /// still queued, and this companion has dropped well below that bridge — i.e. it fell off or
+    /// was knocked off. The brain answers by teleporting the companion back to the owner's side.
+    /// </summary>
+    public static bool ShouldRecallForBuild(CompanionInstance instance, Player owner)
+    {
+        if (Main.netMode != NetmodeID.SinglePlayer || instance is null || !ValidOwner(owner) ||
+            instance.Entity is null || !instance.Entity.active)
+            return false;
+
+        CompanionPlayer data = owner.GetModPlayer<CompanionPlayer>();
+        if (!data.BuildTacticActive || data.BuildMode != CompanionBuildMode.BattlePlatform)
+            return false;
+
+        if (!HasPendingJobs(owner.whoAmI))
+            return false;
+
+        int platformY = FindOwnerPlatformRow(owner);
+        if (platformY == int.MinValue)
+            return false;
+
+        int builderFootY = instance.Entity.Bottom.ToTileCoordinates().Y;
+        return builderFootY > platformY + BattlePlatformFallTiles;
     }
 
     /// <summary>Called from the idle branch of CompanionBrain. Combat, waypoints, garrison,
@@ -316,6 +330,10 @@ public sealed class CompanionBuildingSystem : ModSystem
         if (Vector2.DistanceSquared(builder.Center, targetWorld) > BuildReachTiles * 16f * BuildReachTiles * 16f)
         {
             navigator.Navigate(builder, targetWorld);
+            // A battle-platform bridge must be walked, never dropped through: keep the companion
+            // on top of the platforms it is laying so it does not fall into the gap it is closing.
+            if (job.ForceFlat)
+                builder.controlDown = false;
             return true;
         }
 
@@ -354,31 +372,8 @@ public sealed class CompanionBuildingSystem : ModSystem
         return true;
     }
 
-    private static void ScheduleBridge(Player owner, OwnerBuildState state, Point target, int itemType)
-    {
-        Item sample = ContentSamples.ItemsByType[itemType];
-        int startX = (int)(owner.Center.X / 16f);
-        // A bridge is an extension of the surface the owner is currently using, not a line at
-        // the cursor's height. The target still chooses its horizontal direction and length.
-        int bridgeY = FindStandingSurfaceY(owner);
-        int delta = Math.Clamp(target.X - startX, -160, 160);
-        int endX = startX + delta;
-        int step = endX >= startX ? 1 : -1;
-        int prerequisiteJobId = -1;
-        for (int x = startX; ; x += step)
-        {
-            int queuedJobId = QueueTile(state, x, bridgeY, itemType, sample.createTile, sample.placeStyle,
-                allowAnchorPlacement: prerequisiteJobId < 0, prerequisiteJobId: prerequisiteJobId);
-            if (queuedJobId >= 0)
-                prerequisiteJobId = queuedJobId;
-            if (x == endX)
-                break;
-        }
-    }
-
-    /// <summary>Returns the tile row supporting the owner's feet. A bridge can overlap the
-    /// existing floor at its start; occupied tiles are safely skipped and the extension begins
-    /// at the first empty cell beyond it.</summary>
+    /// <summary>Returns the tile row supporting a player's feet (solid or platform). Used to keep
+    /// construction level with where the owner actually stands.</summary>
     private static int FindStandingSurfaceY(Player owner)
     {
         int feetY = owner.Bottom.ToTileCoordinates().Y;
@@ -397,141 +392,123 @@ public sealed class CompanionBuildingSystem : ModSystem
             }
         }
 
-        // If the player is airborne, retain a predictable row at their feet rather than using
-        // an unrelated mouse height.
         return feetY;
     }
 
-    /// <summary>Uses the first solid/platform surface beneath the requested construction point.
-    /// Plans retain their requested horizontal location but no longer float because the cursor
-    /// happened to be at head height.</summary>
-    private static int FindConstructionSurfaceY(int x, int requestedY)
+    /// <summary>The platform row the owner is standing on, or int.MinValue if the owner is not on a
+    /// platform. Battle platform only engages while the owner stands on a platform.</summary>
+    private static int FindOwnerPlatformRow(Player owner)
     {
-        for (int y = requestedY; y <= requestedY + 60; y++)
+        int feetY = owner.Bottom.ToTileCoordinates().Y;
+        int leftX = owner.Left.ToTileCoordinates().X;
+        int rightX = owner.Right.ToTileCoordinates().X;
+        for (int y = feetY - 1; y <= feetY + 2; y++)
         {
-            if (!WorldGen.InWorld(x, y, 5))
-                break;
+            for (int x = leftX; x <= rightX; x++)
+            {
+                if (!WorldGen.InWorld(x, y, 5))
+                    continue;
 
-            Tile tile = Main.tile[x, y];
-            if (tile.HasTile && (Main.tileSolid[tile.TileType] || TileID.Sets.Platforms[tile.TileType]))
-                return y;
+                Tile tile = Main.tile[x, y];
+                if (tile.HasTile && tile.TileType < TileID.Sets.Platforms.Length &&
+                    TileID.Sets.Platforms[tile.TileType])
+                    return y;
+            }
         }
 
-        return requestedY;
+        return int.MinValue;
     }
 
-    private static void ScheduleShelter(
-        Player owner,
-        OwnerBuildState state,
-        Point target,
-        int blockItemType,
-        int wallItemType,
-        int torchItemType)
+    /// <summary>
+    /// Battle platform. Only while the owner stands on a platform whose facing side breaks off
+    /// within the lookahead window, lay flat platforms across the near gap — at most six ahead of
+    /// the owner, so a bottomless drop is bridged only as fast as the owner advances into it.
+    /// </summary>
+    private static void TickBattlePlatform(Player owner, OwnerBuildState state)
     {
-        Item block = ContentSamples.ItemsByType[blockItemType];
-        int left = target.X - 5;
-        int right = target.X + 5;
-        int bottom = FindConstructionSurfaceY(target.X, target.Y);
-        int top = bottom - 6;
-        int doorwayX = owner.direction >= 0 ? right : left;
-
-        for (int x = left; x <= right; x++)
-        {
-            QueueTile(state, x, bottom, blockItemType, block.createTile, block.placeStyle,
-                allowAnchorPlacement: x == target.X);
-            QueueTile(state, x, top, blockItemType, block.createTile, block.placeStyle);
-        }
-        for (int y = top + 1; y < bottom; y++)
-        {
-            QueueTile(state, left, y, blockItemType, block.createTile, block.placeStyle);
-            QueueTile(state, right, y, blockItemType, block.createTile, block.placeStyle);
-        }
-
-        // Leave a three-tile opening on the owner's facing side. The system deliberately does
-        // not guess which door the player wants or replace terrain to force one in.
-        for (int y = bottom - 3; y < bottom; y++)
-            RemoveQueuedCell(state, doorwayX, y, BuildJobKind.Tile);
-
-        if (wallItemType > ItemID.None)
-        {
-            Item wall = ContentSamples.ItemsByType[wallItemType];
-            for (int x = left + 1; x < right; x++)
-            for (int y = top + 1; y < bottom; y++)
-                QueueWall(state, x, y, wallItemType, wall.createWall);
-        }
-
-        if (torchItemType > ItemID.None)
-        {
-            Item torch = ContentSamples.ItemsByType[torchItemType];
-            QueueTile(state, left + 1, top + 3, torchItemType, torch.createTile, torch.placeStyle);
-            QueueTile(state, right - 1, top + 3, torchItemType, torch.createTile, torch.placeStyle);
-        }
-    }
-
-    private static void ScheduleArena(OwnerBuildState state, Point center, int platformItemType, int torchItemType)
-    {
-        Item platform = ContentSamples.ItemsByType[platformItemType];
-        int floorY = FindConstructionSurfaceY(center.X, center.Y);
-        for (int row = 0; row < 3; row++)
-        {
-            int y = floorY - row * 10;
-            for (int x = center.X - 30; x <= center.X + 30; x++)
-                QueueTile(state, x, y, platformItemType, platform.createTile, platform.placeStyle,
-                    allowAnchorPlacement: x == center.X);
-        }
-
-        if (torchItemType > ItemID.None)
-        {
-            Item torch = ContentSamples.ItemsByType[torchItemType];
-            for (int row = 0; row < 3; row++)
-            for (int column = -1; column <= 1; column += 2)
-                QueueTile(state, center.X + column * 20, floorY - row * 10 - 1,
-                    torchItemType, torch.createTile, torch.placeStyle);
-        }
-    }
-
-    private static void ScheduleRopeShaft(
-        Player owner,
-        OwnerBuildState state,
-        Point target,
-        int ropeItemType,
-        int torchItemType)
-    {
-        Item rope = ContentSamples.ItemsByType[ropeItemType];
-        int top = FindStandingSurfaceY(owner);
-        int bottom = Math.Min(top + 120, Math.Max(top, target.Y));
-        for (int y = top; y <= bottom; y++)
-            QueueTile(state, target.X, y, ropeItemType, rope.createTile, rope.placeStyle,
-                allowAnchorPlacement: y == top);
-
-        if (torchItemType <= ItemID.None)
+        if (!TryChooseMaterial(owner, -1, IsPlatform, out int platformItemType))
             return;
 
-        Item torch = ContentSamples.ItemsByType[torchItemType];
-        for (int y = top; y <= bottom; y += 12)
+        int platformY = FindOwnerPlatformRow(owner);
+        if (platformY == int.MinValue)
+            return;
+
+        Item platform = ContentSamples.ItemsByType[platformItemType];
+        int direction = owner.direction >= 0 ? 1 : -1;
+        int ownerX = owner.Center.ToTileCoordinates().X;
+
+        for (int step = 1; step <= BattlePlatformLookaheadTiles; step++)
         {
-            Point? light = FindSupportedTorchCell(target.X, y);
-            if (light is Point spot)
-                QueueTile(state, spot.X, spot.Y, torchItemType, torch.createTile, torch.placeStyle);
+            int x = ownerX + direction * step;
+            if (!WorldGen.InWorld(x, platformY, 5))
+                break;
+
+            Tile tile = Main.tile[x, platformY];
+            if (tile.HasTile)
+            {
+                // An existing platform is fine to walk past; solid ground ahead is a wall we must
+                // not bury a hidden platform inside, so stop there.
+                if (tile.TileType < TileID.Sets.Platforms.Length && TileID.Sets.Platforms[tile.TileType])
+                    continue;
+                break;
+            }
+
+            // Forced placement so the very first cell over open air still goes down without an
+            // already-built neighbour to lean on. forceFlat keeps them flat, never hammered.
+            QueueTile(state, x, platformY, platformItemType, platform.createTile, platform.placeStyle,
+                allowAnchorPlacement: true, forceFlat: true);
         }
     }
 
-    private static Point? FindSupportedTorchCell(int ropeX, int y)
+    /// <summary>
+    /// Defensive build. Idle unless a hostile NPC is near the owner; then raise a short pillar a
+    /// few tiles toward the nearest threat, trying to block its approach. Any placeable solid
+    /// block works; the pillar is deliberately small and offset so it never boxes the owner in.
+    /// </summary>
+    private static void TickDefensiveBuild(Player owner, OwnerBuildState state)
     {
-        foreach (int offset in new[] { -1, 1 })
-        {
-            int x = ropeX + offset;
-            if (!WorldGen.InWorld(x, y, 5) || Main.tile[x, y].HasTile)
-                continue;
-            if (Main.tile[x, y].WallType > WallID.None || SolidTile(x + offset, y) || SolidTile(x, y + 1))
-                return new Point(x, y);
-        }
-        return null;
+        if (state.DefensiveCooldown > 0)
+            return;
+
+        NPC threat = FindNearestThreat(owner, DefensiveScanTiles * 16f);
+        if (threat is null)
+            return;
+
+        if (!TryChooseMaterial(owner, -1, IsDefensiveBlock, out int blockItemType))
+            return;
+
+        state.DefensiveCooldown = DefensiveRecomputeTicks;
+
+        Item block = ContentSamples.ItemsByType[blockItemType];
+        int direction = threat.Center.X >= owner.Center.X ? 1 : -1;
+        int baseY = FindStandingSurfaceY(owner);
+        int wallX = owner.Center.ToTileCoordinates().X + direction * DefensiveWallOffsetTiles;
+
+        for (int i = 1; i <= DefensiveWallHeight; i++)
+            QueueTile(state, wallX, baseY - i, blockItemType, block.createTile, block.placeStyle,
+                allowAnchorPlacement: true);
     }
 
-    private static bool SolidTile(int x, int y) =>
-        WorldGen.InWorld(x, y, 2) && Main.tile[x, y].HasTile &&
-        Main.tileSolid[Main.tile[x, y].TileType] && !TileID.Sets.Platforms[Main.tile[x, y].TileType];
+    private static NPC FindNearestThreat(Player owner, float maxDistance)
+    {
+        NPC nearest = null;
+        float bestDistance = maxDistance * maxDistance;
+        for (int i = 0; i < Main.maxNPCs; i++)
+        {
+            NPC npc = Main.npc[i];
+            if (!npc.active || npc.friendly || npc.townNPC || npc.damage <= 0 || npc.lifeMax <= 5 ||
+                npc.dontTakeDamage && npc.immortal)
+                continue;
+
+            float distance = Vector2.DistanceSquared(owner.Center, npc.Center);
+            if (distance < bestDistance)
+            {
+                bestDistance = distance;
+                nearest = npc;
+            }
+        }
+        return nearest;
+    }
 
     private static PlacementResult TryPlaceJob(CompanionInstance instance, Player owner, BuildJob job)
     {
@@ -561,9 +538,9 @@ public sealed class CompanionBuildingSystem : ModSystem
             // A normal placement needs an already-built neighbour to anchor to. Cells queued in a
             // plan are filled nearest-first, so an inner frame tile can come up before the block it
             // would lean on and fail purely on ordering. Rather than retry forever and eventually
-            // drop it — which is what left visible gaps in shelters and arenas — force the cell in
-            // once it has clearly missed its turn. The cell is always part of the plan and is only
-            // ever empty here, so forcing it cannot overwrite anything the player placed.
+            // drop it — which is what left visible gaps in bridges — force the cell in once it has
+            // clearly missed its turn. The cell is always part of the plan and is only ever empty
+            // here, so forcing it cannot overwrite anything the player placed.
             if (!placed && (job.AllowAnchorPlacement || job.Attempts >= 3) && !Main.tile[job.X, job.Y].HasTile)
             {
                 placed = WorldGen.PlaceTile(job.X, job.Y, job.PlaceType, mute: false, forced: true,
@@ -573,6 +550,14 @@ public sealed class CompanionBuildingSystem : ModSystem
             if (placed)
             {
                 TileLoader.PlaceInWorld(job.X, job.Y, hookItem);
+                if (job.ForceFlat)
+                {
+                    // Tile is a readonly location handle in tML; copying the handle preserves
+                    // writes while avoiding mutation through Tilemap's value-returning indexer.
+                    Tile placedTile = Main.tile[job.X, job.Y];
+                    placedTile.Slope = SlopeType.Solid;
+                    placedTile.IsHalfBlock = false;
+                }
                 WorldGen.SquareTileFrame(job.X, job.Y);
             }
         }
@@ -610,7 +595,8 @@ public sealed class CompanionBuildingSystem : ModSystem
             checkedProfiles.Add(preferred.Id);
         foreach (CompanionInstance member in CompanionEntitySystem.All)
         {
-            if (member.OwnerWhoAmI != owner.whoAmI || !member.Entity.active || !checkedProfiles.Add(member.ProfileId))
+            if (member.OwnerWhoAmI != owner.whoAmI || !member.Entity.active || member.IsAutoIdentity ||
+                !checkedProfiles.Add(member.ProfileId))
                 continue;
             source = FindInBackpack(data.GetProfile(member.ProfileId), item => item.type == itemType);
             if (source is not null)
@@ -646,7 +632,9 @@ public sealed class CompanionBuildingSystem : ModSystem
         HashSet<int> checkedProfiles = [];
         foreach (CompanionInstance member in CompanionEntitySystem.All)
         {
-            if (member.OwnerWhoAmI != owner.whoAmI || !member.Entity.active || !checkedProfiles.Add(member.ProfileId))
+            // Never pull build materials from the automation companion's backpack; it is isolated.
+            if (member.OwnerWhoAmI != owner.whoAmI || !member.Entity.active || member.IsAutoIdentity ||
+                !checkedProfiles.Add(member.ProfileId))
                 continue;
             MaterialSource source = FindInBackpack(data.GetProfile(member.ProfileId), predicate);
             if (source is not null)
@@ -688,20 +676,33 @@ public sealed class CompanionBuildingSystem : ModSystem
         item is not null && item.createTile != -1 && item.createTile < TileLoader.TileCount &&
         TileID.Sets.Platforms[item.createTile];
 
-    private static bool IsRope(Item item) =>
-        item is not null && item.type > ItemID.None && item.type < ItemID.Sets.SortingPriorityRopes.Length &&
-        ItemID.Sets.SortingPriorityRopes[item.type] != -1 && item.createTile != -1;
-
-    private static bool IsTorch(Item item) =>
-        item is not null && item.createTile != -1 && item.createTile < TileLoader.TileCount &&
-        TileID.Sets.Torch[item.createTile];
-
-    private static bool IsWallItem(Item item) => item is not null && item.createWall > WallID.None;
-
     private static bool IsSimpleSolidBlock(Item item) =>
         item is not null && item.createTile != -1 && item.createTile < TileLoader.TileCount &&
         Main.tileSolid[item.createTile] && !Main.tileFrameImportant[item.createTile] &&
         !TileID.Sets.Platforms[item.createTile] && !TileID.Sets.Torch[item.createTile];
+
+    private static bool IsDefensiveBlock(Item item) => IsSimpleSolidBlock(item);
+
+    private static bool IsSmartRepeatableTile(Item item) => IsPlatform(item) || IsSimpleSolidBlock(item);
+
+    private static bool OwnerHasMaterial(Player owner, int itemType) =>
+        FindInInventory(owner, item => item.type == itemType) is not null;
+
+    private static bool TryGetPlacementDirection(Point previous, Point current, out Point direction)
+    {
+        int dx = current.X - previous.X;
+        int dy = current.Y - previous.Y;
+        direction = Point.Zero;
+
+        // Allow the cursor to advance a few cells between observations, but only accept a
+        // cardinal line. Diagonal guesses are especially destructive around doors and stairs.
+        if (dy == 0 && dx != 0 && Math.Abs(dx) <= 3)
+            direction = new Point(Math.Sign(dx), 0);
+        else if (dx == 0 && dy != 0 && Math.Abs(dy) <= 3)
+            direction = new Point(0, Math.Sign(dy));
+
+        return direction != Point.Zero;
+    }
 
     private static int QueueTile(
         OwnerBuildState state,
@@ -711,14 +712,16 @@ public sealed class CompanionBuildingSystem : ModSystem
         int tileType,
         int style,
         bool allowAnchorPlacement = false,
-        int prerequisiteJobId = -1)
+        int prerequisiteJobId = -1,
+        bool forceFlat = false)
     {
         if (!WorldGen.InWorld(x, y, 5))
             return -1;
         Tile tile = Main.tile[x, y];
         if (tile.HasTile)
             return -1;
-        return Queue(state, x, y, BuildJobKind.Tile, itemType, tileType, style, allowAnchorPlacement, prerequisiteJobId);
+        return Queue(state, x, y, BuildJobKind.Tile, itemType, tileType, style,
+            allowAnchorPlacement, prerequisiteJobId, forceFlat);
     }
 
     private static void QueueWall(OwnerBuildState state, int x, int y, int itemType, int wallType)
@@ -737,7 +740,8 @@ public sealed class CompanionBuildingSystem : ModSystem
         int placeType,
         int style,
         bool allowAnchorPlacement,
-        int prerequisiteJobId = -1)
+        int prerequisiteJobId = -1,
+        bool forceFlat = false)
     {
         if (state.Jobs.Count >= MaximumQueuedJobs || itemType <= ItemID.None || placeType < 0)
             return -1;
@@ -754,23 +758,11 @@ public sealed class CompanionBuildingSystem : ModSystem
             PlaceType = placeType,
             Style = style,
             AllowAnchorPlacement = allowAnchorPlacement,
-            PrerequisiteJobId = prerequisiteJobId
+            PrerequisiteJobId = prerequisiteJobId,
+            ForceFlat = forceFlat
         };
         state.Jobs.Add(job);
         return job.Id;
-    }
-
-    private static void RemoveQueuedCell(OwnerBuildState state, int x, int y, BuildJobKind kind)
-    {
-        for (int i = state.Jobs.Count - 1; i >= 0; i--)
-        {
-            BuildJob job = state.Jobs[i];
-            if (job.X == x && job.Y == y && job.Kind == kind)
-            {
-                state.Jobs.RemoveAt(i);
-                state.Keys.Remove(new JobKey(x, y, kind));
-            }
-        }
     }
 
     private static void RemoveJob(OwnerBuildState state, BuildJob job)
@@ -832,6 +824,9 @@ public sealed class CompanionBuildingSystem : ModSystem
         }
         return state;
     }
+
+    private static bool HasPendingJobs(int ownerWhoAmI) =>
+        States.TryGetValue(ownerWhoAmI, out OwnerBuildState state) && state.Jobs.Count > 0;
 
     private static bool ValidOwner(Player owner) =>
         Main.netMode == NetmodeID.SinglePlayer && owner is not null && owner.active &&

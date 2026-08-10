@@ -256,6 +256,7 @@ public sealed class CompanionBrain
         }
 
         ResetControls(me);
+        navigator.UpdateOwnedDoors(me);
         itemUseClaimedThisTick = false;
         instance.WorkTile = null;
         instance.WantsAltUse = false;
@@ -411,6 +412,12 @@ public sealed class CompanionBrain
             // Placed ahead of build/follow so a free-roamer neither builds nor shadows the owner.
             FreeRoamWander(me, owner);
         }
+        else if (CompanionBuildingSystem.ShouldRecallForBuild(instance, owner))
+        {
+            // Battle platform: the companion fell/was knocked off the bridge while the owner is
+            // still up on it. Snap back to the owner's side and resume laying platforms.
+            TeleportBeside(me, owner);
+        }
         else if (CompanionBuildingSystem.TryPerformBuildWork(instance, owner, profile, navigator))
         {
         }
@@ -481,7 +488,10 @@ public sealed class CompanionBrain
 
         // First tick of a fresh death: pick the timer.
         if (instance.ReviveTicksLeft <= 0)
+        {
             instance.ReviveTicksLeft = IsBossFightActive() ? BossReviveTicks : NormalReviveTicks;
+            CompanionEntitySystem.ResetCompanionDamageState(instance);
+        }
 
         instance.ReviveTicksLeft--;
         if (instance.ReviveTicksLeft <= 0)
@@ -493,6 +503,8 @@ public sealed class CompanionBrain
             instance.PersistentLife = me.statLife;
             instance.PersistentLifeInitialized = true;
             instance.LastSharedLifeMax = me.statLifeMax;
+            instance.AutoHealCooldownTicks = 0;
+            CompanionEntitySystem.ResetCompanionDamageState(instance);
             ResetCorpseGibs(me);
             TeleportBeside(me, owner);
             if (instance.TryGetContext(out _, out CompanionProfile profile))
@@ -532,7 +544,7 @@ public sealed class CompanionBrain
     /// KillMe call on whoAmI == Main.myPlayer (Player.cs:31607), which is also why a dying
     /// companion drops no tombstone.
     /// </summary>
-    private static void ResetCorpseGibs(Player me)
+    internal static void ResetCorpseGibs(Player me)
     {
         me.headPosition = Vector2.Zero;
         me.bodyPosition = Vector2.Zero;
@@ -548,7 +560,7 @@ public sealed class CompanionBrain
         me.legVelocity = Vector2.Zero;
     }
 
-    private static bool IsBossFightActive()
+    internal static bool IsBossFightActive()
     {
         foreach (NPC npc in Main.ActiveNPCs)
         {
@@ -1834,12 +1846,19 @@ public sealed class CompanionBrain
         // is not yanked off its fort by a stray hit. Either outranks the far-away timer —
         // anything past a few tiles is too far to help. The cooldown stops lava/debuff tick
         // damage from turning this into a dust strobe.
-        bool wantRescue = ownerData.ManualRescueTime > 0 ||
-            (ownerData.RescueSignalTime > 0 && profile.Mode != CompanionMode.Garrison);
-        if (wantRescue && rescueCooldown == 0)
+        bool manualRescue = ownerData.ManualRescueTime > 0;
+        bool automaticRescue = ownerData.RescueSignalTime > 0 && profile.Mode != CompanionMode.Garrison;
+        if ((manualRescue || automaticRescue) && rescueCooldown == 0)
         {
-            TeleportBeside(me, owner);
-            rescueCooldown = RescueCooldownTicks;
+            // Explicit player recalls keep their established behaviour. Automatic hurt rescues
+            // instead require a clear, dry, non-hurting spot around the owner; if none exists,
+            // keeping the companion where it is is safer than materialising on the hitbox.
+            if (manualRescue || TeleportNearOwnerSafely(me, owner))
+            {
+                if (manualRescue)
+                    TeleportBeside(me, owner);
+                rescueCooldown = RescueCooldownTicks;
+            }
             return;
         }
 
@@ -1984,6 +2003,88 @@ public sealed class CompanionBrain
         farFromOwnerTicks = 0;
         // Recalling to the owner ends a soft (waypoint-derived) post so the companion resumes
         // following. A true Garrison mark is left intact — the companion walks back to it.
+        softHoldActive = false;
+        stuckReference = me.Center;
+        notProgressingTicks = 0;
+        ResetVerticalFollowRescue();
+        CompanionEntitySystem.SpawnRecallDustBurst(me.Center);
+    }
+
+    /// <summary>Moves an automatic rescue to a separate, terrain-safe position near the owner.
+    /// A bad rescue is worse than no rescue when the owner is standing in lava, inside a boss,
+    /// or on a narrow ledge, so this has no unsafe overlap fallback.</summary>
+    private bool TeleportNearOwnerSafely(Player me, Player owner)
+    {
+        const float minimumDistance = 80f;
+        const float worldMargin = 240f;
+        int width = System.Math.Max(20, me.width);
+        int height = System.Math.Max(42, me.height);
+        int preferredDirection = (me.whoAmI & 1) == 0 ? -1 : 1;
+        float worldRight = Main.maxTilesX * 16f - worldMargin;
+        int ownerTileY = System.Math.Clamp((int)(owner.Center.Y / 16f), 20, Main.maxTilesY - 20);
+
+        // Alternating sides and a slot-derived first side naturally fan a group out instead of
+        // making every companion test the same tile first.
+        for (int attempt = 0; attempt < 24; attempt++)
+        {
+            int direction = attempt % 2 == 0 ? preferredDirection : -preferredDirection;
+            float distance = minimumDistance + (attempt / 2 % 6) * 24f;
+            float x = MathHelper.Clamp(owner.Center.X + direction * distance, worldMargin, worldRight);
+            int tileX = System.Math.Clamp((int)(x / 16f), 20, Main.maxTilesX - 20);
+            for (int floorRow = System.Math.Max(20, ownerTileY - 20); floorRow <= System.Math.Min(Main.maxTilesY - 20, ownerTileY + 48); floorRow++)
+            {
+                Vector2 candidate = new(tileX * 16f + 8f, floorRow * 16f - height * 0.5f);
+                if (!IsSafeRescueLocation(candidate, me, owner, width, height))
+                    continue;
+
+                RelocateAfterSafeRescue(me, candidate);
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool IsSafeRescueLocation(Vector2 center, Player me, Player owner, int width, int height)
+    {
+        Vector2 topLeft = center - new Vector2(width * 0.5f, height * 0.5f);
+        if (Vector2.DistanceSquared(center, owner.Center) < 64f * 64f ||
+            Collision.SolidCollision(topLeft, width, height) ||
+            Collision.WetCollision(topLeft, width, height) ||
+            Collision.AnyHurtingTiles(topLeft, width, height) ||
+            !Collision.SolidCollision(topLeft + new Vector2(0f, 4f), width, height, acceptTopSurfaces: true))
+            return false;
+
+        Rectangle landingHitbox = new((int)topLeft.X, (int)topLeft.Y, width, height);
+        foreach (Player player in Main.ActivePlayers)
+        {
+            if (player.whoAmI != me.whoAmI && player.Hitbox.Intersects(landingHitbox))
+                return false;
+        }
+
+        foreach (NPC npc in Main.ActiveNPCs)
+        {
+            if (!npc.friendly && npc.damage > 0 && Vector2.DistanceSquared(npc.Center, center) < 144f * 144f)
+                return false;
+        }
+
+        foreach (Projectile projectile in Main.ActiveProjectiles)
+        {
+            if (projectile.hostile && projectile.damage > 0 && Vector2.DistanceSquared(projectile.Center, center) < 112f * 112f)
+                return false;
+        }
+
+        return true;
+    }
+
+    private void RelocateAfterSafeRescue(Player me, Vector2 destination)
+    {
+        CompanionEntitySystem.SpawnRecallDustBurst(me.Center);
+        me.Center = destination;
+        me.velocity = Vector2.Zero;
+        me.fallStart = (int)(me.position.Y / 16f);
+        navigator.Reset();
+        farFromOwnerTicks = 0;
         softHoldActive = false;
         stuckReference = me.Center;
         notProgressingTicks = 0;

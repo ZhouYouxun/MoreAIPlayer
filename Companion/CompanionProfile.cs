@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using Microsoft.Xna.Framework;
+using MoreAIPlayer.Companion.Automation;
 using Terraria;
 using Terraria.ID;
 using Terraria.Localization;
@@ -93,6 +94,47 @@ public sealed class CompanionProfile
 
     /// <summary>Behaviour mode cycled by the command book. Persists with the profile.</summary>
     public CompanionMode Mode = CompanionMode.Attack;
+
+    /// <summary>Non-null only while this profile is (or once was) the world's automation companion.
+    /// See <see cref="AutoCompanionState"/>.</summary>
+    public AutoCompanionState AutoState { get; private set; }
+
+    /// <summary>True while the automation flow owns this profile. Every normal-companion system
+    /// (command book, build tactics, squad spread, rescue, manager panel) filters on this so an
+    /// automation companion never joins them until it converts after Moon Lord.</summary>
+    public bool IsAutoRunning => AutoState is not null && AutoState.Running;
+
+    /// <summary>Turns a freshly created profile into the world's automation companion: marks the
+    /// automation state active and hands it only the two starting tools the design allows.</summary>
+    public void BeginAutomation()
+    {
+        AutoState = new AutoCompanionState();
+        GiveInitialAutomationTools();
+    }
+
+    /// <summary>Clears the automation identity when the run finishes (Moon Lord). Keeps every item,
+    /// the name and the appearance so a perfectly ordinary companion profile remains.</summary>
+    public void EndAutomation()
+    {
+        if (AutoState is not null)
+            AutoState.Running = false;
+    }
+
+    /// <summary>
+    /// The only items an automation companion starts with: a Copper Pickaxe in the reserved pick
+    /// slot and a Copper Axe in the first normal weapon slot. Everything else must be gathered,
+    /// dropped, looted, fished, bought or legally crafted.
+    /// </summary>
+    private void GiveInitialAutomationTools()
+    {
+        Item pick = new();
+        pick.SetDefaults(ItemID.CopperPickaxe);
+        Hotbar[PickSlot] = pick;
+
+        Item axe = new();
+        axe.SetDefaults(ItemID.CopperAxe);
+        Hotbar[FirstCombatSlot] = axe;
+    }
 
     /// <summary>潜伏 mode: with a rogue weapon, wait for full Calamity stealth before every attack.</summary>
     public bool RogueStealthWait = true;
@@ -361,7 +403,7 @@ public sealed class CompanionProfile
 
     public TagCompound Save()
     {
-        return new TagCompound
+        TagCompound tag = new()
         {
             [nameof(Id)] = Id,
             [nameof(Name)] = Name,
@@ -391,6 +433,9 @@ public sealed class CompanionProfile
             [nameof(Hook)] = SaveItems(Hook),
             [nameof(Mount)] = SaveItems(Mount)
         };
+        if (AutoState is not null)
+            tag[nameof(AutoState)] = AutoState.Save();
+        return tag;
     }
 
     public static CompanionProfile Load(TagCompound tag)
@@ -431,6 +476,8 @@ public sealed class CompanionProfile
             foreach (string key in tag.GetList<string>("PreferAltUseWeapons"))
                 profile.preferAltUseWeapons.Add(key);
         }
+        if (tag.ContainsKey(nameof(AutoState)))
+            profile.AutoState = AutoCompanionState.Load(tag.GetCompound(nameof(AutoState)));
         profile.MigrateReservedSlots();
         return profile;
     }

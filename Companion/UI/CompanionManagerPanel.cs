@@ -323,7 +323,9 @@ public static class CompanionManagerPanel
         List<CompanionInstance> entries = [];
         foreach (CompanionInstance instance in CompanionEntitySystem.All)
         {
-            if (instance.OwnerWhoAmI == Main.myPlayer && instance.Entity.active)
+            // The automation companion is managed only through the automation book, never the
+            // normal manager panel (no dismiss button, no backpack card here).
+            if (instance.OwnerWhoAmI == Main.myPlayer && instance.Entity.active && !instance.IsAutoIdentity)
                 entries.Add(instance);
         }
         entries.Sort((a, b) => a.ProfileId.CompareTo(b.ProfileId));

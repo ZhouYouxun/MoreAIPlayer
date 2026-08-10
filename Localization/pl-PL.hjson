@@ -50,6 +50,11 @@ Mods: {
 					Tooltip: Domyślnie wyłączone. Włącz, aby towarzysze otrzymywali normalne obrażenia, mogli zginąć i odradzali się po zwykłym czasie oczekiwania. Gdy opcja jest wyłączona, są odporni na wszystkie obrażenia.
 				}
 
+				CompanionsRescueWhenOwnerHurt: {
+					Label: "[i:MagicMirror] Przywołaj towarzyszy po otrzymaniu obrażeń"
+					Tooltip: Domyślnie wyłączone. Towarzysze teleportują się na bezpieczne, oddzielne miejsca obok ciebie.
+				}
+
 				CompanionsAutoCollectWorldItems: {
 					Label: "[i:TreasureMagnet] Towarzysze automatycznie zbierają przedmioty świata"
 					Tooltip: Domyślnie wyłączone. Gdy opcja jest wyłączona, towarzysze nie skanują, nie rezerwują, nie podchodzą ani nie zbierają przedmiotów świata. Włącz ją dopiero po sprawdzeniu zgodności z zapisem i innymi modami.
@@ -169,14 +174,24 @@ Mods: {
 				DisplayName: Księga Budowniczego
 				Tooltip:
 					'''
-					Prawy przycisk: przełączaj pięć planów. Lewy przycisk: wykonaj wybrany plan. Dół + lewy przycisk: anuluj wszystkie prace.
-					· Inteligentna pomoc: włącza ciągłe wsparcie. Towarzysze uczą się stawianych bloków i ścian oraz przedłużają krótkie, wyraźne wzory.
-					· Most: buduje poziomy most z platform do 160 pól w stronę kursora.
-					· Schronienie: buduje ramę 11 × 7 z wejściem szerokim na trzy pola, a przy dostępnych materiałach dodaje ściany i światło.
-					· Arena: buduje trzy rzędy po 61 platform, oddalone o dziesięć pól, z dostępnym oświetleniem.
-					· Szyb linowy: układa pionowo do 120 pól liny i umieszcza światła tam, gdzie mają podparcie.
-					Najpierw zużywane są nieulubione materiały z plecaków aktywnych towarzyszy, potem z twojego ekwipunku. Brak materiałów bezpiecznie wstrzymuje prace.
-					Towarzysze nigdy nie kopią ani nie zastępują bloków. Walka, ratunek, punkty trasy i tryby specjalne zawsze mają pierwszeństwo. Tylko gra jednoosobowa.
+					Hold right click: open the tactic wheel. Left click: switch the selected tactic on or off.
+					· Smart Build: while you place the same block along a line, companions continue that block in the same direction from their own or your inventory.
+					· Defensive Build: when an enemy is near, companions raise a short blocking pillar between you and the nearest threat.
+					· Battle Platform: while you stand on a platform whose facing edge breaks off ahead, companions extend flat platforms across the gap — about six tiles ahead, so keep walking to keep bridging. They will not drop off the bridge, and return to your side if knocked off.
+					Builders take non-favourited materials from active companion backpacks first, then your inventory. Work pauses safely if supplies run out.
+					Companions never mine or replace blocks. Combat, rescue calls, waypoints and specialist modes always take priority. Single-player only.
+					'''
+			}
+
+			CompanionAutomationBook: {
+				DisplayName: Księga automatyzacji
+				Tooltip:
+					'''
+					[Wyłącznie dla zabawy; ta funkcja jest nadal w fazie testów]
+					Lewy przycisk: przywołuje jedynego automatycznego towarzysza (istniejący nie zostanie zresetowany ani zastąpiony)
+					Prawy przycisk: otwiera jego plecak
+					Spróbuje samodzielnie eksplorować, zbierać, budować, walczyć i rozwijać świat; po ukończeniu stanie się zwykłym widmowym towarzyszem
+					Nadal może się zaciąć, pomylić lub napotkać inne błędy. Najpierw wykonaj kopię świata. Tylko tryb jednoosobowy.
 					'''
 			}
 
@@ -338,6 +353,16 @@ Mods: {
 		}
 
 		CompanionCommand: {
+			AutomationSingleplayerOnly: Księga automatyzacji na razie działa tylko w trybie jednoosobowym.
+			AutomationAlreadyActive: Ten automatyczny towarzysz jest już zajęty; ponowne kliknięcie go nie zresetuje.
+			AutomationNoFreeSlot: Obecnie nie ma wolnego miejsca dla automatycznego towarzysza.
+			AutomationNotCreated: Ten świat nie ma jeszcze automatycznego towarzysza. Kliknij lewym przyciskiem, aby go przywołać.
+			AutomationSummoned: "{0} został przywołany i zacznie samodzielnie rozwijać świat."
+			AutomationBlocked: Automatyczny towarzysz utknął na „{0}”: {1}. Będzie sam okresowo ponawiał próby.
+			AutomationCompleted: "{0} pokonał Władcę Księżyca. Bieg automatyczny zakończony; teraz jest zwykłym widmowym towarzyszem."
+			AutomationUnsupportedWorld: Ten specjalny świat nie ma jeszcze strategii automatycznej; automatyczny towarzysz bezpiecznie się zatrzymał.
+			AutomationUnsupportedMod: Postęp tego moda nie ma dostawcy automatyzacji; towarzysz podąża tylko ścieżką podstawową.
+			AutomationBackpackUnavailable: Plecak automatycznego towarzysza jest teraz niedostępny.
 			ModeAttack: Tryb szturmu
 			ModeDefense: Tryb obrony
 			ModeGarrison: Tryb garnizonu
@@ -392,21 +417,17 @@ Mods: {
 			HunterPanelHunting: · {0}: zbliża się, by cię zabić!
 			HunterRefresh: 🔄 Odtwórz i rozmieść oddział łowców
 			HunterRefreshed: Oddział łowców został odtworzony i rozmieszczony!
-			BuilderModeSmartAssist: Inteligentna pomoc
-			BuilderModeBridge: Most
-			BuilderModeShelter: Schronienie
-			BuilderModeArena: Arena walki
-			BuilderModeRopeShaft: Szyb linowy
-			BuilderModeChanged: Plan budowy → {0}
-			BuilderSmartEnabled: Inteligentna pomoc w budowie włączona. Stawiaj bloki normalnie, a towarzysze przedłużą wyraźne wzory.
-			BuilderSmartDisabled: Inteligentna pomoc w budowie wyłączona. Już zaplanowane prace pozostają w kolejce.
-			BuilderQueued: "{0}: zaplanowano {1} pól budowy. Towarzysze zaczną, gdy będzie bezpiecznie."
-			BuilderCancelled: Anulowano {0} pól budowy.
-			BuilderInvalidTarget: Cel znajduje się poza bezpiecznym obszarem świata.
-			BuilderNeedPlatforms: Ten plan wymaga nieulubionych platform w plecaku aktywnego towarzysza lub twoim ekwipunku.
-			BuilderNeedBlocks: Ten plan wymaga nieulubionych pełnych bloków budowlanych w plecaku aktywnego towarzysza lub twoim ekwipunku.
-			BuilderNeedRope: Ten plan wymaga nieulubionej liny w plecaku aktywnego towarzysza lub twoim ekwipunku.
-			BuilderNothingToBuild: Wszystkie pola są już zajęte lub zaplanowane; niczego nie zmieniono.
+			BuilderModeSmartBuild: Smart Build
+			BuilderModeDefensiveBuild: Defensive Build
+			BuilderModeBattlePlatform: Battle Platform
+			BuilderStateOn: on
+			BuilderStateOff: off
+			BuilderModeChanged: Tactic → {0} ({1})
+			BuilderTacticOn: "{0} switched on. Left click again to switch it off."
+			BuilderTacticOff: "{0} switched off. Any queued construction was cleared."
+			BuilderWheelTitle: Select construction tactic
+			BuilderWheelStateOn: Hold right: switch tactic  •  Left click: turn off
+			BuilderWheelStateOff: Hold right: switch tactic  •  Left click: turn on
 		}
 
 		NPCs.DamageTestDummyNPC.DisplayName: Manekin testowy obrażeń

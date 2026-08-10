@@ -21,6 +21,11 @@ public sealed class CompanionGlobalItem : GlobalItem
     /// This is only the fallback. ChooseAmmo scans the ammo slots and the rest of the
     /// inventory first, so any special ammo the player stocks is picked (and consumed)
     /// ahead of it, exactly like a human player.
+    ///
+    /// The automation companion is deliberately excluded: the design forbids free ammo for it
+    /// (§1.3), so it needs and consumes real ammunition exactly like a human, and its planner is
+    /// responsible for keeping ammo stocked.
     /// </summary>
-    public override bool NeedsAmmo(Item item, Player player) => !CompanionEntitySystem.IsCompanion(player);
+    public override bool NeedsAmmo(Item item, Player player) =>
+        !CompanionEntitySystem.IsCompanion(player) || CompanionEntitySystem.IsAutoCompanion(player);
 }

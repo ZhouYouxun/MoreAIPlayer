@@ -64,7 +64,9 @@ public sealed class CompanionDebugger : ModItem
         CompanionProfile profile = null;
         foreach (CompanionProfile candidate in playerData.Profiles)
         {
-            if (CompanionEntitySystem.FindByProfile(player.whoAmI, candidate.Id) is null)
+            // Never summon the automation companion's profile through the debug book — it is owned
+            // by the automation book, which has its own one-per-world summon rules.
+            if (!candidate.IsAutoRunning && CompanionEntitySystem.FindByProfile(player.whoAmI, candidate.Id) is null)
             {
                 profile = candidate;
                 break;

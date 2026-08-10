@@ -50,6 +50,11 @@ Mods: {
 					Tooltip: Disattivato per impostazione predefinita. Attivalo perché i compagni subiscano danni normali, possano morire e tornino dopo il normale tempo di attesa. Se disattivato, sono immuni a tutti i danni.
 				}
 
+				CompanionsRescueWhenOwnerHurt: {
+					Label: "[i:MagicMirror] Richiama i compagni quando subisci danni"
+					Tooltip: Disattivato per impostazione predefinita. I compagni si teletrasportano in posizioni sicure e separate vicino a te.
+				}
+
 				CompanionsAutoCollectWorldItems: {
 					Label: "[i:TreasureMagnet] I compagni raccolgono automaticamente gli oggetti del mondo"
 					Tooltip: Disattivato per impostazione predefinita. Quando è disattivato, i compagni non cercano, prenotano, raggiungono né raccolgono oggetti del mondo. Attivalo solo dopo aver verificato la compatibilità con il salvataggio e le altre mod.
@@ -169,14 +174,24 @@ Mods: {
 				DisplayName: Tomo dell'Architetto
 				Tooltip:
 					'''
-					Clic destro: alterna cinque progetti. Clic sinistro: esegue quello scelto. Giù + clic sinistro: annulla tutti i lavori.
-					· Assistenza intelligente: attiva l'aiuto continuo. I compagni imparano i blocchi e i muri posati e prolungano schemi brevi e chiari.
-					· Ponte: costruisce un ponte orizzontale di piattaforme lungo fino a 160 caselle verso il cursore.
-					· Rifugio: costruisce un telaio di 11 × 7 con ingresso di tre caselle e aggiunge muri e luci se disponibili.
-					· Arena: costruisce tre file di 61 piattaforme distanti dieci caselle, usando l'illuminazione disponibile.
-					· Pozzo di corde: posa fino a 120 caselle di corda verticale e luci nei punti con sostegno.
-					Usano prima i materiali non preferiti negli zaini dei compagni attivi, poi il tuo inventario. Se finiscono, il lavoro si mette in pausa.
-					Non scavano né sostituiscono mai blocchi. Combattimento, soccorso, segnali e modalità specializzate hanno sempre la priorità. Solo giocatore singolo.
+					Hold right click: open the tactic wheel. Left click: switch the selected tactic on or off.
+					· Smart Build: while you place the same block along a line, companions continue that block in the same direction from their own or your inventory.
+					· Defensive Build: when an enemy is near, companions raise a short blocking pillar between you and the nearest threat.
+					· Battle Platform: while you stand on a platform whose facing edge breaks off ahead, companions extend flat platforms across the gap — about six tiles ahead, so keep walking to keep bridging. They will not drop off the bridge, and return to your side if knocked off.
+					Builders take non-favourited materials from active companion backpacks first, then your inventory. Work pauses safely if supplies run out.
+					Companions never mine or replace blocks. Combat, rescue calls, waypoints and specialist modes always take priority. Single-player only.
+					'''
+			}
+
+			CompanionAutomationBook: {
+				DisplayName: Tomo automatico
+				Tooltip:
+					'''
+					[Solo per divertimento; questa funzione è ancora in fase di test]
+					Clic sinistro: evoca il tuo unico compagno automatico (quello esistente non viene mai azzerato o sostituito)
+					Clic destro: apre il suo zaino
+					Proverà autonomamente a esplorare, raccogliere, costruire, combattere e avanzare nel mondo; al termine diventerà un normale compagno fantasma
+					Può ancora bloccarsi, sbagliare o incontrare altri bug. Esegui prima un backup del mondo. Solo giocatore singolo.
 					'''
 			}
 
@@ -338,6 +353,16 @@ Mods: {
 		}
 
 		CompanionCommand: {
+			AutomationSingleplayerOnly: Il Tomo automatico per ora è solo per giocatore singolo.
+			AutomationAlreadyActive: Questo compagno automatico è già occupato; cliccare di nuovo non lo azzera.
+			AutomationNoFreeSlot: Al momento non c'è nessuno slot libero per il compagno automatico.
+			AutomationNotCreated: Questo mondo non ha ancora un compagno automatico. Fai clic sinistro per evocarne uno.
+			AutomationSummoned: "{0} è stato evocato e inizierà ad avanzare nel mondo da solo."
+			AutomationBlocked: Il compagno automatico è bloccato su «{0}»: {1}. Riproverà periodicamente da solo.
+			AutomationCompleted: "{0} ha sconfitto il Signore della Luna. La sequenza automatica è finita; ora è un normale compagno fantasma."
+			AutomationUnsupportedWorld: Questo mondo speciale non ha ancora una strategia automatica; il compagno automatico si è fermato in sicurezza.
+			AutomationUnsupportedMod: La progressione di questo mod non ha un fornitore di automazione; il compagno segue solo il percorso vanilla.
+			AutomationBackpackUnavailable: Lo zaino del compagno automatico non è disponibile in questo momento.
 			ModeAttack: Modalità Assalto
 			ModeDefense: Modalità Difesa
 			ModeGarrison: Modalità Guarnigione
@@ -392,21 +417,17 @@ Mods: {
 			HunterPanelHunting: · {0}: ti sta raggiungendo per ucciderti!
 			HunterRefresh: 🔄 Ricrea e schiera la squadra di cacciatori
 			HunterRefreshed: Squadra di cacciatori ricreata e schierata!
-			BuilderModeSmartAssist: Assistenza intelligente
-			BuilderModeBridge: Ponte
-			BuilderModeShelter: Rifugio
-			BuilderModeArena: Arena di battaglia
-			BuilderModeRopeShaft: Pozzo di corde
-			BuilderModeChanged: Progetto di costruzione → {0}
-			BuilderSmartEnabled: Assistenza alla costruzione attivata. Posa normalmente i blocchi e i compagni prolungheranno gli schemi chiari.
-			BuilderSmartDisabled: Assistenza alla costruzione disattivata. I lavori già in coda restano invariati.
-			BuilderQueued: "{0}: accodate {1} caselle di costruzione. I compagni lavoreranno quando sarà sicuro."
-			BuilderCancelled: Annullate {0} caselle di costruzione.
-			BuilderInvalidTarget: L'obiettivo è fuori dall'area sicura del mondo.
-			BuilderNeedPlatforms: Questo progetto richiede piattaforme non preferite nello zaino di un compagno attivo o nel tuo inventario.
-			BuilderNeedBlocks: Questo progetto richiede blocchi solidi non preferiti nello zaino di un compagno attivo o nel tuo inventario.
-			BuilderNeedRope: Questo progetto richiede corde non preferite nello zaino di un compagno attivo o nel tuo inventario.
-			BuilderNothingToBuild: Tutte le caselle sono già occupate o in coda; non è cambiato nulla.
+			BuilderModeSmartBuild: Smart Build
+			BuilderModeDefensiveBuild: Defensive Build
+			BuilderModeBattlePlatform: Battle Platform
+			BuilderStateOn: on
+			BuilderStateOff: off
+			BuilderModeChanged: Tactic → {0} ({1})
+			BuilderTacticOn: "{0} switched on. Left click again to switch it off."
+			BuilderTacticOff: "{0} switched off. Any queued construction was cleared."
+			BuilderWheelTitle: Select construction tactic
+			BuilderWheelStateOn: Hold right: switch tactic  •  Left click: turn off
+			BuilderWheelStateOff: Hold right: switch tactic  •  Left click: turn on
 		}
 
 		NPCs.DamageTestDummyNPC.DisplayName: Manichino per test dei danni

@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using Microsoft.Xna.Framework;
+using MoreAIPlayer.Companion.Automation;
 using MoreAIPlayer.Companion.Building;
 using Terraria;
 using Terraria.DataStructures;
@@ -34,8 +35,17 @@ public sealed class CompanionPlayer : ModPlayer
     private const int RescueSignalWindow = 10;
 
     public List<CompanionProfile> Profiles { get; private set; } = [];
-    public CompanionBuildMode BuildMode = CompanionBuildMode.SmartAssist;
-    public bool SmartBuildEnabled;
+
+    /// <summary>Per-world automation-companion bindings, keyed by the world's unique id. See
+    /// <see cref="AutoWorldBinding"/>. Persists with the character, not the world.</summary>
+    private readonly Dictionary<string, AutoWorldBinding> autoBindings = [];
+
+    /// <summary>Which construction tactic the builder book has selected.</summary>
+    public CompanionBuildMode BuildMode = CompanionBuildMode.SmartBuild;
+
+    /// <summary>Whether the selected tactic is currently switched on. One left click toggles it;
+    /// switching tactic keeps this flag, so turning the book on once lets you cycle tactics live.</summary>
+    public bool BuildTacticActive;
     public int RequestedTarget = -1;
     public int CombatRequestTime;
 
@@ -91,8 +101,9 @@ public sealed class CompanionPlayer : ModPlayer
     public override void Initialize()
     {
         Profiles = [];
-        BuildMode = CompanionBuildMode.SmartAssist;
-        SmartBuildEnabled = false;
+        autoBindings.Clear();
+        BuildMode = CompanionBuildMode.SmartBuild;
+        BuildTacticActive = false;
         buildSnapshotValid = false;
     }
 
@@ -116,6 +127,49 @@ public sealed class CompanionPlayer : ModPlayer
         return null;
     }
 
+    // ---- Automation companion, one per (character, world), keyed by world unique id (§4.1) ----
+
+    private static string CurrentWorldKey() =>
+        Main.ActiveWorldFileData?.UniqueId.ToString() ?? string.Empty;
+
+    /// <summary>The automation binding for the world the player is currently in, or null.</summary>
+    public AutoWorldBinding CurrentWorldAutoBinding() =>
+        autoBindings.TryGetValue(CurrentWorldKey(), out AutoWorldBinding binding) ? binding : null;
+
+    /// <summary>The automation companion profile bound to the current world, or null if none.</summary>
+    public CompanionProfile GetAutomationProfileForCurrentWorld()
+    {
+        AutoWorldBinding binding = CurrentWorldAutoBinding();
+        return binding is null ? null : GetProfile(binding.ProfileId);
+    }
+
+    /// <summary>Whether this world's automation run has already finished (Moon Lord defeated).</summary>
+    public bool IsAutomationCompletedForCurrentWorld() => CurrentWorldAutoBinding()?.Completed == true;
+
+    /// <summary>
+    /// Creates the from-scratch automation companion for the current world and binds it. The
+    /// appearance and name are randomized so it reads as a distinct new player, and it receives
+    /// only its two starting tools — the whole flow builds up from there.
+    /// </summary>
+    public CompanionProfile CreateAutomationProfileForCurrentWorld()
+    {
+        CompanionProfile profile = CreateProfile(mirrorOwner: false);
+        profile.BeginAutomation();
+        autoBindings[CurrentWorldKey()] = new AutoWorldBinding { ProfileId = profile.Id, Completed = false };
+        return profile;
+    }
+
+    /// <summary>Marks the current world's automation run finished and converts the profile back to
+    /// a normal companion. Used by the Moon Lord completion path (later phase).</summary>
+    public void MarkAutomationCompletedForCurrentWorld()
+    {
+        AutoWorldBinding binding = CurrentWorldAutoBinding();
+        if (binding is null)
+            return;
+        binding.Completed = true;
+        GetProfile(binding.ProfileId)?.EndAutomation();
+    }
+
     public override void SaveData(TagCompound tag)
     {
         List<TagCompound> savedProfiles = new(Profiles.Count);
@@ -123,7 +177,16 @@ public sealed class CompanionPlayer : ModPlayer
             savedProfiles.Add(profile.Save());
         tag[nameof(Profiles)] = savedProfiles;
         tag[nameof(BuildMode)] = (int)BuildMode;
-        tag[nameof(SmartBuildEnabled)] = SmartBuildEnabled;
+        tag[nameof(BuildTacticActive)] = BuildTacticActive;
+
+        List<TagCompound> savedBindings = new(autoBindings.Count);
+        foreach ((string world, AutoWorldBinding binding) in autoBindings)
+        {
+            TagCompound entry = binding.Save();
+            entry["World"] = world;
+            savedBindings.Add(entry);
+        }
+        tag["AutoBindings"] = savedBindings;
     }
 
     public override void LoadData(TagCompound tag)
@@ -132,8 +195,20 @@ public sealed class CompanionPlayer : ModPlayer
         int savedMode = tag.ContainsKey(nameof(BuildMode)) ? tag.GetInt(nameof(BuildMode)) : 0;
         BuildMode = System.Enum.IsDefined(typeof(CompanionBuildMode), savedMode)
             ? (CompanionBuildMode)savedMode
-            : CompanionBuildMode.SmartAssist;
-        SmartBuildEnabled = tag.ContainsKey(nameof(SmartBuildEnabled)) && tag.GetBool(nameof(SmartBuildEnabled));
+            : CompanionBuildMode.SmartBuild;
+        BuildTacticActive = tag.ContainsKey(nameof(BuildTacticActive)) && tag.GetBool(nameof(BuildTacticActive));
+
+        autoBindings.Clear();
+        if (tag.ContainsKey("AutoBindings"))
+        {
+            foreach (TagCompound entry in tag.GetList<TagCompound>("AutoBindings"))
+            {
+                string world = entry.GetString("World");
+                if (!string.IsNullOrEmpty(world))
+                    autoBindings[world] = AutoWorldBinding.Load(entry);
+            }
+        }
+
         if (!tag.ContainsKey(nameof(Profiles)))
         {
             if (tag.ContainsKey(nameof(CompanionProfile.Hotbar)))
@@ -249,6 +324,16 @@ public sealed class CompanionPlayer : ModPlayer
             buildSnapshotStyle);
     }
 
+    public override void PostUpdateEquips()
+    {
+        if (Main.netMode != NetmodeID.SinglePlayer || !CompanionEntitySystem.IsCompanion(Player))
+            return;
+
+        CompanionInstance instance = CompanionEntitySystem.GetBySlot(Player.whoAmI);
+        if (instance is not null && instance.TryGetContext(out Player owner, out _))
+            PrepareCompanionLifeForVanillaUpdate(instance, owner);
+    }
+
     public override void PostUpdate()
     {
         // Every field maintained below exists only to feed companion AI, which is
@@ -271,61 +356,109 @@ public sealed class CompanionPlayer : ModPlayer
 
         if (CompanionEntitySystem.IsCompanion(Player))
         {
-            // BindProfile runs before vanilla's player-stat pass. That pass rebuilds
-            // statLifeMax2 from this synthetic player's own (empty) Life Crystal history and
-            // used to put a companion straight back at 100 max life. Reapply the owner's final
-            // already-calculated maximum after the pass, which covers life crystals, fruit,
-            // accessories, buffs and modded max-life effects without any item-ID special cases.
             CompanionInstance instance = CompanionEntitySystem.GetBySlot(Player.whoAmI);
-            if (instance is not null && instance.TryGetContext(out Player owner, out _))
+            if (instance is not null)
             {
-                SynchronizeCompanionLife(instance, owner);
-            }
+                if (instance.TryGetContext(out Player owner, out _))
+                    CaptureCompanionLifeAfterVanillaUpdate(instance, owner);
 
-            Player.statMana = Player.statManaMax2;
-            if (!Player.dead && Player.potionDelay <= 0 && Player.statLife <= Player.statLifeMax2 - 100)
-            {
-                int lifeBeforeHealing = Player.statLife;
-                TryUseHealingPotion(instance);
-                if (Player.statLife > lifeBeforeHealing)
-                    instance.PersistentLife = System.Math.Clamp(Player.statLife, 1, Player.statLifeMax2);
+                Player.statMana = Player.statManaMax2;
+                if (instance.AutoHealCooldownTicks > 0)
+                    instance.AutoHealCooldownTicks--;
+
+                // Do not turn a helper into a panic-drinking machine. It waits until it is
+                // genuinely hurt, consumes at most one potion, then observes that potion's own
+                // cooldown. The fallback also covers nonstandard zero-delay healing items.
+                if (!Player.dead && instance.AutoHealCooldownTicks <= 0 && Player.potionDelay <= 0 &&
+                    Player.statLife * 2 <= Player.statLifeMax2)
+                {
+                    int lifeBeforeHealing = Player.statLife;
+                    TryUseHealingPotion(instance);
+                    if (Player.statLife > lifeBeforeHealing)
+                    {
+                        instance.PersistentLife = System.Math.Clamp(Player.statLife, 1, Player.statLifeMax2);
+                        instance.AutoHealCooldownTicks = System.Math.Max(60, Player.potionDelay);
+                    }
+                }
             }
         }
 
         ObserveMiningAndTrees();
     }
 
-    private void SynchronizeCompanionLife(CompanionInstance instance, Player owner)
+    /// <summary>
+    /// Runs after equipment/max-life effects but before vanilla UpdateLifeRegen. Restoring the
+    /// persistent value here lets natural regeneration and negative regen (poison, burning,
+    /// suffocation and modded DoT) settle normally instead of being overwritten afterward.
+    /// </summary>
+    private void PrepareCompanionLifeForVanillaUpdate(CompanionInstance instance, Player owner)
     {
-        int sharedMaxLife = System.Math.Max(100, System.Math.Max(owner.statLifeMax, owner.statLifeMax2));
+        int sharedMaxLife = instance.AutoMaxLife > 0
+            ? instance.AutoMaxLife
+            : System.Math.Max(100, System.Math.Max(owner.statLifeMax, owner.statLifeMax2));
         Player.statLifeMax = sharedMaxLife;
         Player.statLifeMax2 = sharedMaxLife;
 
+        if (!instance.PersistentLifeInitialized)
+        {
+            instance.PersistentLife = sharedMaxLife;
+            instance.PersistentLifeInitialized = true;
+        }
+        else if (instance.PersistentLife > 0 && instance.LastSharedLifeMax > 0 &&
+            instance.PersistentLife >= instance.LastSharedLifeMax)
+        {
+            // Fully healed stays fully healed when the owner gains or loses max life.
+            instance.PersistentLife = sharedMaxLife;
+        }
+
+        if (Player.dead || instance.PersistentLife <= 0)
+        {
+            Player.statLife = 0;
+            instance.PersistentLife = 0;
+            instance.LastSharedLifeMax = sharedMaxLife;
+            return;
+        }
+
+        instance.PersistentLife = System.Math.Clamp(instance.PersistentLife, 1, sharedMaxLife);
+        instance.LastSharedLifeMax = sharedMaxLife;
+        Player.statLife = instance.PersistentLife;
+    }
+
+    /// <summary>Captures vanilla regen/DoT after it has actually changed current life.</summary>
+    internal void CaptureCompanionLifeAfterVanillaUpdate(CompanionInstance instance, Player owner)
+    {
+        int sharedMaxLife = instance.AutoMaxLife > 0
+            ? instance.AutoMaxLife
+            : System.Math.Max(100, System.Math.Max(owner.statLifeMax, owner.statLifeMax2));
+        Player.statLifeMax = sharedMaxLife;
+        Player.statLifeMax2 = sharedMaxLife;
+
+        if (!MoreAIPlayerClientConfig.CompanionDamageEnabled &&
+            instance.PersistentLifeInitialized && instance.PersistentLife > 0)
+        {
+            // This protection must run before the lethal check. Otherwise the final poison/fire
+            // tick could set life to zero and kill an allegedly invulnerable companion even
+            // though every non-lethal tick was correctly rejected.
+            int protectedLife = System.Math.Clamp(instance.PersistentLife, 1, sharedMaxLife);
+            Player.statLife = System.Math.Max(Player.statLife, protectedLife);
+            Player.dead = false;
+        }
+
         if (Player.dead || Player.statLife <= 0)
         {
+            Player.statLife = 0;
+            Player.dead = true;
             instance.PersistentLife = 0;
             instance.PersistentLifeInitialized = true;
             instance.LastSharedLifeMax = sharedMaxLife;
             return;
         }
 
-        if (!instance.PersistentLifeInitialized)
-        {
-            // A new summon always begins healthy. Do not seed from Player.statLife: vanilla
-            // has already reduced that synthetic player's empty life-crystal state to 100.
-            instance.PersistentLife = sharedMaxLife;
-            instance.PersistentLifeInitialized = true;
-        }
-        else if (instance.PersistentLife >= instance.LastSharedLifeMax)
-        {
-            // Preserve the useful invariant "fully healed stays fully healed" when the owner
-            // gains or loses max life through crystals, fruit, equipment, buffs, or another mod.
-            instance.PersistentLife = sharedMaxLife;
-        }
-
-        instance.PersistentLife = System.Math.Clamp(instance.PersistentLife, 1, sharedMaxLife);
+        int currentLife = System.Math.Clamp(Player.statLife, 1, sharedMaxLife);
+        Player.statLife = currentLife;
+        instance.PersistentLife = currentLife;
+        instance.PersistentLifeInitialized = true;
         instance.LastSharedLifeMax = sharedMaxLife;
-        Player.statLife = instance.PersistentLife;
     }
 
     private void TryUseHealingPotion(CompanionInstance instance)
@@ -353,26 +486,21 @@ public sealed class CompanionPlayer : ModPlayer
 
     public override bool CanBeHitByProjectile(Projectile proj)
     {
-        if (CompanionEntitySystem.IsCompanion(Player) &&
+        if (CompanionEntitySystem.IsCompanion(Player) && !CompanionEntitySystem.IsAutoCompanion(Player) &&
             IsWhipProjectile(proj) && proj.owner != Player.whoAmI)
             return true;
         return base.CanBeHitByProjectile(proj);
     }
 
     /// <summary>
-    /// When survival is disabled, reject the hit at the earliest player-wide immunity hook.
-    /// FreeDodge is only queried for Main.myPlayer, so it silently never ran for our synthetic
-    /// player slots. ImmuneTo is checked before that local-player branch and therefore covers
-    /// NPC contact, projectiles, fall damage and environmental damage for companions as well.
-    /// With the option enabled this returns false and vanilla applies ordinary damage normally.
+    /// Reject damage entering through Terraria's ordinary local-player routing. The one exception
+    /// is CompanionEntitySystem's tightly scoped owned evaluation: that pass has already selected
+    /// a real collision and uses the normal Hurt calculation exactly once. Other ModPlayer
+    /// ImmuneTo hooks still run during that evaluation, so third-party immunity remains valid.
     /// </summary>
     public override bool ImmuneTo(PlayerDeathReason damageSource, int cooldownCounter, bool dodgeable) =>
         CompanionEntitySystem.IsCompanion(Player) &&
-        // Fail closed while the client config is still loading: the documented default is
-        // invulnerability, so a null config must not create one frame where a freshly spawned
-        // companion can unexpectedly take damage. Once the user explicitly enables damage,
-        // return false and leave every vanilla damage source intact.
-        !MoreAIPlayerClientConfig.CompanionDamageEnabled;
+        !CompanionEntitySystem.IsOwnedDamageEvaluation(Player);
 
     public override void OnHurt(Player.HurtInfo info)
     {
@@ -381,7 +509,13 @@ public sealed class CompanionPlayer : ModPlayer
 
         // Any damage counts, not just NPC contact — fall damage, lava and traps all mean the
         // owner is in trouble and wants the escort back at their side.
-        SignalRescue();
+        // This is opt-in: a hit normally must not reposition any companion. Companion damage
+        // also must never trigger a rescue signal of its own.
+        if (!CompanionEntitySystem.IsCompanion(Player) &&
+            MoreAIPlayerClientConfig.CompanionsRescueOnOwnerHurt)
+        {
+            SignalRescue();
+        }
 
         int sourceNpc = info.DamageSource.SourceNPCIndex;
         if (sourceNpc >= 0 && sourceNpc < Main.maxNPCs && Main.npc[sourceNpc].active)
@@ -390,29 +524,22 @@ public sealed class CompanionPlayer : ModPlayer
             CombatRequestTime = 300;
         }
 
-        if (CompanionEntitySystem.IsCompanion(Player))
+        if (CompanionEntitySystem.IsCompanion(Player) && !CompanionEntitySystem.IsAutoCompanion(Player))
         {
-            // Player.Hurt has already applied the final vanilla damage here, including the
-            // companion's own defence, endurance and any modded damage hooks. Snapshot that
-            // result before the next stat rebuild so enabled damage cannot be silently healed.
-            CompanionInstance companion = CompanionEntitySystem.GetBySlot(Player.whoAmI);
-            if (companion is not null)
-            {
-                companion.PersistentLife = System.Math.Max(0, Player.statLife);
-                companion.PersistentLifeInitialized = true;
-            }
-
             int projIndex = info.DamageSource.SourceProjectileLocalIndex;
             if (projIndex >= 0 && projIndex < Main.maxProjectiles)
             {
                 Projectile proj = Main.projectile[projIndex];
                 if (IsWhipProjectile(proj) && proj.owner != Player.whoAmI)
-                {
-                    WhipBuffTimer = 600; // 10s buff
-                    SpawnWhipSparkles(Player.Center);
-                }
+                    GrantWhipBuff();
             }
         }
+    }
+
+    internal void GrantWhipBuff()
+    {
+        WhipBuffTimer = 600; // 10s buff
+        SpawnWhipSparkles(Player.Center);
     }
 
     private static void SpawnWhipSparkles(Vector2 center)
@@ -425,7 +552,7 @@ public sealed class CompanionPlayer : ModPlayer
         }
     }
 
-    private static bool IsWhipProjectile(Projectile proj)
+    internal static bool IsWhipProjectile(Projectile proj)
     {
         if (proj is null || !proj.active)
             return false;
@@ -437,13 +564,17 @@ public sealed class CompanionPlayer : ModPlayer
     }
 
     /// <summary>
-    /// Gel is free for companions, always. The empty-inventory case is already covered by
+    /// Gel is free for ordinary companions, always. The empty-inventory case is already covered by
     /// CompanionGlobalItem.NeedsAmmo, but this also stops a gel stack the player stocked
     /// from draining — a companion's flamethrower is never supposed to run out, whether or
     /// not anyone hands it fuel. Every other ammo type is consumed normally.
+    ///
+    /// The automation companion is excluded (it consumes gel like a real player) because the
+    /// design forbids free ammo/materials for it (§1.3).
     /// </summary>
     public override bool CanConsumeAmmo(Item weapon, Item ammo) =>
-        ammo.ammo != AmmoID.Gel || !CompanionEntitySystem.IsCompanion(Player);
+        ammo.ammo != AmmoID.Gel || !CompanionEntitySystem.IsCompanion(Player) ||
+        CompanionEntitySystem.IsAutoCompanion(Player);
 
     public override void OnHitNPC(NPC target, NPC.HitInfo hit, int damageDone)
     {

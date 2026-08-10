@@ -96,7 +96,10 @@ public sealed class CompanionCommandBook : ModItem
         List<CompanionInstance> owned = [];
         foreach (CompanionInstance instance in CompanionEntitySystem.All)
         {
-            if (instance.OwnerWhoAmI == ownerWhoAmI && instance.Entity.active)
+            // The automation companion ignores the command book entirely — it never joins the
+            // waypoint/mode squad. Excluding it here also keeps it out of the mode/builder wheels
+            // and the builder book, which all read this list.
+            if (instance.OwnerWhoAmI == ownerWhoAmI && instance.Entity.active && !instance.IsAutoIdentity)
                 owned.Add(instance);
         }
         return owned;
