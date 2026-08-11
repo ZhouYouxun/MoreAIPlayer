@@ -15,6 +15,15 @@ Mods: {
 		}
 
 		Configs: {
+			MoreAIPlayerServerConfig: {
+				DisplayName: Phantom Companion Gameplay Settings
+
+				OrdinaryCompanionsHostileToPlayers: {
+					Label: "[i:BloodyMachete] Ordinary companions can hurt players"
+					Tooltip: Disabled by default and intended for entertainment and testing. Only ordinary companions summoned by the debug book are affected. They remain allies with one another and still target only hostile NPCs. Players can hurt them, and their item or projectile attacks can hurt players on contact. Hunters and present or former automation companions are excluded.
+				}
+			}
+
 			MoreAIPlayerClientConfig: {
 				DisplayName: Phantom Companion Client Settings
 
@@ -161,11 +170,13 @@ Mods: {
 				DisplayName: Hunter Book
 				Tooltip:
 					'''
-					Left click: start or end Hunter Game. Hunters first assemble far away, then begin the pursuit.
-					Right click: choose 1 to 3 hunters and review the game state.
+					Left click: start or abandon the selected Hunter Trial. Hunters assemble far away before acting.
+					Right click: choose 1 to 3 hunters and a trial rule.
+					· Survival: endure 180 seconds against hunters who return after defeat.
+					· Elimination: defeat the required number of hunters as they regroup and return.
+					· Breakout: reach a distant exit within 150 seconds; hunters intercept your route without resting.
 					Available after any pre-Hardmode boss until the Wall of Flesh, or from Hardmode until Plantera. Defeating the Wall of Flesh or Plantera ends the current game.
 					Hunter kits are curated for the current stage only; they never scale from your defence. More hunters means weaker individuals.
-					A tracker near your character shows the approaching countdown and the nearest hunter's distance.
 					'''
 			}
 
@@ -349,12 +360,17 @@ Mods: {
 			DiagnosticsRecovery: Recovered ItemCheck {0} · slot {1} · aim {2} · consecutive misses {3}
 			DiagnosticsOwnership: Projectile ownership fixes {0} · context leak fixes {1}
 			RightClickOpen: "{0} · Right-click to open equipment and backpack"
-			HunterTrackerTitle: Hunter Game · {0}
+			HunterTrackerTitle: Hunter Trial · {0}
 			HunterTrackerPreparing: Hunters assembling in the distance · {0}s
 			HunterTrackerNearest: Nearest hunter: {0} tiles
 			HunterTrackerResting: Nearest hunter resting: {0} tiles
 			HunterTrackerReviving: Nearest hunter regrouping: {0}s
 			HunterTrackerSearching: Searching for hunter signals...
+			HunterTrackerObjectiveSurvival: Objective: survive · {0}s remaining
+			HunterTrackerObjectiveElimination: Objective: defeat hunters · {0}/{1}
+			HunterTrackerObjectiveBreakout: Objective: exit {0} tiles away · {1}s remaining
+			HunterBreakoutMarker: ◆ Exit · {0} tiles
+			HunterBreakoutMarkerHere: ◆ Exit
 		}
 
 		CompanionCommand: {
@@ -385,21 +401,18 @@ Mods: {
 			HunterNameBravo: Hunter · Bravo
 			HunterNameCharlie: Hunter · Charlie
 			HunterNameFallback: Hunter #{0}
-			HunterModeEnabled: "[Hunter Game] {0} started. Hunters are assembling in the distance..."
-			HunterModeDisabled: "[Hunter Game] ended. The alert is over."
-			HunterRestarting: "[Hunter Game] The next wave is assembling in the distance..."
-			HunterRequiresBoss: Hunter Game is locked until you defeat any boss in pre-Hardmode.
-			HunterUnavailablePostPlantera: Hunter Game ends after Plantera and cannot be started in this world stage.
-			HunterStageEndedHardmode: "[Hunter Game] The Wall of Flesh has fallen. This pre-Hardmode game has ended."
-			HunterStageEndedPlantera: "[Hunter Game] Plantera has fallen. This game has ended."
+			HunterRequiresBoss: Hunter Trials unlock after you defeat any boss in pre-Hardmode.
+			HunterUnavailablePostPlantera: Hunter Trials end after Plantera and cannot begin at this world stage.
+			HunterStageEndedHardmode: "[Hunter Trial] The Wall of Flesh has fallen. This pre-Hardmode trial has ended."
+			HunterStageEndedPlantera: "[Hunter Trial] Plantera has fallen. This trial has ended."
 			HunterStagePreHardmode: Pre-Hardmode Hunt
 			HunterStageEarlyHardmode: Early Hardmode Hunt
 			HunterStageUnavailable: No eligible stage
 			HunterStageStatus: Game stage: {0}
 			HunterSpawned: "[Warning] Hostile player {0} has infiltrated your world!"
-			HunterDefeated: "[Broadcast] Hostile player {0} was defeated! They will return with a fresh loadout in 60 seconds..."
+			HunterDefeated: "[Broadcast] Hostile player {0} was defeated! They regroup in {1} seconds..."
 			HunterRespawned: "[Warning] Hostile player {0} has returned and resumed the chase!"
-			HunterSingleplayerOnly: Manhunt Mode is single-player only for now.
+			HunterSingleplayerOnly: Hunter Trials are single-player only for now.
 			ScaleSingleplayerOnly: The size matrix is single-player only for now.
 			ScaleNoSpace: There is not enough room here for the selected size.
 			ScalePanelTitle: ◆ Crystal Size Matrix
@@ -409,19 +422,39 @@ Mods: {
 			Disabled: Off
 			HunterResting: "[Hunter Alert] {0} has fallen back to rest and gather supplies!"
 			HunterHunting: "[Hunter Alert] {0} has found your trail again and resumed the hunt!"
-			HunterPanelTitle: ⚔ Manhunt Settings
+			HunterPanelTitle: ⚔ Hunter Trial Settings
 			Close: Close
-			HunterPanelEnabled: "[Mode Status] Enabled (click to disable)"
-			HunterPanelDisabled: "[Mode Status] Disabled (click to enable)"
+			HunterPanelEnabled: "[Trial active] Click to abandon"
+			HunterPanelDisabled: "[Trial inactive] Click to begin"
 			HunterCountTitle: Number of hunters:
 			HunterCount: "{0} hunter(s)"
 			HunterStatusTitle: Hunter status:
-			HunterInactive: · Manhunt Mode is inactive
+			HunterInactive: · Hunter Trial has not begun
 			HunterPanelReviving: · {0}: reviving ({1}s remaining)
 			HunterPanelResting: · {0}: resting and gathering supplies
 			HunterPanelHunting: · {0}: closing in for the kill!
-			HunterRefresh: 🔄 Rebuild and deploy the hunter squad
-			HunterRefreshed: Hunter squad rebuilt and redeployed!
+			HunterRefresh: 🔄 Restart the current trial from zero
+			HunterTrialSurvival: Survival
+			HunterTrialElimination: Elimination
+			HunterTrialBreakout: Breakout
+			HunterTrialTypeTitle: Choose a trial rule:
+			HunterTrialSurvivalDescription: Endure {0} seconds; defeated hunters regroup and return.
+			HunterTrialEliminationDescription: Defeat {0} hunters in total; your death fails the trial.
+			HunterTrialBreakoutDescription: Reach the exit within {0} seconds; hunters move to intercept.
+			HunterObjectiveStatusTitle: Current objective:
+			HunterObjectiveNotStarted: Choose a rule, then begin the trial
+			HunterTrialStartSurvival: "[Survival Trial] Endure {0} seconds. World stage: {1}."
+			HunterTrialStartElimination: "[Elimination Trial] Defeat {0} hunters. World stage: {1}."
+			HunterTrialStartBreakout: "[Breakout Trial] Reach the exit within {0} seconds. World stage: {1}."
+			HunterTrialAbandoned: "[Hunter Trial] Trial abandoned. The alert is over."
+			HunterCannotStartDead: You cannot begin a Hunter Trial while unable to act.
+			HunterTrialRestarting: "[Hunter Trial] Restarting {0} from zero. Hunters are regrouping..."
+			HunterTrialFailedDeath: "[Trial failed] You were defeated."
+			HunterTrialFailedTimeout: "[Trial failed] Time expired before you reached the exit."
+			HunterTrialVictorySurvival: "[Trial complete] You survived {0} seconds and defeated {1} hunters."
+			HunterTrialVictoryElimination: "[Trial complete] You defeated {0} hunters in {1} seconds."
+			HunterTrialVictoryBreakout: "[Trial complete] You broke out in {0} seconds and defeated {1} hunters."
+			HunterDefeatedProgress: "[Elimination] {0} defeated: {1}/{2}. Regrouping in {3} seconds."
 			BuilderModeSmartBuild: Smart Build
 			BuilderModeDefensiveBuild: Defensive Build
 			BuilderModeBattlePlatform: Battle Platform

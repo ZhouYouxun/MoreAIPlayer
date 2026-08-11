@@ -512,6 +512,7 @@ public sealed class CompanionPlayer : ModPlayer
         // This is opt-in: a hit normally must not reposition any companion. Companion damage
         // also must never trigger a rescue signal of its own.
         if (!CompanionEntitySystem.IsCompanion(Player) &&
+            !CompanionEntitySystem.IsCompanionDamageSource(info.DamageSource) &&
             MoreAIPlayerClientConfig.CompanionsRescueOnOwnerHurt)
         {
             SignalRescue();

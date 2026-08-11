@@ -9,14 +9,13 @@ using Terraria.ModLoader;
 namespace MoreAIPlayer.Companion.Content;
 
 /// <summary>
-/// Third companion book: Hunter's Tome (猎人手稿).
-/// Left click toggles Hostile Hunter PVP Mode ON/OFF.
-/// Right click opens the Hunter Configuration Panel (HunterConfigPanel) to adjust hunter count
-/// and options.
+/// Third companion book: Hunter Trial Book. Left click starts or abandons the selected trial;
+/// right click opens the compact rule/count panel. The three rules share hunter infrastructure
+/// but have explicit survival, elimination and breakout win conditions.
 /// </summary>
 public sealed class CompanionHunterBook : ModItem
 {
-    public override string Texture => $"Terraria/Images/Item_{ItemID.DemonScythe}";
+    public override string Texture => "MoreAIPlayer/图片/猎人书";
 
     public override void SetDefaults()
     {
@@ -51,7 +50,7 @@ public sealed class CompanionHunterBook : ModItem
             return true;
         }
 
-        // Left click toggles hunter mode
+        // Left click starts or abandons the selected trial.
         HunterSystem.ToggleMode();
         return true;
     }

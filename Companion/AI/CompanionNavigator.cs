@@ -19,6 +19,10 @@ public sealed class CompanionNavigator
     private const int FailedRepathDelayTicks = 60;
     private const int StuckRepathTicks = 60;
 
+    // After a platform drop completes, hold off on another one briefly so the companion cannot
+    // chain-fall through several layers in a single continuous press.
+    private const int PlatformDropCooldownTicks = 16;
+
     private List<PathStep> path;
     private int pathIndex;
     private int repathCooldown;
@@ -26,6 +30,23 @@ public sealed class CompanionNavigator
     private int stuckTicks;
     private Vector2 lastPosition;
     private bool jumpHeldLastTick;
+
+    // The order currently being executed. FollowPath / DirectSteer read it to decide whether a
+    // platform drop is even permitted; the parameterless Navigate overload maps to a safe order
+    // that never drops.
+    private NavigationRequest currentRequest;
+
+    // Platform-drop state. cooldown blocks a new drop for a short window; the commitment row is
+    // the platform being left during an active drop — Down is released the instant the body clears
+    // it, which is what stops a single order from punching through the next platform too.
+    private int platformDropCooldown;
+    private int dropCommitmentSourceRow = -1;
+    // After a drop is refused for a real terrain reason (hazard / no landing), platform drops are
+    // suppressed for a short window so the search routes around instead of replanning the exact
+    // same denied fall every frame.
+    private int dropSuppressionTicks;
+    private DropDenialReason lastDropDenial = DropDenialReason.Approved;
+
     private readonly List<OpenedDoor> openedDoors = [];
 
     // A door is remembered only when this navigator successfully opened it. This keeps the
@@ -48,6 +69,13 @@ public sealed class CompanionNavigator
     /// anywhere (see its stuck-teleport policy). Idling clears it.</summary>
     public bool IsTryingToMove { get; private set; }
 
+    /// <summary>True while the navigator is driving a rope climb this tick. The brain must not let
+    /// ordinary combat positioning fight the climb for vertical control (see doc §2.3).</summary>
+    public bool IsClimbing { get; private set; }
+
+    /// <summary>Why the most recent platform-drop request was refused, for diagnostics.</summary>
+    public DropDenialReason LastDropDenial => lastDropDenial;
+
     public void Reset()
     {
         path = null;
@@ -57,6 +85,9 @@ public sealed class CompanionNavigator
         stuckTicks = 0;
         LastPathFailed = false;
         jumpHeldLastTick = false;
+        IsClimbing = false;
+        platformDropCooldown = 0;
+        dropCommitmentSourceRow = -1;
         openedDoors.Clear();
     }
 
@@ -117,15 +148,41 @@ public sealed class CompanionNavigator
         }
     }
 
-    /// <summary>Writes movement controls onto the player to travel toward the goal.</summary>
-    public void Navigate(Player me, Vector2 goalWorld)
+    /// <summary>
+    /// Legacy safe entry point: travel to a world position without ever actively dropping through
+    /// a platform. Every call site that has not opted into a lower layer inherits this, which is
+    /// what removes the erroneous combat/follow platform drops in one stroke.
+    /// </summary>
+    public void Navigate(Player me, Vector2 goalWorld) => Navigate(me, NavigationRequest.Safe(goalWorld));
+
+    /// <summary>Writes movement controls onto the player to travel toward the request's goal,
+    /// honouring its intent and platform-drop permission.</summary>
+    public void Navigate(Player me, in NavigationRequest request)
     {
+        currentRequest = request;
+        IsClimbing = false;
+        if (platformDropCooldown > 0)
+            platformDropCooldown--;
+        if (dropSuppressionTicks > 0)
+            dropSuppressionTicks--;
+        bool dropAllowedNow = request.AllowPlatformDrop && dropSuppressionTicks <= 0;
+
+        // A drop that has landed (feet back on the ground) always ends the commitment and starts
+        // the cooldown, even if the drop waypoint was skipped this tick before the drop handler ran.
+        if (dropCommitmentSourceRow >= 0 && me.velocity.Y == 0f)
+        {
+            dropCommitmentSourceRow = -1;
+            platformDropCooldown = PlatformDropCooldownTicks;
+        }
+
+        Vector2 goalWorld = request.GoalWorld;
         Vector2 toGoal = goalWorld - me.Center;
         if (System.Math.Abs(toGoal.X) > 12f)
             TryOpenDoorAhead(me, System.Math.Sign(toGoal.X));
 
-        // Close targets never need a path.
-        if (System.Math.Abs(toGoal.X) < 48f && System.Math.Abs(toGoal.Y) < 56f)
+        // Close targets never need a path — but a rope climb still does, so a nearly-vertical goal
+        // reached by a rope must not shortcut to DirectSteer.
+        if (System.Math.Abs(toGoal.X) < 48f && System.Math.Abs(toGoal.Y) < 56f && !me.pulley)
         {
             path = null;
             DirectSteer(me, goalWorld);
@@ -144,7 +201,8 @@ public sealed class CompanionNavigator
         if (repathCooldown <= 0 && (path is null || goalMoved || pathExhausted || stuck))
         {
             Point startTile = new((int)(me.Bottom.X / 16f), (int)((me.Bottom.Y - 1f) / 16f));
-            path = CompanionPathfinder.FindPath(startTile, goalTile, MovementCaps.From(me));
+            path = CompanionPathfinder.FindPath(startTile, goalTile, MovementCaps.From(me),
+                dropAllowedNow, request.MaximumSafeDropTiles);
             pathIndex = 0;
             stuckTicks = 0;
             lastGoalTile = goalTile;
@@ -167,6 +225,8 @@ public sealed class CompanionNavigator
         stuckTicks = 0;
         jumpHeldLastTick = false;
         IsTryingToMove = false;
+        IsClimbing = false;
+        dropCommitmentSourceRow = -1;
     }
 
     private void FollowPath(Player me)
@@ -194,6 +254,15 @@ public sealed class CompanionNavigator
             return;
 
         PathStep current = path[pathIndex];
+
+        // Rope steps own vertical (and, before grabbing, horizontal) movement entirely; nothing
+        // else in FollowPath runs while climbing.
+        if (current.IsRopeMove)
+        {
+            ExecuteRopeClimb(me, current);
+            return;
+        }
+
         Vector2 target = current.FeetWorld;
         float dx = target.X - feet.X;
         float dy = target.Y - feet.Y; // positive: waypoint below the feet
@@ -203,17 +272,22 @@ public sealed class CompanionNavigator
         else if (dx < -6f)
             me.controlLeft = true;
 
+        // Leaving a rope onto a platform/ground: stop climbing, walk toward the exit tile. Not
+        // pressing up/down lets vanilla release the pulley as horizontal movement carries the
+        // companion off the rope.
+        if (current.Kind == PathMoveKind.ExitRope)
+        {
+            dropCommitmentSourceRow = -1;
+            ApplyJumpControls(me, dy < -8f);
+            TryOpenDoorForCurrentMovement(me);
+            return;
+        }
+
+        // The ONLY way controlDown is pressed for a fall-through is an explicit, approved
+        // DropThroughPlatform step. The old "waypoint is a bit lower, so hold Down" shortcut is
+        // gone — that shortcut is exactly what knocked companions off battle platforms.
         if (current.Kind == PathMoveKind.DropThroughPlatform)
-        {
-            // Hold down while still above the waypoint, easing off right before landing so
-            // the companion does not immediately fall through the destination platform too.
-            if (dy > 20f)
-                me.controlDown = true;
-        }
-        else if (dy > 40f && StandingOnPlatform(me))
-        {
-            me.controlDown = true;
-        }
+            ExecutePlatformDrop(me, dy);
 
         bool needUp = dy < -8f;
 
@@ -227,6 +301,128 @@ public sealed class CompanionNavigator
 
         ApplyJumpControls(me, needUp);
         TryOpenDoorForCurrentMovement(me);
+    }
+
+    /// <summary>
+    /// Presses Down for an approved platform fall-through, then releases the moment the body has
+    /// cleared the platform it is leaving. Refuses (and re-plans without a drop) when the central
+    /// approval says no — cooldown, a hazardous landing, or having already slipped off the platform.
+    /// </summary>
+    private void ExecutePlatformDrop(Player me, float dy)
+    {
+        // Already committed to a drop: hold Down only until the body top clears the source
+        // platform, then release so vanilla catches the companion on the destination platform.
+        if (dropCommitmentSourceRow >= 0)
+        {
+            bool clearedSource = me.Top.Y > (dropCommitmentSourceRow + 1) * 16f;
+            if (clearedSource || me.velocity.Y == 0f)
+            {
+                dropCommitmentSourceRow = -1;
+                platformDropCooldown = PlatformDropCooldownTicks;
+                return;
+            }
+            if (dy > 20f)
+                me.controlDown = true;
+            return;
+        }
+
+        // Starting a fresh drop: it must pass the central gate every time.
+        if (CompanionPlatformDrop.TryApprove(me, currentRequest, platformDropCooldown, out _, out DropDenialReason reason))
+        {
+            lastDropDenial = DropDenialReason.Approved;
+            dropCommitmentSourceRow = (int)(me.Bottom.Y / 16f);
+            if (dy > 20f)
+                me.controlDown = true;
+            return;
+        }
+
+        // Refused. Do not press Down. For a real terrain refusal (hazard / no landing / blocked
+        // channel), suppress drops briefly and re-plan so the follower routes around instead of
+        // grinding on the same denied fall. Cooldown and "slipped off the platform" just wait.
+        lastDropDenial = reason;
+        if (reason is DropDenialReason.LandingHazard or DropDenialReason.NoLanding or DropDenialReason.ChannelBlocked)
+        {
+            dropSuppressionTicks = 40;
+            path = null;
+            repathCooldown = 0;
+            lastGoalTile = new Point(-1, -1);
+        }
+    }
+
+    /// <summary>
+    /// Drives a rope climb. The companion is a real Player, so the vanilla pulley code does the
+    /// physics — this only aligns to the rope column and presses up/down toward the waypoint, and
+    /// never presses Jump (which would detach). Being knocked off simply stops the climb; it does
+    /// not spam Up in mid-air.
+    /// </summary>
+    private void ExecuteRopeClimb(Player me, PathStep current)
+    {
+        float ropeColumnX = current.X * 16f + 8f;
+        float dxToRope = ropeColumnX - me.Center.X;
+
+        // Which way along the rope: the step kind for a climb, or the waypoint height for an entry.
+        bool goUp = current.Kind switch
+        {
+            PathMoveKind.ClimbRopeUp => true,
+            PathMoveKind.ClimbRopeDown => false,
+            _ => RopeEntryGoesUp(current, me)
+        };
+
+        int bodyTop = (int)(me.Top.Y / 16f);
+        int bodyBottom = (int)(me.Bottom.Y / 16f);
+        bool overlappingRope = CompanionRopeRegistry.ColumnHasRope(current.X, bodyTop - 1, bodyBottom + 1);
+
+        if (me.pulley)
+        {
+            // On the rope: vanilla snaps X, so only press up/down. Horizontal input here would
+            // walk off the rope.
+            IsClimbing = true;
+            if (goUp)
+                me.controlUp = true;
+            else
+                me.controlDown = true;
+            me.controlJump = false;
+        }
+        else if (overlappingRope && System.Math.Abs(dxToRope) < 12f)
+        {
+            // Beside/over the rope but not attached yet: a tiny alignment nudge plus up/down makes
+            // FindPulley grab it (the grab requires up or down to be held).
+            if (dxToRope > 4f)
+                me.controlRight = true;
+            else if (dxToRope < -4f)
+                me.controlLeft = true;
+            if (goUp)
+                me.controlUp = true;
+            else
+                me.controlDown = true;
+            me.controlJump = false;
+            IsClimbing = true;
+        }
+        else
+        {
+            // Not on the rope and not overlapping it: approach horizontally. Do NOT press Up in the
+            // air — there is nothing to grab, and holding Up wedged against terrain is the failure
+            // mode the rope contract calls out.
+            if (dxToRope > 4f)
+                me.controlRight = true;
+            else if (dxToRope < -4f)
+                me.controlLeft = true;
+        }
+    }
+
+    /// <summary>For an EnterRope step, whether to grab and start climbing up or down: follow the
+    /// next rope step's direction if there is one, otherwise the waypoint's height.</summary>
+    private bool RopeEntryGoesUp(PathStep current, Player me)
+    {
+        if (path is not null && pathIndex + 1 < path.Count)
+        {
+            PathStep next = path[pathIndex + 1];
+            if (next.Kind == PathMoveKind.ClimbRopeUp)
+                return true;
+            if (next.Kind == PathMoveKind.ClimbRopeDown)
+                return false;
+        }
+        return current.TileCenterWorld.Y <= me.Center.Y;
     }
 
     private void DirectSteer(Player me, Vector2 goalWorld)
@@ -249,8 +445,12 @@ public sealed class CompanionNavigator
                        System.Math.Abs(me.velocity.X) < 0.35f && stuckTicks > 10;
         bool needUp = toGoal.Y < -48f || blocked;
 
-        if (toGoal.Y > 48f && StandingOnPlatform(me) && System.Math.Abs(toGoal.X) < 160f)
-            me.controlDown = true;
+        // A lower goal no longer implies dropping through the floor. Fall through a platform here
+        // only when the active order permits it AND the central gate approves — otherwise the
+        // companion simply steers toward the goal on its current layer.
+        if (currentRequest.AllowPlatformDrop && dropSuppressionTicks <= 0 &&
+            toGoal.Y > 48f && System.Math.Abs(toGoal.X) < 160f && StandingOnPlatform(me))
+            ExecutePlatformDrop(me, toGoal.Y);
 
         if (!needUp && me.velocity.Y == 0f && toGoal.Y < 32f && (me.controlLeft || me.controlRight) &&
             NoGroundAhead(me, me.controlRight ? 1f : -1f))

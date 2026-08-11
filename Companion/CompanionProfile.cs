@@ -95,6 +95,10 @@ public sealed class CompanionProfile
     /// <summary>Behaviour mode cycled by the command book. Persists with the profile.</summary>
     public CompanionMode Mode = CompanionMode.Attack;
 
+    /// <summary>Persistent source identity. This is intentionally not derived from whether the
+    /// automation brain happens to be running right now.</summary>
+    public CompanionOrigin Origin { get; private set; } = CompanionOrigin.OrdinaryDebug;
+
     /// <summary>Non-null only while this profile is (or once was) the world's automation companion.
     /// See <see cref="AutoCompanionState"/>.</summary>
     public AutoCompanionState AutoState { get; private set; }
@@ -108,6 +112,7 @@ public sealed class CompanionProfile
     /// automation state active and hands it only the two starting tools the design allows.</summary>
     public void BeginAutomation()
     {
+        Origin = CompanionOrigin.Automation;
         AutoState = new AutoCompanionState();
         GiveInitialAutomationTools();
     }
@@ -420,6 +425,7 @@ public sealed class CompanionProfile
             [nameof(ShoeColor)] = SaveColor(ShoeColor),
             [nameof(RogueStealthWait)] = RogueStealthWait,
             [nameof(Mode)] = (int)Mode,
+            [nameof(Origin)] = (int)Origin,
             ["PreferAltUseWeapons"] = new List<string>(preferAltUseWeapons),
             [nameof(Hotbar)] = SaveItems(Hotbar),
             [nameof(Ammo)] = SaveItems(Ammo),
@@ -478,6 +484,20 @@ public sealed class CompanionProfile
         }
         if (tag.ContainsKey(nameof(AutoState)))
             profile.AutoState = AutoCompanionState.Load(tag.GetCompound(nameof(AutoState)));
+        int savedOrigin = tag.ContainsKey(nameof(Origin)) ? tag.GetInt(nameof(Origin)) : -1;
+        if (savedOrigin >= (int)CompanionOrigin.OrdinaryDebug &&
+            savedOrigin <= (int)CompanionOrigin.Automation)
+        {
+            profile.Origin = (CompanionOrigin)savedOrigin;
+        }
+        else
+        {
+            // Migration contract: all old profiles carrying automation history stay Automation;
+            // every other legacy/debug-book profile becomes OrdinaryDebug.
+            profile.Origin = profile.AutoState is null
+                ? CompanionOrigin.OrdinaryDebug
+                : CompanionOrigin.Automation;
+        }
         profile.MigrateReservedSlots();
         return profile;
     }

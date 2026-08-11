@@ -67,8 +67,22 @@ public sealed class DamageTestDummy : ModItem
 
     public override void AddRecipes()
     {
+        // A cheap but deliberate early-game craft: the hay makes it visually read as a rabbit
+        // dummy while the wood/work bench prevents it from being an accidental pocket recipe.
         CreateRecipe()
             .AddIngredient(ItemID.Hay, 10)
+            .AddIngredient(ItemID.Wood, 10)
+            .AddTile(TileID.WorkBenches)
+            .Register();
+
+        // Both conversion recipes are intentionally station-free: turn a captured bunny or an
+        // already-owned vanilla target dummy into this testing variant anywhere.
+        CreateRecipe()
+            .AddIngredient(ItemID.Bunny)
+            .Register();
+
+        CreateRecipe()
+            .AddIngredient(ItemID.TargetDummy)
             .Register();
     }
 }

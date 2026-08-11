@@ -31,6 +31,14 @@ public sealed class CompanionInstance
     /// re-resolving its profile each time.</summary>
     public bool IsAutoIdentity;
 
+    /// <summary>Cached persistent origin used by the optional player-hostility damage pass.</summary>
+    public bool IsOrdinaryDebugIdentity;
+
+    /// <summary>One-hit-per-swing guards for the custom PvP bridge. Single-player is the only
+    /// synthetic-player runtime, so one real-player bit in each direction is sufficient.</summary>
+    public bool HitByRealPlayerThisSwing;
+    public bool HitRealPlayerThisSwing;
+
     /// <summary>Independent maximum life/mana for the automation companion, refreshed each tick in
     /// <see cref="BindProfile"/> from its own crystal/fruit counts. -1 means "not an automation
     /// companion — use the owner-shared maximum instead." The life-persistence machinery reads
@@ -251,6 +259,7 @@ public sealed class CompanionInstance
     {
         Player me = Entity;
         IsAutoIdentity = profile.IsAutoRunning;
+        IsOrdinaryDebugIdentity = profile.Origin == CompanionOrigin.OrdinaryDebug;
         if (IsAutoIdentity)
         {
             AutoMaxLife = profile.AutoState.MaxLife();

@@ -14,7 +14,7 @@ namespace MoreAIPlayer.Companion.Content;
 /// </summary>
 public sealed class CompanionBuilderBook : ModItem
 {
-    public override string Texture => $"Terraria/Images/Item_{ItemID.MagnetSphere}";
+    public override string Texture => "MoreAIPlayer/图片/建造书";
 
     public override void SetDefaults()
     {

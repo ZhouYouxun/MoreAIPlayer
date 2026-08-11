@@ -16,6 +16,7 @@ public sealed class HunterInstance
     public bool WantsUseItem;
     public bool WantsAltUse;
     public int ReviveTicksLeft;
+    public bool DefeatCounted;
     public ulong ItemCheckPreparedFrame = ulong.MaxValue;
     public ulong ItemCheckDetourFrame = ulong.MaxValue;
     public long RecoveredItemChecks;
@@ -68,6 +69,7 @@ public sealed class HunterInstance
 
         WantsUseItem = false;
         WantsAltUse = false;
+        DefeatCounted = false;
         ItemCheckPreparedFrame = ulong.MaxValue;
         ItemCheckDetourFrame = ulong.MaxValue;
         ConsecutiveItemCheckMisses = 0;

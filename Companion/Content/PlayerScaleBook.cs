@@ -10,7 +10,7 @@ namespace MoreAIPlayer.Companion.Content;
 /// <summary>Fifth book: crystal-matrix control for the real player's body scale.</summary>
 public sealed class PlayerScaleBook : ModItem
 {
-    public override string Texture => $"Terraria/Images/Item_{ItemID.CrystalStorm}";
+    public override string Texture => "MoreAIPlayer/图片/倍率书";
 
     public override void SetDefaults()
     {

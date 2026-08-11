@@ -15,6 +15,15 @@ Mods: {
 		}
 
 		Configs: {
+			MoreAIPlayerServerConfig: {
+				DisplayName: Regole di gioco dei compagni fantasma
+
+				OrdinaryCompanionsHostileToPlayers: {
+					Label: "[i:BloodyMachete] I compagni normali possono ferire i giocatori"
+					Tooltip: Disattivato per impostazione predefinita e destinato solo a divertimento e test. Influisce soltanto sui compagni normali evocati dal libro di debug. Restano alleati tra loro e prendono di mira solo PNG ostili. I giocatori possono ferirli e le loro armi o i loro proiettili possono ferire i giocatori al contatto. Cacciatori e compagni automatici presenti o passati sono esclusi.
+				}
+			}
+
 			MoreAIPlayerClientConfig: {
 				DisplayName: Impostazioni client dei compagni fantasma
 
@@ -161,12 +170,13 @@ Mods: {
 				DisplayName: Libro dei cacciatori
 				Tooltip:
 					'''
-					Nota: questo oggetto è ancora in prova e potrebbe avere problemi.
-					Clic sinistro: attiva o disattiva la modalità Caccia. Cacciatori ostili seguiranno le tue tracce.
-					Clic destro: apre le impostazioni Caccia e permette di scegliere da 1 a 3 cacciatori.
-					L'equipaggiamento dei cacciatori scala con il progresso del mondo e la tua difesa. La modalità Caccia attiva il PvP finché è attiva.
-					I cacciatori ti inseguono per 2 minuti, riposano 45 secondi e poi riprendono la caccia.
-					I cacciatori sconfitti tornano dopo 60 secondi con nuovo equipaggiamento.
+					Clic sinistro: avvia o abbandona la Prova dei cacciatori scelta. Prima si radunano in lontananza.
+					Clic destro: scegli da 1 a 3 cacciatori e una regola.
+					· Sopravvivenza: resisti 180 secondi contro cacciatori che tornano dopo la sconfitta.
+					· Eliminazione: sconfiggi il numero richiesto di cacciatori.
+					· Sfondamento: raggiungi un'uscita lontana entro 150 secondi; i cacciatori intercettano il percorso.
+					Disponibile dopo un boss pre-Hardmode fino al Muro di Carne e nel primo Hardmode fino a Plantera.
+					L'equipaggiamento dipende dalla fase del mondo, mai dalla tua difesa. Più cacciatori significa individui più deboli.
 					'''
 			}
 
@@ -344,12 +354,17 @@ Mods: {
 			DiagnosticsRecovery: Controllo oggetti recuperato {0} · posizione {1} · mira {2} · errori consecutivi {3}
 			DiagnosticsOwnership: Proprietà proiettili corretta {0} · perdite di contesto {1}
 			RightClickOpen: "{0} · Clic destro per aprire equipaggiamento e zaino"
-			HunterTrackerTitle: Gioco del Cacciatore · {0}
+			HunterTrackerTitle: Prova dei cacciatori · {0}
 			HunterTrackerPreparing: I cacciatori si radunano in lontananza · {0}s
 			HunterTrackerNearest: Cacciatore più vicino: {0} caselle
 			HunterTrackerResting: Cacciatore più vicino a riposo: {0} caselle
 			HunterTrackerReviving: Cacciatore più vicino in riorganizzazione: {0}s
 			HunterTrackerSearching: Ricerca dei segnali dei cacciatori...
+			HunterTrackerObjectiveSurvival: Obiettivo: sopravvivi · restano {0}s
+			HunterTrackerObjectiveElimination: Obiettivo: sconfiggi i cacciatori · {0}/{1}
+			HunterTrackerObjectiveBreakout: Obiettivo: uscita a {0} caselle · restano {1}s
+			HunterBreakoutMarker: ◆ Uscita · {0} caselle
+			HunterBreakoutMarkerHere: ◆ Uscita
 		}
 
 		CompanionCommand: {
@@ -380,21 +395,18 @@ Mods: {
 			HunterNameBravo: Cacciatore · Bravo
 			HunterNameCharlie: Cacciatore · Charlie
 			HunterNameFallback: Cacciatore #{0}
-			HunterModeEnabled: "[Gioco del Cacciatore] iniziato: {0}. I cacciatori si radunano in lontananza..."
-			HunterModeDisabled: "[Gioco del Cacciatore] terminato. L'allarme è rientrato."
-			HunterRestarting: "[Gioco del Cacciatore] La prossima ondata si raduna in lontananza..."
-			HunterRequiresBoss: Sconfiggi un boss prima dell'Hardmode per sbloccare il Gioco del Cacciatore.
-			HunterUnavailablePostPlantera: Dopo Plantera il Gioco del Cacciatore non è più disponibile.
-			HunterStageEndedHardmode: "[Gioco del Cacciatore] Il Muro di Carne è caduto. Questa partita pre-Hardmode è terminata."
-			HunterStageEndedPlantera: "[Gioco del Cacciatore] Plantera è caduta. Questa partita è terminata."
+			HunterRequiresBoss: Sconfiggi un boss pre-Hardmode per sbloccare le Prove dei cacciatori.
+			HunterUnavailablePostPlantera: Le Prove dei cacciatori non sono più disponibili dopo Plantera.
+			HunterStageEndedHardmode: "[Prova dei cacciatori] Il Muro di Carne è caduto. Questa prova pre-Hardmode è terminata."
+			HunterStageEndedPlantera: "[Prova dei cacciatori] Plantera è caduta. Questa prova è terminata."
 			HunterStagePreHardmode: Caccia pre-Hardmode
 			HunterStageEarlyHardmode: Caccia Hardmode iniziale
 			HunterStageUnavailable: Nessuna fase disponibile
 			HunterStageStatus: Fase di gioco: {0}
 			HunterSpawned: "[Avviso] Il giocatore ostile {0} si è infiltrato nel tuo mondo!"
-			HunterDefeated: "[Annuncio] Il giocatore ostile {0} è stato sconfitto! Tornerà tra 60 secondi con nuovo equipaggiamento..."
+			HunterDefeated: "[Annuncio] Il giocatore ostile {0} è stato sconfitto! Si riorganizza tra {1} secondi..."
 			HunterRespawned: "[Avviso] Il giocatore ostile {0} è tornato e riprende l'inseguimento!"
-			HunterSingleplayerOnly: La modalità Caccia al momento è disponibile solo in giocatore singolo.
+			HunterSingleplayerOnly: Le Prove dei cacciatori al momento sono disponibili solo in giocatore singolo.
 			ScaleSingleplayerOnly: La matrice delle dimensioni è disponibile solo in giocatore singolo.
 			ScaleNoSpace: Qui non c'è spazio sufficiente per la dimensione scelta.
 			ScalePanelTitle: ◆ Matrice delle dimensioni di cristallo
@@ -404,19 +416,39 @@ Mods: {
 			Disabled: Disattiva
 			HunterResting: "[Allerta Caccia] {0} si ritira per riposare e raccogliere rifornimenti!"
 			HunterHunting: "[Allerta Caccia] {0} ha ritrovato le tue tracce e riprende la caccia!"
-			HunterPanelTitle: ⚔ Impostazioni modalità Caccia
+			HunterPanelTitle: ⚔ Impostazioni Prova dei cacciatori
 			Close: Chiudi
-			HunterPanelEnabled: "[Stato modalità] Attiva (clicca per disattivare)"
-			HunterPanelDisabled: "[Stato modalità] Disattiva (clicca per attivare)"
+			HunterPanelEnabled: "[Prova attiva] Clic per abbandonare"
+			HunterPanelDisabled: "[Prova inattiva] Clic per iniziare"
 			HunterCountTitle: Numero di cacciatori:
 			HunterCount: "{0} cacciatore/i"
 			HunterStatusTitle: Stato dei cacciatori:
-			HunterInactive: · La modalità Caccia non è attiva
+			HunterInactive: · La Prova dei cacciatori non è iniziata
 			HunterPanelReviving: · {0}: resurrezione ({1}s rimanenti)
 			HunterPanelResting: · {0}: riposa e raccoglie rifornimenti
 			HunterPanelHunting: · {0}: ti sta raggiungendo per ucciderti!
-			HunterRefresh: 🔄 Ricrea e schiera la squadra di cacciatori
-			HunterRefreshed: Squadra di cacciatori ricreata e schierata!
+			HunterRefresh: 🔄 Riavvia la prova attuale
+			HunterTrialSurvival: Sopravvivenza
+			HunterTrialElimination: Eliminazione
+			HunterTrialBreakout: Sfondamento
+			HunterTrialTypeTitle: Scegli una regola:
+			HunterTrialSurvivalDescription: Resisti {0} secondi; i cacciatori sconfitti tornano.
+			HunterTrialEliminationDescription: Sconfiggi {0} cacciatori; la tua morte fallisce la prova.
+			HunterTrialBreakoutDescription: Raggiungi l'uscita in {0} secondi; i cacciatori intercettano.
+			HunterObjectiveStatusTitle: Obiettivo attuale:
+			HunterObjectiveNotStarted: Scegli una regola e inizia la prova
+			HunterTrialStartSurvival: "[Sopravvivenza] Resisti {0} secondi. Fase del mondo: {1}."
+			HunterTrialStartElimination: "[Eliminazione] Sconfiggi {0} cacciatori. Fase del mondo: {1}."
+			HunterTrialStartBreakout: "[Sfondamento] Raggiungi l'uscita in {0} secondi. Fase del mondo: {1}."
+			HunterTrialAbandoned: "[Prova dei cacciatori] Prova abbandonata. L'allarme è finito."
+			HunterCannotStartDead: Non puoi iniziare una Prova dei cacciatori senza poter agire.
+			HunterTrialRestarting: "[Prova dei cacciatori] Riavvio di {0}. I cacciatori si riorganizzano..."
+			HunterTrialFailedDeath: "[Prova fallita] Sei stato sconfitto."
+			HunterTrialFailedTimeout: "[Prova fallita] Tempo scaduto prima dell'uscita."
+			HunterTrialVictorySurvival: "[Prova completata] Hai resistito {0} secondi e sconfitto {1} cacciatori."
+			HunterTrialVictoryElimination: "[Prova completata] Hai sconfitto {0} cacciatori in {1} secondi."
+			HunterTrialVictoryBreakout: "[Prova completata] Uscita raggiunta in {0} secondi; {1} cacciatori sconfitti."
+			HunterDefeatedProgress: "[Eliminazione] {0} sconfitto: {1}/{2}. Ritorna tra {3} secondi."
 			BuilderModeSmartBuild: Smart Build
 			BuilderModeDefensiveBuild: Defensive Build
 			BuilderModeBattlePlatform: Battle Platform

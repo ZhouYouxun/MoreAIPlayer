@@ -8,7 +8,7 @@ using Terraria.ModLoader;
 
 namespace MoreAIPlayer.Companion.Hunter;
 
-/// <summary>Owns the bounded Hunter Game lifecycle and its virtual-player hunters.</summary>
+/// <summary>Owns the bounded Hunter Trial lifecycle and its virtual-player hunters.</summary>
 public sealed class HunterSystem : ModSystem
 {
     private const int InitialApproachDelayTicks = 210;
@@ -17,6 +17,12 @@ public sealed class HunterSystem : ModSystem
     private const float MaximumRemoteSpawnDistance = 3000f;
     private const float MinimumRecoverySpawnDistance = 720f;
     private const float MaximumRecoverySpawnDistance = 1040f;
+    private const float MinimumBreakoutDistance = 2000f;
+    private const float MaximumBreakoutDistance = 2800f;
+    private const float BreakoutArrivalRadius = 88f;
+
+    public const int SurvivalDurationTicks = 10800;
+    public const int BreakoutDurationTicks = 9000;
 
     public const float CatchUpTeleportDistance = 5600f;
 
@@ -26,12 +32,27 @@ public sealed class HunterSystem : ModSystem
     private static int pendingSpawnCount;
     private static int nextSpawnIndex;
     private static int nextSpawnDelay;
+    private static int objectiveTicksLeft;
+    private static int objectiveTicksElapsed;
+    private static int defeatedHunters;
+    private static int eliminationTarget;
+    private static Vector2 breakoutDestination;
+    private static bool hasBreakoutDestination;
 
     public static bool HunterModeActive { get; private set; }
     public static int TargetHunterCount { get; private set; } = 1;
+    public static HunterTrialType SelectedTrial { get; private set; } = HunterTrialType.Survival;
+    public static HunterTrialType ActiveTrial { get; private set; }
     public static HunterGameStage ActiveStage { get; private set; }
     public static bool IsPreparing => HunterModeActive && pendingSpawnCount > 0;
     public static int PreparationSeconds => IsPreparing ? (int)System.Math.Ceiling(nextSpawnDelay / 60f) : 0;
+    public static int ObjectiveSecondsRemaining => System.Math.Max(0, (int)System.Math.Ceiling(objectiveTicksLeft / 60f));
+    public static int ObjectiveSecondsElapsed => System.Math.Max(0, objectiveTicksElapsed / 60);
+    public static int DefeatedHunters => defeatedHunters;
+    public static int EliminationTarget => HunterModeActive && eliminationTarget > 0
+        ? eliminationTarget
+        : CalculateEliminationTarget(TargetHunterCount);
+    public static bool HuntersMayRest => ActiveTrial != HunterTrialType.Breakout;
 
     public static IEnumerable<HunterInstance> All => BySlot.Values;
 
@@ -59,7 +80,7 @@ public sealed class HunterSystem : ModSystem
 
         if (HunterModeActive)
         {
-            EndGame("HunterModeDisabled", new Color(120, 255, 120));
+            EndGame("HunterTrialAbandoned", new Color(180, 210, 180));
             return;
         }
 
@@ -69,11 +90,19 @@ public sealed class HunterSystem : ModSystem
             return;
         }
 
+        Player localPlayer = Main.LocalPlayer;
+        if (localPlayer is null || !localPlayer.active || localPlayer.dead || localPlayer.statLife <= 0)
+        {
+            Main.NewText(Text("HunterCannotStartDead"), 255, 170, 110);
+            return;
+        }
+
         HunterModeActive = true;
         ActiveStage = stage;
         RememberHostileState();
+        InitializeTrial(localPlayer);
         QueueNewHunt();
-        Main.NewText(Text("HunterModeEnabled", Text(StageKey(stage))), 255, 80, 80);
+        AnnounceTrialStart(stage);
     }
 
     public static void SetHunterCount(int count)
@@ -84,7 +113,27 @@ public sealed class HunterSystem : ModSystem
             return;
         }
 
-        TargetHunterCount = System.Math.Clamp(count, 1, 3);
+        int clamped = System.Math.Clamp(count, 1, 3);
+        if (TargetHunterCount == clamped)
+            return;
+
+        TargetHunterCount = clamped;
+        if (HunterModeActive)
+            RestartHunt();
+    }
+
+    public static void SetTrialType(HunterTrialType trial)
+    {
+        if (Main.netMode != NetmodeID.SinglePlayer)
+        {
+            ResetModeAndClear();
+            return;
+        }
+
+        if (trial is HunterTrialType.None || SelectedTrial == trial)
+            return;
+
+        SelectedTrial = trial;
         if (HunterModeActive)
             RestartHunt();
     }
@@ -100,8 +149,35 @@ public sealed class HunterSystem : ModSystem
         }
 
         ClearHunters(restoreHostileState: false);
+        InitializeTrial(Main.LocalPlayer);
         QueueNewHunt();
-        Main.NewText(Text("HunterRestarting"), 255, 200, 100);
+        Main.NewText(Text("HunterTrialRestarting", Text(TrialKey(ActiveTrial))), 255, 200, 100);
+    }
+
+    public static bool TryGetBreakoutDestination(out Vector2 destination)
+    {
+        destination = breakoutDestination;
+        return HunterModeActive && ActiveTrial == HunterTrialType.Breakout && hasBreakoutDestination;
+    }
+
+    /// <summary>Breakout hunters do not merely tail the player. They run ahead along the route
+    /// and spread across it, turning the destination into an actual interception problem.</summary>
+    public static Vector2 GetPursuitAnchor(HunterInstance hunter, Player target)
+    {
+        if (target is null || hunter is null || !TryGetBreakoutDestination(out Vector2 destination))
+            return target?.Center ?? Vector2.Zero;
+
+        Vector2 route = destination - target.Center;
+        float routeLength = route.Length();
+        if (routeLength < 160f)
+            return target.Center;
+
+        Vector2 forward = route / routeLength;
+        Vector2 perpendicular = new(-forward.Y, forward.X);
+        float lead = MathHelper.Clamp(routeLength * 0.28f, 180f, 520f);
+        float centerIndex = (TargetHunterCount - 1) * 0.5f;
+        float laneOffset = (hunter.HuntIndex - centerIndex) * 150f;
+        return target.Center + forward * lead + perpendicular * laneOffset;
     }
 
     public static bool TryGetNearestHunter(Player target, out HunterInstance nearest, out float distance)
@@ -332,6 +408,105 @@ public sealed class HunterSystem : ModSystem
         nextSpawnDelay = InitialApproachDelayTicks;
     }
 
+    private static void InitializeTrial(Player localPlayer)
+    {
+        ActiveTrial = SelectedTrial;
+        objectiveTicksElapsed = 0;
+        defeatedHunters = 0;
+        eliminationTarget = CalculateEliminationTarget(TargetHunterCount);
+        objectiveTicksLeft = ActiveTrial switch
+        {
+            HunterTrialType.Survival => SurvivalDurationTicks,
+            HunterTrialType.Breakout => BreakoutDurationTicks,
+            _ => 0
+        };
+
+        hasBreakoutDestination = ActiveTrial == HunterTrialType.Breakout && localPlayer is not null;
+        breakoutDestination = hasBreakoutDestination
+            ? FindSafeSpawnPosition(localPlayer, null, MinimumBreakoutDistance, MaximumBreakoutDistance)
+            : Vector2.Zero;
+    }
+
+    private static int CalculateEliminationTarget(int hunterCount) =>
+        3 + (System.Math.Clamp(hunterCount, 1, 3) - 1) * 2;
+
+    private static void AnnounceTrialStart(HunterGameStage stage)
+    {
+        string stageName = Text(StageKey(stage));
+        string message = ActiveTrial switch
+        {
+            HunterTrialType.Elimination => Text("HunterTrialStartElimination", eliminationTarget, stageName),
+            HunterTrialType.Breakout => Text("HunterTrialStartBreakout", BreakoutDurationTicks / 60, stageName),
+            _ => Text("HunterTrialStartSurvival", SurvivalDurationTicks / 60, stageName)
+        };
+        Main.NewText(message, 255, 80, 80);
+    }
+
+    /// <summary>Returns true when the current trial resolved and callers must stop touching the
+    /// hunter collection for this tick.</summary>
+    private static bool UpdateTrialObjective(Player localPlayer)
+    {
+        // The clock begins only after the whole squad has entered. The distant assembly warning
+        // remains setup time, not hidden time taken away from the stated objective.
+        if (pendingSpawnCount > 0 || BySlot.Count == 0)
+            return false;
+
+        objectiveTicksElapsed++;
+        switch (ActiveTrial)
+        {
+            case HunterTrialType.Survival:
+                objectiveTicksLeft--;
+                if (objectiveTicksLeft <= 0)
+                {
+                    CompleteTrial();
+                    return true;
+                }
+                break;
+
+            case HunterTrialType.Elimination:
+                if (defeatedHunters >= eliminationTarget)
+                {
+                    CompleteTrial();
+                    return true;
+                }
+                break;
+
+            case HunterTrialType.Breakout:
+                objectiveTicksLeft--;
+                if (hasBreakoutDestination &&
+                    Vector2.DistanceSquared(localPlayer.Center, breakoutDestination) <= BreakoutArrivalRadius * BreakoutArrivalRadius)
+                {
+                    CompleteTrial();
+                    return true;
+                }
+                if (objectiveTicksLeft <= 0)
+                {
+                    EndGame("HunterTrialFailedTimeout", new Color(255, 120, 100));
+                    return true;
+                }
+                break;
+        }
+
+        return false;
+    }
+
+    private static void CompleteTrial()
+    {
+        int elapsedSeconds = System.Math.Max(1, (int)System.Math.Ceiling(objectiveTicksElapsed / 60f));
+        switch (ActiveTrial)
+        {
+            case HunterTrialType.Elimination:
+                EndGame("HunterTrialVictoryElimination", new Color(120, 255, 150), defeatedHunters, elapsedSeconds);
+                break;
+            case HunterTrialType.Breakout:
+                EndGame("HunterTrialVictoryBreakout", new Color(120, 255, 150), elapsedSeconds, defeatedHunters);
+                break;
+            default:
+                EndGame("HunterTrialVictorySurvival", new Color(120, 255, 150), SurvivalDurationTicks / 60, defeatedHunters);
+                break;
+        }
+    }
+
     private static void UpdateScheduledSpawns(Player localPlayer)
     {
         if (pendingSpawnCount <= 0)
@@ -394,24 +569,41 @@ public sealed class HunterSystem : ModSystem
         return false;
     }
 
-    private static string StageKey(HunterGameStage stage) => stage switch
+    public static bool TryGetCurrentEligibleStage(out HunterGameStage stage) =>
+        TryGetEligibleStage(out stage, out _);
+
+    public static string StageKey(HunterGameStage stage) => stage switch
     {
         HunterGameStage.PreHardmode => "HunterStagePreHardmode",
         HunterGameStage.EarlyHardmode => "HunterStageEarlyHardmode",
         _ => "HunterStageUnavailable"
     };
 
+    public static string TrialKey(HunterTrialType trial) => trial switch
+    {
+        HunterTrialType.Elimination => "HunterTrialElimination",
+        HunterTrialType.Breakout => "HunterTrialBreakout",
+        _ => "HunterTrialSurvival"
+    };
+
     private static string Text(string key, params object[] args) =>
         Language.GetTextValue($"Mods.MoreAIPlayer.CompanionCommand.{key}", args);
 
-    private static void EndGame(string messageKey, Color color)
+    private static void EndGame(string messageKey, Color color, params object[] args)
     {
         HunterModeActive = false;
         pendingSpawnCount = 0;
         nextSpawnDelay = 0;
         ActiveStage = HunterGameStage.None;
+        ActiveTrial = HunterTrialType.None;
+        objectiveTicksLeft = 0;
+        objectiveTicksElapsed = 0;
+        eliminationTarget = 0;
+        hasBreakoutDestination = false;
+        breakoutDestination = Vector2.Zero;
         ClearAllHunters();
-        Main.NewText(Text(messageKey), color);
+        Main.NewText(Text(messageKey, args), color);
+        defeatedHunters = 0;
     }
 
     private static void ResetModeAndClear()
@@ -420,6 +612,13 @@ public sealed class HunterSystem : ModSystem
         pendingSpawnCount = 0;
         nextSpawnDelay = 0;
         ActiveStage = HunterGameStage.None;
+        ActiveTrial = HunterTrialType.None;
+        objectiveTicksLeft = 0;
+        objectiveTicksElapsed = 0;
+        defeatedHunters = 0;
+        eliminationTarget = 0;
+        hasBreakoutDestination = false;
+        breakoutDestination = Vector2.Zero;
         ClearAllHunters();
     }
 
@@ -455,7 +654,7 @@ public sealed class HunterSystem : ModSystem
         }
 
         Player localPlayer = Main.LocalPlayer;
-        if (localPlayer is null || !localPlayer.active || localPlayer.dead)
+        if (localPlayer is null || !localPlayer.active)
         {
             foreach (HunterInstance hunter in BySlot.Values)
             {
@@ -467,12 +666,21 @@ public sealed class HunterSystem : ModSystem
             return;
         }
 
+        if (localPlayer.dead || localPlayer.statLife <= 0)
+        {
+            EndGame("HunterTrialFailedDeath", new Color(255, 120, 100));
+            return;
+        }
+
         RememberHostileState();
         localPlayer.hostile = true;
         UpdateScheduledSpawns(localPlayer);
+        if (UpdateTrialObjective(localPlayer))
+            return;
 
         List<int> conflictedSlots = null;
         List<int> faultedSlots = null;
+        bool eliminationCompleted = false;
         foreach ((int slot, HunterInstance instance) in BySlot)
         {
             Player me = instance.Entity;
@@ -493,8 +701,28 @@ public sealed class HunterSystem : ModSystem
             {
                 if (instance.ReviveTicksLeft <= 0)
                 {
-                    instance.ReviveTicksLeft = 3600;
-                    Main.NewText(Text("HunterDefeated", me.name), 255, 240, 100);
+                    if (!instance.DefeatCounted)
+                    {
+                        instance.DefeatCounted = true;
+                        defeatedHunters++;
+                    }
+
+                    if (ActiveTrial == HunterTrialType.Elimination && defeatedHunters >= eliminationTarget)
+                    {
+                        eliminationCompleted = true;
+                        continue;
+                    }
+
+                    instance.ReviveTicksLeft = ActiveTrial == HunterTrialType.Elimination ? 900 : 1800;
+                    if (ActiveTrial == HunterTrialType.Elimination)
+                    {
+                        Main.NewText(Text("HunterDefeatedProgress", me.name, defeatedHunters,
+                            eliminationTarget, instance.ReviveTicksLeft / 60), 255, 240, 100);
+                    }
+                    else
+                    {
+                        Main.NewText(Text("HunterDefeated", me.name, instance.ReviveTicksLeft / 60), 255, 240, 100);
+                    }
                 }
 
                 instance.ReviveTicksLeft--;
@@ -535,6 +763,12 @@ public sealed class HunterSystem : ModSystem
             instance.FaultStreak++;
             if (instance.FaultStreak >= HunterInstance.MaxFaultStreak)
                 (faultedSlots ??= []).Add(slot);
+        }
+
+        if (eliminationCompleted)
+        {
+            CompleteTrial();
+            return;
         }
 
         if (conflictedSlots is not null)

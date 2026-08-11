@@ -15,6 +15,15 @@ Mods: {
 		}
 
 		Configs: {
+			MoreAIPlayerServerConfig: {
+				DisplayName: Zasady rozgrywki Widmowych Towarzyszy
+
+				OrdinaryCompanionsHostileToPlayers: {
+					Label: "[i:BloodyMachete] Zwykli towarzysze mogą ranić graczy"
+					Tooltip: Domyślnie wyłączone i przeznaczone wyłącznie do zabawy oraz testów. Dotyczy tylko zwykłych towarzyszy przywołanych książką debugowania. Nadal są sojusznikami i celują wyłącznie we wrogich NPC. Gracze mogą ich ranić, a ich broń lub pociski mogą zranić graczy przy kontakcie. Łowcy oraz obecni i dawni automatyczni towarzysze są wykluczeni.
+				}
+			}
+
 			MoreAIPlayerClientConfig: {
 				DisplayName: Ustawienia klienta Widmowych Towarzyszy
 
@@ -161,12 +170,13 @@ Mods: {
 				DisplayName: Księga łowców
 				Tooltip:
 					'''
-					Uwaga: ten przedmiot jest nadal testowany i może zawierać problemy.
-					Lewy przycisk myszy: włącza lub wyłącza tryb Polowania. Wrodzy łowcy zaczną tropić cię po śladach.
-					Prawy przycisk myszy: otwiera ustawienia Polowania i pozwala wybrać od 1 do 3 łowców.
-					Wyposażenie łowców skaluje się z postępem świata i twoją obroną. Tryb Polowania włącza PvP, gdy jest aktywny.
-					Łowcy ścigają cię przez 2 minuty, odpoczywają 45 sekund, a potem wznawiają pościg.
-					Pokonani łowcy wracają po 60 sekundach z nowym wyposażeniem.
+					Lewy przycisk: rozpocznij lub porzuć wybraną Próbę łowców. Najpierw zbierają się w oddali.
+					Prawy przycisk: wybierz od 1 do 3 łowców oraz regułę próby.
+					· Przetrwanie: wytrzymaj 180 sekund przeciw powracającym łowcom.
+					· Eliminacja: pokonaj wymaganą liczbę łowców.
+					· Przebicie: dotrzyj do odległego wyjścia w 150 sekund; łowcy przechwytują trasę.
+					Dostępne po bossie przed Hardmode aż do Ściany Ciała oraz we wczesnym Hardmode do Plantery.
+					Wyposażenie zależy od etapu świata, nie od twojej obrony. Więcej łowców oznacza słabsze jednostki.
 					'''
 			}
 
@@ -344,12 +354,17 @@ Mods: {
 			DiagnosticsRecovery: Kontrola przedmiotów odzyskana {0} · miejsce {1} · cel {2} · kolejne braki {3}
 			DiagnosticsOwnership: Naprawy właściciela pocisku {0} · wycieki kontekstu {1}
 			RightClickOpen: "{0} · Prawy klik otwiera wyposażenie i plecak"
-			HunterTrackerTitle: Gra łowcy · {0}
+			HunterTrackerTitle: Próba łowców · {0}
 			HunterTrackerPreparing: Łowcy zbierają się w oddali · {0}s
 			HunterTrackerNearest: Najbliższy łowca: {0} pól
 			HunterTrackerResting: Najbliższy łowca odpoczywa: {0} pól
 			HunterTrackerReviving: Najbliższy łowca przegrupowuje się: {0}s
 			HunterTrackerSearching: Szukanie sygnałów łowców...
+			HunterTrackerObjectiveSurvival: Cel: przetrwaj · pozostało {0}s
+			HunterTrackerObjectiveElimination: Cel: pokonaj łowców · {0}/{1}
+			HunterTrackerObjectiveBreakout: Cel: wyjście za {0} pól · pozostało {1}s
+			HunterBreakoutMarker: ◆ Wyjście · {0} pól
+			HunterBreakoutMarkerHere: ◆ Wyjście
 		}
 
 		CompanionCommand: {
@@ -380,21 +395,18 @@ Mods: {
 			HunterNameBravo: Łowca · Bravo
 			HunterNameCharlie: Łowca · Charlie
 			HunterNameFallback: Łowca #{0}
-			HunterModeEnabled: "[Gra łowcy] rozpoczęta: {0}. Łowcy zbierają się w oddali..."
-			HunterModeDisabled: "[Gra łowcy] zakończona. Alarm odwołany."
-			HunterRestarting: "[Gra łowcy] Następna fala zbiera się w oddali..."
-			HunterRequiresBoss: Pokonaj dowolnego bossa przed Hardmode, aby odblokować Grę łowcy.
-			HunterUnavailablePostPlantera: Gra łowcy nie jest dostępna po Planterze.
-			HunterStageEndedHardmode: "[Gra łowcy] Ściana Ciała upadła. Ta rozgrywka przed Hardmode dobiegła końca."
-			HunterStageEndedPlantera: "[Gra łowcy] Plantera upadła. Ta rozgrywka dobiegła końca."
+			HunterRequiresBoss: Pokonaj dowolnego bossa przed Hardmode, aby odblokować Próby łowców.
+			HunterUnavailablePostPlantera: Próby łowców nie są dostępne po Planterze.
+			HunterStageEndedHardmode: "[Próba łowców] Ściana Ciała upadła. Ta próba przed Hardmode dobiegła końca."
+			HunterStageEndedPlantera: "[Próba łowców] Plantera upadła. Ta próba dobiegła końca."
 			HunterStagePreHardmode: Polowanie przed Hardmode
 			HunterStageEarlyHardmode: Wczesne polowanie Hardmode
 			HunterStageUnavailable: Brak dostępnej fazy
 			HunterStageStatus: Faza gry: {0}
 			HunterSpawned: "[Ostrzeżenie] Wrogi gracz {0} zakradł się do twojego świata!"
-			HunterDefeated: "[Komunikat] Wrogi gracz {0} został pokonany! Wróci za 60 sekund z nowym wyposażeniem..."
+			HunterDefeated: "[Komunikat] Wrogi gracz {0} został pokonany! Przegrupuje się za {1} sekund..."
 			HunterRespawned: "[Ostrzeżenie] Wrogi gracz {0} wrócił i wznawia pościg!"
-			HunterSingleplayerOnly: Tryb Polowania jest na razie dostępny tylko w trybie jednoosobowym.
+			HunterSingleplayerOnly: Próby łowców są na razie dostępne tylko w trybie jednoosobowym.
 			ScaleSingleplayerOnly: Matryca rozmiaru jest dostępna tylko w trybie jednoosobowym.
 			ScaleNoSpace: Brakuje tu miejsca na wybrany rozmiar.
 			ScalePanelTitle: ◆ Kryształowa matryca rozmiaru
@@ -404,19 +416,39 @@ Mods: {
 			Disabled: Wył.
 			HunterResting: "[Alarm łowcy] {0} wycofuje się, by odpocząć i zebrać zapasy!"
 			HunterHunting: "[Alarm łowcy] {0} znów odnalazł twój ślad i wznawia polowanie!"
-			HunterPanelTitle: ⚔ Ustawienia trybu Polowania
+			HunterPanelTitle: ⚔ Ustawienia Próby łowców
 			Close: Zamknij
-			HunterPanelEnabled: "[Stan trybu] Włączony (kliknij, aby wyłączyć)"
-			HunterPanelDisabled: "[Stan trybu] Wyłączony (kliknij, aby włączyć)"
+			HunterPanelEnabled: "[Próba trwa] Kliknij, aby porzucić"
+			HunterPanelDisabled: "[Próba nieaktywna] Kliknij, aby zacząć"
 			HunterCountTitle: Liczba łowców:
 			HunterCount: "{0} łowca/ów"
 			HunterStatusTitle: Status łowców:
-			HunterInactive: · Tryb Polowania jest nieaktywny
+			HunterInactive: · Próba łowców jeszcze się nie rozpoczęła
 			HunterPanelReviving: · {0}: odradza się (pozostało {1}s)
 			HunterPanelResting: · {0}: odpoczywa i zbiera zapasy
 			HunterPanelHunting: · {0}: zbliża się, by cię zabić!
-			HunterRefresh: 🔄 Odtwórz i rozmieść oddział łowców
-			HunterRefreshed: Oddział łowców został odtworzony i rozmieszczony!
+			HunterRefresh: 🔄 Rozpocznij próbę od nowa
+			HunterTrialSurvival: Przetrwanie
+			HunterTrialElimination: Eliminacja
+			HunterTrialBreakout: Przebicie
+			HunterTrialTypeTitle: Wybierz regułę próby:
+			HunterTrialSurvivalDescription: Wytrzymaj {0} sekund; pokonani łowcy wracają.
+			HunterTrialEliminationDescription: Pokonaj {0} łowców; twoja śmierć kończy próbę.
+			HunterTrialBreakoutDescription: Dotrzyj do wyjścia w {0} sekund; łowcy przechwytują trasę.
+			HunterObjectiveStatusTitle: Bieżący cel:
+			HunterObjectiveNotStarted: Wybierz regułę i rozpocznij próbę
+			HunterTrialStartSurvival: "[Przetrwanie] Wytrzymaj {0} sekund. Etap świata: {1}."
+			HunterTrialStartElimination: "[Eliminacja] Pokonaj {0} łowców. Etap świata: {1}."
+			HunterTrialStartBreakout: "[Przebicie] Dotrzyj do wyjścia w {0} sekund. Etap świata: {1}."
+			HunterTrialAbandoned: "[Próba łowców] Próba porzucona. Alarm odwołany."
+			HunterCannotStartDead: Nie możesz rozpocząć Próby łowców bez możliwości działania.
+			HunterTrialRestarting: "[Próba łowców] Ponowny start {0}. Łowcy się przegrupowują..."
+			HunterTrialFailedDeath: "[Próba nieudana] Zostałeś pokonany."
+			HunterTrialFailedTimeout: "[Próba nieudana] Czas minął przed dotarciem do wyjścia."
+			HunterTrialVictorySurvival: "[Próba ukończona] Przetrwano {0} sekund i pokonano {1} łowców."
+			HunterTrialVictoryElimination: "[Próba ukończona] Pokonano {0} łowców w {1} sekund."
+			HunterTrialVictoryBreakout: "[Próba ukończona] Przebicie w {0} sekund; pokonano {1} łowców."
+			HunterDefeatedProgress: "[Eliminacja] {0} pokonany: {1}/{2}. Powrót za {3} sekund."
 			BuilderModeSmartBuild: Smart Build
 			BuilderModeDefensiveBuild: Defensive Build
 			BuilderModeBattlePlatform: Battle Platform

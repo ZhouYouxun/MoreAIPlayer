@@ -26,12 +26,22 @@ public sealed class AutoCompanionBrain
     private readonly CompanionNavigator navigator = new();
     private readonly AutoActuator actuator = new();
     private readonly AutoCapabilities capabilities = new();
+    private readonly AutoTaskRuntime taskRuntime = new();
+    private readonly AutoWatchdog watchdog;
     private AutoContext context;
+    private bool runtimeInitialized;
 
     // Simple surface wander used when the local area holds no more of what the current goal needs.
     private int wanderDir = 1;
     private int wanderStuckTicks;
     private float lastWanderX;
+
+    public AutoCompanionBrain()
+    {
+        watchdog = new AutoWatchdog(taskRuntime);
+    }
+
+    public AutoTaskRuntime TaskRuntime => taskRuntime;
 
     public void Update(CompanionInstance instance, Player owner, CompanionProfile profile)
     {
@@ -68,12 +78,37 @@ public sealed class AutoCompanionBrain
         AutoContext ctx = BuildContext(instance, owner, profile);
         capabilities.Refresh(me, profile);
 
-        AutoPlan plan = AutoProgressionPlanner.Plan(ctx);
-        AutoTaskResult result = ExecutePlan(ctx, plan);
+        if (!runtimeInitialized)
+        {
+            taskRuntime.BossFailureCount = profile.AutoState.BossFailureCount;
+            runtimeInitialized = true;
+        }
 
-        // No local target for the chosen goal: roam the surface so more resources come into range.
-        if (result == AutoTaskResult.AlternativeRequired)
-            Wander(ctx);
+        AutoPlan plan = AutoProgressionPlanner.Plan(ctx);
+        taskRuntime.CurrentStep = plan.Goal;
+        if (watchdog.OnBackoff(plan))
+        {
+            navigator.Idle(me);
+            profile.AutoState.BossFailureCount = taskRuntime.BossFailureCount;
+            return;
+        }
+
+        AutoTaskResult result = ExecutePlan(ctx, plan);
+        if (instance.WorkTile is Point targetTile)
+            taskRuntime.LastTargetTile = targetTile;
+        AutoWatchdogAction action = watchdog.Observe(ctx, plan, result);
+        profile.AutoState.BossFailureCount = taskRuntime.BossFailureCount;
+
+        switch (action)
+        {
+            case AutoWatchdogAction.Recover:
+                Wander(ctx);
+                break;
+            case AutoWatchdogAction.Wait:
+            case AutoWatchdogAction.Blocked:
+                navigator.Idle(me);
+                break;
+        }
     }
 
     private AutoContext BuildContext(CompanionInstance instance, Player owner, CompanionProfile profile)
@@ -112,6 +147,8 @@ public sealed class AutoCompanionBrain
                     ? AutoTaskResult.Running : AutoTaskResult.RetryLater;
             case AutoGoalId.BuildShelter:
                 return AutoShelterController.Build(ctx);
+            case AutoGoalId.DepositSurplus:
+                return AutoStorageController.DepositSurplus(ctx);
             case AutoGoalId.Idle:
             default:
                 navigator.Idle(ctx.Me);

@@ -12,7 +12,7 @@ namespace MoreAIPlayer.Companion.Content;
 /// </summary>
 public sealed class CompanionDevelopmentBook : ModItem
 {
-    public override string Texture => $"Terraria/Images/Item_{ItemID.GoldenShower}";
+    public override string Texture => $"Terraria/Images/Item_{ItemID.WaterBolt}";
 
     public override void SetDefaults()
     {

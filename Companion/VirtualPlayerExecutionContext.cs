@@ -17,7 +17,12 @@ internal static class VirtualPlayerExecutionContext
 
         internal Scope(Player player, Vector2 aimWorld, bool wantsUseItem, bool wantsAltUse, Point? workTile)
         {
-            active = player is not null && player.whoAmI >= 0 && player.whoAmI < Main.maxPlayers;
+            // The Main.myPlayer swap below is only ever legitimate for a synthetic companion/hunter,
+            // which exist in singleplayer alone. Gating it on the runtime policy means that even if a
+            // future caller forgets to check, a multiplayer client can never have its local-player
+            // identity or virtual mouse hijacked.
+            active = player is not null && player.whoAmI >= 0 && player.whoAmI < Main.maxPlayers &&
+                CompanionRuntimePolicy.CanRunSyntheticPlayers;
             saved = active ? SavedState.Capture() : default;
             if (!active)
                 return;

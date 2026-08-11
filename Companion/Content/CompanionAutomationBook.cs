@@ -25,7 +25,7 @@ public sealed class CompanionAutomationBook : ModItem
 {
     // The Lunar Flare book texture is the one vanilla book icon the other six books have not
     // claimed. SpellTome is the only fallback if a runtime ever lacks that constant.
-    public override string Texture => $"Terraria/Images/Item_{ItemID.LunarFlareBook}";
+    public override string Texture => "MoreAIPlayer/图片/自动书";
 
     private static readonly Color WarnColor = new(255, 160, 120);
     private static readonly Color InfoColor = new(120, 200, 255);

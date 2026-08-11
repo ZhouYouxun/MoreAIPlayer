@@ -55,7 +55,7 @@ public sealed class CompanionEntitySystem : ModSystem
     /// </summary>
     public static bool IsCompanion(Player player)
     {
-        if (player is null || Main.netMode != NetmodeID.SinglePlayer)
+        if (player is null || !CompanionRuntimePolicy.CanRunSyntheticPlayers)
             return false;
 
         CompanionInstance instance = GetBySlot(player.whoAmI);
@@ -75,6 +75,37 @@ public sealed class CompanionEntitySystem : ModSystem
         CompanionInstance instance = GetBySlot(player.whoAmI);
         return instance is not null && ReferenceEquals(instance.Entity, player) && instance.IsAutoIdentity;
     }
+
+    /// <summary>The logical faction predicate for the opt-in entertainment rule. It checks the
+    /// persistent profile origin cached on the live instance, not merely whether automation is
+    /// running this tick.</summary>
+    public static bool IsOrdinaryHostileCompanion(Player player)
+    {
+        if (!MoreAIPlayerServerConfig.OrdinaryHostilityEnabled || !IsCompanion(player))
+            return false;
+        CompanionInstance instance = GetBySlot(player.whoAmI);
+        return instance is not null && instance.IsOrdinaryDebugIdentity;
+    }
+
+    public static bool AreCompanionFactionAllies(Player first, Player second) =>
+        IsOrdinaryHostileCompanion(first) && IsOrdinaryHostileCompanion(second);
+
+    public static bool CanPlayerDamageCompanion(Player attacker, CompanionInstance target) =>
+        CompanionRuntimePolicy.IsAuthoritativeDamageSide &&
+        attacker is not null && attacker.active && !attacker.dead && !IsCompanion(attacker) &&
+        !Hunter.HunterSystem.IsHunter(attacker) &&
+        target is not null && IsOrdinaryHostileCompanion(target.Entity);
+
+    public static bool CanCompanionDamagePlayer(CompanionInstance attacker, Player target) =>
+        CompanionRuntimePolicy.IsAuthoritativeDamageSide &&
+        attacker is not null && IsOrdinaryHostileCompanion(attacker.Entity) &&
+        target is not null && target.active && !target.dead && !IsCompanion(target) &&
+        !Hunter.HunterSystem.IsHunter(target);
+
+    /// <summary>Used by owner-side reactions so an incidental companion hit cannot be mistaken for
+    /// an enemy attack and cause a rescue/retaliation command.</summary>
+    public static bool IsCompanionDamageSource(PlayerDeathReason source) =>
+        source.SourcePlayerIndex >= 0 && IsCompanionSlot(source.SourcePlayerIndex);
 
     public static CompanionInstance FindByProfile(int ownerWhoAmI, int profileId)
     {
@@ -128,7 +159,7 @@ public sealed class CompanionEntitySystem : ModSystem
         // A dedicated server never hosts a companion (Summon is singleplayer-only), so the
         // detours below would do nothing there except add a delegate hop to every ItemCheck
         // and every projectile update, for every connected player, forever.
-        if (Main.dedServ)
+        if (CompanionRuntimePolicy.IsDedicatedServer)
             return;
 
         MethodInfo itemCheck = typeof(Player).GetMethod(nameof(Player.ItemCheck), BindingFlags.Instance | BindingFlags.Public)
@@ -167,7 +198,7 @@ public sealed class CompanionEntitySystem : ModSystem
 
     public static bool Summon(Player owner, CompanionProfile profile, Vector2 worldPosition)
     {
-        if (Main.netMode != NetmodeID.SinglePlayer || owner is null || profile is null ||
+        if (!CompanionRuntimePolicy.CanRunSyntheticPlayers || owner is null || profile is null ||
             !owner.active || owner.whoAmI != Main.myPlayer || FindByProfile(owner.whoAmI, profile.Id) is not null)
             return false;
 
@@ -353,7 +384,7 @@ public sealed class CompanionEntitySystem : ModSystem
     /// </summary>
     internal static void KillOwnedProjectiles(int slot)
     {
-        if (Main.netMode != NetmodeID.SinglePlayer)
+        if (!CompanionRuntimePolicy.CanRunSyntheticPlayers)
             return;
 
         foreach (Projectile projectile in Main.ActiveProjectiles)
@@ -429,7 +460,10 @@ public sealed class CompanionEntitySystem : ModSystem
         if (BySlot.Count == 0)
             return;
 
-        if (Main.netMode != NetmodeID.SinglePlayer)
+        // Entering multiplayer (or a host/server) with companions still registered from a previous
+        // singleplayer world: release them before any AI runs. ReleaseAll is the netMode-changed
+        // escape hatch and only clears this mod's own slots — see KillOwnedProjectiles.
+        if (!CompanionRuntimePolicy.CanRunSyntheticPlayers)
         {
             ReleaseAll();
             return;
@@ -567,7 +601,8 @@ public sealed class CompanionEntitySystem : ModSystem
         previousMouseRight = Main.mouseRight;
 
         HoveredSlot = -1;
-        if (Main.gameMenu || Main.dedServ || Main.netMode != NetmodeID.SinglePlayer || BySlot.Count == 0)
+        if (Main.gameMenu || !CompanionRuntimePolicy.CanRunLocalUI ||
+            !CompanionRuntimePolicy.CanRunSyntheticPlayers || BySlot.Count == 0)
             return;
         if (Main.LocalPlayer.mouseInterface)
             return;
@@ -653,7 +688,7 @@ public sealed class CompanionEntitySystem : ModSystem
 
     private static void Player_ItemCheck(OrigItemCheck orig, Player self)
     {
-        if (Main.netMode != NetmodeID.SinglePlayer)
+        if (!CompanionRuntimePolicy.CanRunSyntheticPlayers)
         {
             orig(self);
             return;
@@ -713,7 +748,7 @@ public sealed class CompanionEntitySystem : ModSystem
 
     private static void Projectile_Update(OrigProjectileUpdate orig, Projectile projectile, int index)
     {
-        if (Main.netMode != NetmodeID.SinglePlayer)
+        if (!CompanionRuntimePolicy.CanRunSyntheticPlayers)
         {
             orig(projectile, index);
             return;
@@ -794,7 +829,7 @@ public sealed class CompanionEntitySystem : ModSystem
     /// </summary>
     private static void RunCompanionDamagePass()
     {
-        if (Main.netMode != NetmodeID.SinglePlayer || BySlot.Count == 0)
+        if (!CompanionRuntimePolicy.IsAuthoritativeDamageSide || BySlot.Count == 0)
             return;
 
         bool damageEnabled = MoreAIPlayerClientConfig.CompanionDamageEnabled;
@@ -813,9 +848,12 @@ public sealed class CompanionEntitySystem : ModSystem
                     .CaptureCompanionLifeAfterVanillaUpdate(instance, owner);
             }
 
-            // This configuration is live. Turning damage off clears every owned and mirrored
-            // native counter immediately, so turning it back on cannot inherit a frozen iframe.
-            if (!damageEnabled)
+            bool playerHostilityEnabled = IsOrdinaryHostileCompanion(companion);
+
+            // Environmental survivability and opt-in player hostility are independent. Turning
+            // ordinary damage off still clears its state, but real-player attacks retain the
+            // companion-owned cooldown channel while the hostility rule is enabled.
+            if (!damageEnabled && !playerHostilityEnabled)
             {
                 ResetCompanionDamageState(instance);
                 ResetDisabledEnvironmentalDamageState(companion);
@@ -831,10 +869,236 @@ public sealed class CompanionEntitySystem : ModSystem
             // this frame only: one bad projectile/NPC can never permanently open a world-wide
             // circuit breaker and reproduce "one hit, then invincible forever".
             AdvanceCompanionDamageCooldowns(instance);
-            CompanionFaultGuard.Run("companion NPC damage", () => ResolveNpcContactDamage(instance));
-            CompanionFaultGuard.Run("companion projectile damage", () => ResolveProjectileDamage(instance));
-            CompanionFaultGuard.Run("companion environment damage", () => ResolveEnvironmentalDamage(instance));
+            if (damageEnabled)
+            {
+                CompanionFaultGuard.Run("companion NPC damage", () => ResolveNpcContactDamage(instance));
+                CompanionFaultGuard.Run("companion projectile damage", () => ResolveProjectileDamage(instance));
+                CompanionFaultGuard.Run("companion environment damage", () => ResolveEnvironmentalDamage(instance));
+            }
+            else
+            {
+                ResetDisabledEnvironmentalDamageState(companion);
+            }
+
+            if (playerHostilityEnabled)
+            {
+                CompanionFaultGuard.Run("player to companion PvP bridge",
+                    () => ResolveRealPlayerDamageToCompanion(instance));
+                if (!companion.dead && companion.statLife > 0)
+                {
+                    CompanionFaultGuard.Run("companion to player PvP bridge",
+                        () => ResolveCompanionDamageToRealPlayers(instance));
+                }
+            }
         }
+    }
+
+    private static void ResolveRealPlayerDamageToCompanion(CompanionInstance instance)
+    {
+        Player target = instance.Entity;
+        for (int playerIndex = 0; playerIndex < Main.maxPlayers; playerIndex++)
+        {
+            Player attacker = Main.player[playerIndex];
+            if (!CanPlayerDamageCompanion(attacker, instance))
+                continue;
+
+            ResolvePlayerMeleeAgainstCompanion(attacker, instance);
+            if (target.dead || target.statLife <= 0)
+                return;
+        }
+
+        for (int projectileIndex = 0; projectileIndex < Main.maxProjectiles; projectileIndex++)
+        {
+            Projectile projectile = Main.projectile[projectileIndex];
+            if (!projectile.active || !projectile.friendly || projectile.hostile || projectile.damage <= 0 ||
+                projectile.owner < 0 || projectile.owner >= Main.maxPlayers)
+                continue;
+
+            Player attacker = Main.player[projectile.owner];
+            if (!CanPlayerDamageCompanion(attacker, instance) ||
+                (projectile.ownerHitCheck && !projectile.CanHitWithMeleeWeapon(target)) ||
+                !projectile.Colliding(GetProjectileDamageHitbox(projectile), target.Hitbox) ||
+                !CombinedHooks.CanHitPvpWithProj(projectile, target))
+                continue;
+
+            int direction = projectile.direction != 0
+                ? projectile.direction
+                : (projectile.Center.X < target.Center.X ? 1 : -1);
+            int damage = Main.DamageVar(projectile.damage, attacker.luck);
+            if (TryApplyCompanionDamage(instance,
+                    PlayerDeathReason.ByProjectile(attacker.whoAmI, projectileIndex), damage, direction,
+                    ImmunityCooldownID.General, projectile.IsDamageDodgable(), projectile.ArmorPenetration,
+                    out _, pvp: true))
+            {
+                projectile.StatusPvP(target.whoAmI);
+                ConsumeFriendlyProjectileHit(projectile);
+            }
+
+            if (target.dead || target.statLife <= 0)
+                return;
+        }
+    }
+
+    private static void ResolvePlayerMeleeAgainstCompanion(Player attacker, CompanionInstance targetInstance)
+    {
+        if (attacker.itemAnimation <= 0)
+        {
+            targetInstance.HitByRealPlayerThisSwing = false;
+            return;
+        }
+        if (targetInstance.HitByRealPlayerThisSwing)
+            return;
+
+        Item item = attacker.HeldItem;
+        if (item.IsAir || item.damage <= 0 || item.noMelee || !attacker.CanHit(targetInstance.Entity) ||
+            !CombinedHooks.CanHitPvp(attacker, item, targetInstance.Entity))
+            return;
+
+        if (!TryGetPlayerMeleeHitbox(attacker, item, out Rectangle hitbox) ||
+            !hitbox.Intersects(targetInstance.Entity.Hitbox))
+            return;
+
+        int damage = Main.DamageVar(attacker.GetWeaponDamage(item), attacker.luck);
+        if (TryApplyCompanionDamage(targetInstance,
+                PlayerDeathReason.ByPlayerItem(attacker.whoAmI, item), damage, attacker.direction,
+                ImmunityCooldownID.General, true, 0f, out _, pvp: true))
+        {
+            targetInstance.HitByRealPlayerThisSwing = true;
+            attacker.StatusToPlayerPvP(item.type, targetInstance.Entity.whoAmI);
+            attacker.OnHit(targetInstance.Entity.Center.X, targetInstance.Entity.Center.Y, targetInstance.Entity);
+        }
+    }
+
+    private static void ResolveCompanionDamageToRealPlayers(CompanionInstance instance)
+    {
+        Player attacker = instance.Entity;
+        if (attacker.itemAnimation <= 0)
+            instance.HitRealPlayerThisSwing = false;
+
+        for (int playerIndex = 0; playerIndex < Main.maxPlayers; playerIndex++)
+        {
+            Player target = Main.player[playerIndex];
+            if (!CanCompanionDamagePlayer(instance, target))
+                continue;
+
+            if (!instance.HitRealPlayerThisSwing && attacker.itemAnimation > 0)
+            {
+                Item item = attacker.HeldItem;
+                if (!item.IsAir && item.damage > 0 && !item.noMelee && !target.immune &&
+                    attacker.CanHit(target) && CombinedHooks.CanHitPvp(attacker, item, target))
+                {
+                    if (TryGetPlayerMeleeHitbox(attacker, item, out Rectangle hitbox) &&
+                        hitbox.Intersects(target.Hitbox))
+                    {
+                        int damage = Main.DamageVar(attacker.GetWeaponDamage(item), attacker.luck);
+                        PlayerDeathReason reason = PlayerDeathReason.ByPlayerItem(attacker.whoAmI, item);
+                        if (target.Hurt(reason, damage, attacker.direction, out _, pvp: true) > 0.0)
+                        {
+                            instance.HitRealPlayerThisSwing = true;
+                            attacker.StatusToPlayerPvP(item.type, target.whoAmI);
+                            attacker.OnHit(target.Center.X, target.Center.Y, target);
+                        }
+                    }
+                }
+            }
+
+            if (target.dead)
+                continue;
+
+            for (int projectileIndex = 0; projectileIndex < Main.maxProjectiles; projectileIndex++)
+            {
+                Projectile projectile = Main.projectile[projectileIndex];
+                if (!projectile.active || projectile.owner != instance.Slot || !projectile.friendly ||
+                    projectile.hostile || projectile.damage <= 0 || target.immune ||
+                    (projectile.ownerHitCheck && !projectile.CanHitWithMeleeWeapon(target)) ||
+                    !projectile.Colliding(GetProjectileDamageHitbox(projectile), target.Hitbox) ||
+                    !CombinedHooks.CanHitPvpWithProj(projectile, target))
+                    continue;
+
+                int direction = projectile.direction != 0
+                    ? projectile.direction
+                    : (projectile.Center.X < target.Center.X ? 1 : -1);
+                int damage = Main.DamageVar(projectile.damage, attacker.luck);
+                PlayerDeathReason reason = PlayerDeathReason.ByProjectile(attacker.whoAmI, projectileIndex);
+                if (target.Hurt(reason, damage, direction, out _, pvp: true,
+                        dodgeable: projectile.IsDamageDodgable()) > 0.0)
+                {
+                    projectile.StatusPvP(target.whoAmI);
+                    ConsumeFriendlyProjectileHit(projectile);
+                }
+            }
+        }
+    }
+
+    private static void ConsumeFriendlyProjectileHit(Projectile projectile)
+    {
+        if (!projectile.active || projectile.penetrate < 0)
+            return;
+        projectile.penetrate--;
+        if (projectile.penetrate <= 0)
+            projectile.Kill();
+    }
+
+    /// <summary>Public mod APIs do not expose Player.ItemCheck_GetMeleeHitbox, so reproduce its
+    /// ordinary swing/thrust geometry and then run the official modded hitbox hook. This covers
+    /// vanilla melee and well-behaved modded use styles without invoking ItemCheck a second time.</summary>
+    private static bool TryGetPlayerMeleeHitbox(Player player, Item item, out Rectangle hitbox)
+    {
+        Rectangle frame = Main.dedServ
+            ? new Rectangle(0, 0, 32, 32)
+            : Terraria.GameContent.TextureAssets.Item[item.type].Value.Frame();
+        hitbox = new Rectangle((int)player.itemLocation.X, (int)player.itemLocation.Y,
+            frame.Width, frame.Height);
+
+        float scale = player.GetAdjustedItemScale(item);
+        hitbox.Width = (int)(hitbox.Width * scale);
+        hitbox.Height = (int)(hitbox.Height * scale);
+        if (player.direction == -1)
+            hitbox.X -= hitbox.Width;
+        if (player.gravDir == 1f)
+            hitbox.Y -= hitbox.Height;
+
+        bool noHitbox = false;
+        float animationRatio = player.itemAnimationMax > 0
+            ? player.itemAnimation / (float)player.itemAnimationMax
+            : 0f;
+        if (item.useStyle == ItemUseStyleID.Swing)
+        {
+            if (animationRatio < 0.333f)
+            {
+                if (player.direction == -1)
+                    hitbox.X -= (int)(hitbox.Width * 0.4f);
+                hitbox.Width = (int)(hitbox.Width * 1.4f);
+                hitbox.Y += (int)(hitbox.Height * 0.5f * player.gravDir);
+                hitbox.Height = (int)(hitbox.Height * 1.1f);
+            }
+            else if (animationRatio >= 0.666f)
+            {
+                if (player.direction == 1)
+                    hitbox.X -= (int)(hitbox.Width * 1.2f);
+                hitbox.Width *= 2;
+                hitbox.Y -= (int)(hitbox.Height * 0.4f * player.gravDir);
+                hitbox.Height = (int)(hitbox.Height * 1.4f);
+            }
+        }
+        else if (item.useStyle == ItemUseStyleID.Thrust)
+        {
+            if (animationRatio > 0.666f)
+            {
+                noHitbox = true;
+            }
+            else
+            {
+                if (player.direction == -1)
+                    hitbox.X -= (int)(hitbox.Width * 0.4f);
+                hitbox.Width = (int)(hitbox.Width * 1.4f);
+                hitbox.Y += (int)(hitbox.Height * 0.6f);
+                hitbox.Height = (int)(hitbox.Height * 0.6f);
+            }
+        }
+
+        ItemLoader.UseItemHitbox(item, player, ref hitbox, ref noHitbox);
+        return !noHitbox && hitbox.Width > 0 && hitbox.Height > 0;
     }
 
     private static void ResetDisabledEnvironmentalDamageState(Player companion)
@@ -879,6 +1143,8 @@ public sealed class CompanionEntitySystem : ModSystem
         instance.DamageCooldownFrame = Main.GameUpdateCount;
         instance.LastWhipOwner = -1;
         instance.LastWhipIdentity = -1;
+        instance.HitByRealPlayerThisSwing = false;
+        instance.HitRealPlayerThisSwing = false;
         if (instance.Entity is null)
             return;
         instance.Entity.immune = false;
@@ -1032,7 +1298,7 @@ public sealed class CompanionEntitySystem : ModSystem
     {
         Player companion = instance.Entity;
         // The automation companion is isolated from the owner's whips: it grants no buff.
-        if (instance.IsAutoIdentity)
+        if (instance.IsAutoIdentity || IsOrdinaryHostileCompanion(companion))
             return;
         if (projectile.owner == companion.whoAmI ||
             !CompanionPlayer.IsWhipProjectile(projectile) ||
@@ -1287,7 +1553,7 @@ public sealed class CompanionEntitySystem : ModSystem
 
     private static bool TryApplyCompanionDamage(CompanionInstance instance, PlayerDeathReason source,
         int sourceDamage, int hitDirection, int cooldownSlot, bool dodgeable, float armorPenetration,
-        out Player.HurtInfo hurtInfo)
+        out Player.HurtInfo hurtInfo, bool pvp = false)
     {
         hurtInfo = default;
         Player companion = instance.Entity;
@@ -1304,7 +1570,7 @@ public sealed class CompanionEntitySystem : ModSystem
             try
             {
                 double damageDone = companion.Hurt(source, sourceDamage, hitDirection, out hurtInfo,
-                    pvp: false, quiet: false, cooldownCounter: cooldownSlot, dodgeable: dodgeable,
+                    pvp: pvp, quiet: false, cooldownCounter: cooldownSlot, dodgeable: dodgeable,
                     armorPenetration: armorPenetration);
                 applied = damageDone > 0.0;
             }
@@ -1317,7 +1583,7 @@ public sealed class CompanionEntitySystem : ModSystem
                 if (companion.statLife >= lifeBefore)
                 {
                     hurtInfo = BuildFallbackHurtInfo(companion, source, sourceDamage, hitDirection,
-                        cooldownSlot, dodgeable, armorPenetration);
+                        cooldownSlot, dodgeable, armorPenetration, pvp);
                     applied = ApplyFallbackCompanionHurt(companion, hurtInfo, lifeBefore);
                 }
                 else
@@ -1345,13 +1611,14 @@ public sealed class CompanionEntitySystem : ModSystem
     }
 
     private static Player.HurtInfo BuildFallbackHurtInfo(Player companion, PlayerDeathReason source,
-        int sourceDamage, int hitDirection, int cooldownSlot, bool dodgeable, float armorPenetration)
+        int sourceDamage, int hitDirection, int cooldownSlot, bool dodgeable, float armorPenetration,
+        bool pvp)
     {
         int effectiveCooldown = NormalizeCooldownSlot(cooldownSlot);
         Player.HurtModifiers modifiers = new()
         {
             DamageSource = source,
-            PvP = false,
+            PvP = pvp,
             CooldownCounter = effectiveCooldown,
             Dodgeable = dodgeable,
             HitDirection = hitDirection
@@ -1433,7 +1700,7 @@ public sealed class CompanionEntitySystem : ModSystem
 
     private void RecoverMissedItemChecks()
     {
-        if (Main.netMode != NetmodeID.SinglePlayer || BySlot.Count == 0)
+        if (!CompanionRuntimePolicy.CanRunSyntheticPlayers || BySlot.Count == 0)
             return;
 
         ulong frame = Main.GameUpdateCount;
@@ -1457,7 +1724,7 @@ public sealed class CompanionEntitySystem : ModSystem
 
     private void RecoverMissedHunterItemChecks()
     {
-        if (Main.netMode != NetmodeID.SinglePlayer)
+        if (!CompanionRuntimePolicy.CanRunSyntheticPlayers)
             return;
 
         ulong frame = Main.GameUpdateCount;

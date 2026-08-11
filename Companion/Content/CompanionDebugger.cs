@@ -10,7 +10,7 @@ namespace MoreAIPlayer.Companion.Content;
 
 public sealed class CompanionDebugger : ModItem
 {
-    public override string Texture => $"Terraria/Images/Item_{ItemID.Book}";
+    public override string Texture => "MoreAIPlayer/图片/调试书";
 
     public override void SetDefaults()
     {

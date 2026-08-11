@@ -15,6 +15,15 @@ Mods: {
 		}
 
 		Configs: {
+			MoreAIPlayerServerConfig: {
+				DisplayName: Phantomgefährten-Spielregeln
+
+				OrdinaryCompanionsHostileToPlayers: {
+					Label: "[i:BloodyMachete] Normale Gefährten können Spieler verletzen"
+					Tooltip: Standardmäßig deaktiviert und nur für Unterhaltung und Tests gedacht. Betrifft nur normale Gefährten aus dem Debug-Buch. Sie bleiben untereinander verbündet und greifen weiterhin nur feindliche NPCs an. Spieler können sie verletzen und ihre Waffen oder Projektile können Spieler bei Berührung verletzen. Jäger sowie aktuelle oder ehemalige Automatikgefährten sind ausgeschlossen.
+				}
+			}
+
 			MoreAIPlayerClientConfig: {
 				DisplayName: Phantom-Begleiter Client-Einstellungen
 
@@ -161,12 +170,13 @@ Mods: {
 				DisplayName: Jägerbuch
 				Tooltip:
 					'''
-					Hinweis: Dieser Gegenstand wird noch getestet und kann Probleme haben.
-					Linksklick: Schaltet den Jagdmodus ein oder aus. Feindliche Jäger nehmen deine Spur auf.
-					Rechtsklick: Öffnet die Jagdeinstellungen; wähle 1 bis 3 Jäger.
-					Die Ausrüstung der Jäger skaliert mit dem Weltfortschritt und deiner Verteidigung. Im Jagdmodus wird PvP aktiviert.
-					Jäger verfolgen dich 2 Minuten lang, ruhen dann 45 Sekunden und setzen die Jagd fort.
-					Besiegte Jäger kehren nach 60 Sekunden mit neuer Ausrüstung zurück.
+					Linksklick: Startet oder beendet die gewählte Jägerprüfung. Die Jäger sammeln sich zuerst in der Ferne.
+					Rechtsklick: Wähle 1 bis 3 Jäger und eine Prüfungsregel.
+					· Überleben: Halte 180 Sekunden gegen wiederkehrende Jäger durch.
+					· Ausschaltung: Besiege die geforderte Anzahl Jäger.
+					· Ausbruch: Erreiche binnen 150 Sekunden den fernen Ausgang; Jäger fangen dich unterwegs ab.
+					Verfügbar nach einem Boss vor dem Hardmode bis zur Fleischwand sowie im frühen Hardmode bis Plantera.
+					Jäger nutzen feste Ausrüstung der Weltphase, nicht deine Verteidigung. Mehr Jäger sind einzeln schwächer.
 					'''
 			}
 
@@ -344,12 +354,17 @@ Mods: {
 			DiagnosticsRecovery: Gegenstandsprüfung gerettet {0} · Platz {1} · Ziel {2} · Fehlframes {3}
 			DiagnosticsOwnership: Projektilbesitz korrigiert {0} · Kontextlecks korrigiert {1}
 			RightClickOpen: "{0} · Rechtsklick für Ausrüstung und Rucksack"
-			HunterTrackerTitle: Jägerspiel · {0}
+			HunterTrackerTitle: Jägerprüfung · {0}
 			HunterTrackerPreparing: Jäger sammeln sich in der Ferne · {0}s
 			HunterTrackerNearest: Nächster Jäger: {0} Felder
 			HunterTrackerResting: Nächster Jäger ruht: {0} Felder
 			HunterTrackerReviving: Nächster Jäger formiert sich: {0}s
 			HunterTrackerSearching: Suche nach Jägersignalen...
+			HunterTrackerObjectiveSurvival: Ziel: Überleben · noch {0}s
+			HunterTrackerObjectiveElimination: Ziel: Jäger besiegen · {0}/{1}
+			HunterTrackerObjectiveBreakout: Ziel: Ausgang {0} Felder · noch {1}s
+			HunterBreakoutMarker: ◆ Ausgang · {0} Felder
+			HunterBreakoutMarkerHere: ◆ Ausgang
 		}
 
 		CompanionCommand: {
@@ -380,21 +395,18 @@ Mods: {
 			HunterNameBravo: Jäger · Bravo
 			HunterNameCharlie: Jäger · Charlie
 			HunterNameFallback: Jäger #{0}
-			HunterModeEnabled: "[Jägerspiel] {0} gestartet. Die Jäger sammeln sich in der Ferne..."
-			HunterModeDisabled: "[Jägerspiel] beendet. Die Warnung ist aufgehoben."
-			HunterRestarting: "[Jägerspiel] Die nächste Welle sammelt sich in der Ferne..."
-			HunterRequiresBoss: Besiege im Vor-Hardmode einen beliebigen Boss, um das Jägerspiel freizuschalten.
-			HunterUnavailablePostPlantera: Nach Plantera ist das Jägerspiel nicht mehr verfügbar.
-			HunterStageEndedHardmode: "[Jägerspiel] Die Fleischwand ist gefallen. Dieses Vor-Hardmode-Spiel ist beendet."
-			HunterStageEndedPlantera: "[Jägerspiel] Plantera ist gefallen. Dieses Spiel ist beendet."
+			HunterRequiresBoss: Besiege im Vor-Hardmode einen beliebigen Boss, um Jägerprüfungen freizuschalten.
+			HunterUnavailablePostPlantera: Nach Plantera sind Jägerprüfungen nicht mehr verfügbar.
+			HunterStageEndedHardmode: "[Jägerprüfung] Die Fleischwand ist gefallen. Diese Vor-Hardmode-Prüfung ist beendet."
+			HunterStageEndedPlantera: "[Jägerprüfung] Plantera ist gefallen. Diese Prüfung ist beendet."
 			HunterStagePreHardmode: Vor-Hardmode-Jagd
 			HunterStageEarlyHardmode: Frühe Hardmode-Jagd
 			HunterStageUnavailable: Keine verfügbare Phase
 			HunterStageStatus: Spielphase: {0}
 			HunterSpawned: "[Warnung] Der feindliche Spieler {0} ist in deine Welt eingedrungen!"
-			HunterDefeated: "[Durchsage] Der feindliche Spieler {0} wurde besiegt! Er kehrt in 60 Sekunden mit neuer Ausrüstung zurück..."
+			HunterDefeated: "[Durchsage] Der feindliche Spieler {0} wurde besiegt! Neuformierung in {1} Sekunden..."
 			HunterRespawned: "[Warnung] Der feindliche Spieler {0} ist zurück und nimmt die Jagd wieder auf!"
-			HunterSingleplayerOnly: Der Jagdmodus ist derzeit nur im Einzelspieler verfügbar.
+			HunterSingleplayerOnly: Jägerprüfungen sind derzeit nur im Einzelspieler verfügbar.
 			ScaleSingleplayerOnly: Die Größenmatrix ist derzeit nur im Einzelspieler verfügbar.
 			ScaleNoSpace: Hier ist nicht genug Platz für die gewählte Größe.
 			ScalePanelTitle: ◆ Kristallgrößenmatrix
@@ -404,19 +416,39 @@ Mods: {
 			Disabled: Aus
 			HunterResting: "[Jägerwarnung] {0} zieht sich zurück, um sich auszuruhen und Vorräte zu sammeln!"
 			HunterHunting: "[Jägerwarnung] {0} hat deine Spur wiedergefunden und setzt die Jagd fort!"
-			HunterPanelTitle: ⚔ Jagdmodus-Einstellungen
+			HunterPanelTitle: ⚔ Einstellungen der Jägerprüfung
 			Close: Schließen
-			HunterPanelEnabled: "[Modusstatus] Aktiviert (zum Deaktivieren klicken)"
-			HunterPanelDisabled: "[Modusstatus] Deaktiviert (zum Aktivieren klicken)"
+			HunterPanelEnabled: "[Prüfung aktiv] Klicken zum Aufgeben"
+			HunterPanelDisabled: "[Prüfung inaktiv] Klicken zum Starten"
 			HunterCountTitle: Anzahl der Jäger:
 			HunterCount: "{0} Jäger"
 			HunterStatusTitle: Jägerstatus:
-			HunterInactive: · Jagdmodus ist nicht aktiv
+			HunterInactive: · Jägerprüfung noch nicht begonnen
 			HunterPanelReviving: · {0}: Wiederbelebung ({1}s verbleiben)
 			HunterPanelResting: · {0}: ruht und sammelt Vorräte
 			HunterPanelHunting: · {0}: setzt zur Jagd an!
-			HunterRefresh: 🔄 Jägertrupp neu erstellen und entsenden
-			HunterRefreshed: Jägertrupp wurde neu erstellt und entsandt!
+			HunterRefresh: 🔄 Aktuelle Prüfung neu beginnen
+			HunterTrialSurvival: Überleben
+			HunterTrialElimination: Ausschaltung
+			HunterTrialBreakout: Ausbruch
+			HunterTrialTypeTitle: Prüfungsregel wählen:
+			HunterTrialSurvivalDescription: Halte {0} Sekunden durch; besiegte Jäger kehren zurück.
+			HunterTrialEliminationDescription: Besiege insgesamt {0} Jäger; dein Tod beendet die Prüfung.
+			HunterTrialBreakoutDescription: Erreiche in {0} Sekunden den Ausgang; Jäger fangen dich ab.
+			HunterObjectiveStatusTitle: Aktuelles Ziel:
+			HunterObjectiveNotStarted: Regel wählen und Prüfung beginnen
+			HunterTrialStartSurvival: "[Überlebensprüfung] Halte {0} Sekunden durch. Weltphase: {1}."
+			HunterTrialStartElimination: "[Ausschaltungsprüfung] Besiege {0} Jäger. Weltphase: {1}."
+			HunterTrialStartBreakout: "[Ausbruchsprüfung] Erreiche in {0} Sekunden den Ausgang. Weltphase: {1}."
+			HunterTrialAbandoned: "[Jägerprüfung] Prüfung aufgegeben. Die Warnung ist aufgehoben."
+			HunterCannotStartDead: Du kannst handlungsunfähig keine Jägerprüfung beginnen.
+			HunterTrialRestarting: "[Jägerprüfung] {0} beginnt von vorn. Jäger formieren sich neu..."
+			HunterTrialFailedDeath: "[Prüfung gescheitert] Du wurdest besiegt."
+			HunterTrialFailedTimeout: "[Prüfung gescheitert] Die Zeit bis zum Ausgang ist abgelaufen."
+			HunterTrialVictorySurvival: "[Prüfung bestanden] {0} Sekunden überlebt und {1} Jäger besiegt."
+			HunterTrialVictoryElimination: "[Prüfung bestanden] {0} Jäger in {1} Sekunden besiegt."
+			HunterTrialVictoryBreakout: "[Prüfung bestanden] Ausbruch in {0} Sekunden; {1} Jäger besiegt."
+			HunterDefeatedProgress: "[Ausschaltung] {0} besiegt: {1}/{2}. Neuformierung in {3} Sekunden."
 			BuilderModeSmartBuild: Smart Build
 			BuilderModeDefensiveBuild: Defensive Build
 			BuilderModeBattlePlatform: Battle Platform

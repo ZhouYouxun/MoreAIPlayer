@@ -15,6 +15,15 @@ Mods: {
 		}
 
 		Configs: {
+			MoreAIPlayerServerConfig: {
+				DisplayName: Regras de jogo dos Companheiros Fantasmas
+
+				OrdinaryCompanionsHostileToPlayers: {
+					Label: "[i:BloodyMachete] Companheiros comuns podem ferir jogadores"
+					Tooltip: Desativado por padrão e destinado apenas a diversão e testes. Afeta somente companheiros comuns invocados pelo livro de depuração. Eles continuam aliados entre si e miram apenas NPCs hostis. Jogadores podem feri-los, e suas armas ou projéteis podem ferir jogadores por contato. Caçadores e companheiros automáticos atuais ou antigos ficam de fora.
+				}
+			}
+
 			MoreAIPlayerClientConfig: {
 				DisplayName: Configurações de cliente dos Companheiros Fantasmas
 
@@ -161,12 +170,13 @@ Mods: {
 				DisplayName: Livro dos caçadores
 				Tooltip:
 					'''
-					Nota: este item ainda está em teste e pode apresentar problemas.
-					Clique esquerdo: ativa ou desativa o modo Caçada. Caçadores hostis seguirão seu rastro.
-					Clique direito: abre as configurações de Caçada e permite escolher de 1 a 3 caçadores.
-					O equipamento dos caçadores escala com o progresso do mundo e sua defesa. O modo Caçada ativa PvP enquanto estiver ativo.
-					Os caçadores perseguem você por 2 minutos, descansam 45 segundos e então retomam a caçada.
-					Caçadores derrotados voltam após 60 segundos com equipamentos novos.
+					Clique esquerdo: inicia ou abandona a Prova dos caçadores escolhida. Eles se reúnem primeiro à distância.
+					Clique direito: escolha de 1 a 3 caçadores e uma regra.
+					· Sobrevivência: resista 180 segundos contra caçadores que voltam após serem derrotados.
+					· Eliminação: derrote a quantidade exigida de caçadores.
+					· Fuga: alcance uma saída distante em 150 segundos; os caçadores interceptam sua rota.
+					Disponível após um chefe pré-Hardmode até a Parede de Carne e no início do Hardmode até Plantera.
+					O equipamento depende da fase do mundo, nunca da sua defesa. Mais caçadores significa indivíduos mais fracos.
 					'''
 			}
 
@@ -344,12 +354,17 @@ Mods: {
 			DiagnosticsRecovery: Verificação de itens recuperada {0} · espaço {1} · mira {2} · falhas seguidas {3}
 			DiagnosticsOwnership: Propriedade de projéteis corrigida {0} · vazamentos de contexto {1}
 			RightClickOpen: "{0} · Clique direito para abrir equipamentos e mochila"
-			HunterTrackerTitle: Jogo do Caçador · {0}
+			HunterTrackerTitle: Prova dos caçadores · {0}
 			HunterTrackerPreparing: Os caçadores se reúnem à distância · {0}s
 			HunterTrackerNearest: Caçador mais próximo: {0} blocos
 			HunterTrackerResting: Caçador mais próximo descansando: {0} blocos
 			HunterTrackerReviving: Caçador mais próximo se reagrupara: {0}s
 			HunterTrackerSearching: Procurando sinais de caçadores...
+			HunterTrackerObjectiveSurvival: Objetivo: sobreviva · restam {0}s
+			HunterTrackerObjectiveElimination: Objetivo: derrote caçadores · {0}/{1}
+			HunterTrackerObjectiveBreakout: Objetivo: saída a {0} blocos · restam {1}s
+			HunterBreakoutMarker: ◆ Saída · {0} blocos
+			HunterBreakoutMarkerHere: ◆ Saída
 		}
 
 		CompanionCommand: {
@@ -380,21 +395,18 @@ Mods: {
 			HunterNameBravo: Caçador · Bravo
 			HunterNameCharlie: Caçador · Charlie
 			HunterNameFallback: Caçador #{0}
-			HunterModeEnabled: "[Jogo do Caçador] {0} iniciado. Os caçadores se reúnem à distância..."
-			HunterModeDisabled: "[Jogo do Caçador] encerrado. O alerta acabou."
-			HunterRestarting: "[Jogo do Caçador] A próxima onda se reúne à distância..."
-			HunterRequiresBoss: Derrote qualquer chefe antes do Modo Difícil para desbloquear o Jogo do Caçador.
-			HunterUnavailablePostPlantera: O Jogo do Caçador não está disponível após Plantera.
-			HunterStageEndedHardmode: "[Jogo do Caçador] A Parede de Carne caiu. Esta partida pré-Modo Difícil terminou."
-			HunterStageEndedPlantera: "[Jogo do Caçador] Plantera caiu. Esta partida terminou."
+			HunterRequiresBoss: Derrote um chefe pré-Hardmode para desbloquear as Provas dos caçadores.
+			HunterUnavailablePostPlantera: As Provas dos caçadores não estão disponíveis após Plantera.
+			HunterStageEndedHardmode: "[Prova dos caçadores] A Parede de Carne caiu. Esta prova pré-Hardmode terminou."
+			HunterStageEndedPlantera: "[Prova dos caçadores] Plantera caiu. Esta prova terminou."
 			HunterStagePreHardmode: Caçada pré-Modo Difícil
 			HunterStageEarlyHardmode: Caçada inicial do Modo Difícil
 			HunterStageUnavailable: Nenhuma fase disponível
 			HunterStageStatus: Fase de jogo: {0}
 			HunterSpawned: "[Aviso] O jogador hostil {0} infiltrou-se no seu mundo!"
-			HunterDefeated: "[Aviso] O jogador hostil {0} foi derrotado! Ele voltará em 60 segundos com equipamentos novos..."
+			HunterDefeated: "[Aviso] O jogador hostil {0} foi derrotado! Ele se reagrupará em {1} segundos..."
 			HunterRespawned: "[Aviso] O jogador hostil {0} voltou e retomou a perseguição!"
-			HunterSingleplayerOnly: O modo Caçada por enquanto só está disponível no modo solo.
+			HunterSingleplayerOnly: As Provas dos caçadores por enquanto só estão disponíveis no modo solo.
 			ScaleSingleplayerOnly: A matriz de tamanho por enquanto só está disponível no modo solo.
 			ScaleNoSpace: Não há espaço suficiente aqui para o tamanho escolhido.
 			ScalePanelTitle: ◆ Matriz de tamanho de cristal
@@ -404,19 +416,39 @@ Mods: {
 			Disabled: Desligado
 			HunterResting: "[Alerta de caçada] {0} recuou para descansar e reunir suprimentos!"
 			HunterHunting: "[Alerta de caçada] {0} encontrou seu rastro novamente e retomou a caçada!"
-			HunterPanelTitle: ⚔ Configurações do modo Caçada
+			HunterPanelTitle: ⚔ Configurações da Prova dos caçadores
 			Close: Fechar
-			HunterPanelEnabled: "[Status do modo] Ativado (clique para desativar)"
-			HunterPanelDisabled: "[Status do modo] Desativado (clique para ativar)"
+			HunterPanelEnabled: "[Prova ativa] Clique para abandonar"
+			HunterPanelDisabled: "[Prova inativa] Clique para começar"
 			HunterCountTitle: Número de caçadores:
 			HunterCount: "{0} caçador(es)"
 			HunterStatusTitle: Status dos caçadores:
-			HunterInactive: · O modo Caçada está inativo
+			HunterInactive: · A Prova dos caçadores ainda não começou
 			HunterPanelReviving: · {0}: revivendo ({1}s restantes)
 			HunterPanelResting: · {0}: descansando e reunindo suprimentos
 			HunterPanelHunting: · {0}: está chegando para matar você!
-			HunterRefresh: 🔄 Reconstruir e enviar o esquadrão de caçadores
-			HunterRefreshed: Esquadrão de caçadores reconstruído e enviado!
+			HunterRefresh: 🔄 Reiniciar a prova atual
+			HunterTrialSurvival: Sobrevivência
+			HunterTrialElimination: Eliminação
+			HunterTrialBreakout: Fuga
+			HunterTrialTypeTitle: Escolha uma regra:
+			HunterTrialSurvivalDescription: Resista {0} segundos; caçadores derrotados retornam.
+			HunterTrialEliminationDescription: Derrote {0} caçadores; sua morte falha a prova.
+			HunterTrialBreakoutDescription: Alcance a saída em {0} segundos; caçadores interceptam.
+			HunterObjectiveStatusTitle: Objetivo atual:
+			HunterObjectiveNotStarted: Escolha uma regra e comece a prova
+			HunterTrialStartSurvival: "[Sobrevivência] Resista {0} segundos. Fase do mundo: {1}."
+			HunterTrialStartElimination: "[Eliminação] Derrote {0} caçadores. Fase do mundo: {1}."
+			HunterTrialStartBreakout: "[Fuga] Alcance a saída em {0} segundos. Fase do mundo: {1}."
+			HunterTrialAbandoned: "[Prova dos caçadores] Prova abandonada. O alerta acabou."
+			HunterCannotStartDead: Você não pode iniciar a prova sem poder agir.
+			HunterTrialRestarting: "[Prova dos caçadores] Reiniciando {0}. Caçadores se reagrupam..."
+			HunterTrialFailedDeath: "[Prova falhou] Você foi derrotado."
+			HunterTrialFailedTimeout: "[Prova falhou] O tempo acabou antes de chegar à saída."
+			HunterTrialVictorySurvival: "[Prova concluída] Você sobreviveu {0} segundos e derrotou {1} caçadores."
+			HunterTrialVictoryElimination: "[Prova concluída] Você derrotou {0} caçadores em {1} segundos."
+			HunterTrialVictoryBreakout: "[Prova concluída] Você escapou em {0} segundos e derrotou {1} caçadores."
+			HunterDefeatedProgress: "[Eliminação] {0} derrotado: {1}/{2}. Retorna em {3} segundos."
 			BuilderModeSmartBuild: Smart Build
 			BuilderModeDefensiveBuild: Defensive Build
 			BuilderModeBattlePlatform: Battle Platform

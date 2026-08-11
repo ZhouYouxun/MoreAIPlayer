@@ -18,7 +18,7 @@ namespace MoreAIPlayer.Companion.Automation;
 public sealed class AutoCompanionState
 {
     /// <summary>Bumped whenever the saved automation layout changes shape.</summary>
-    public const int CurrentVersion = 2;
+    public const int CurrentVersion = 3;
 
     /// <summary>The version this state was written with; used for forward migration on load.</summary>
     public int Version = CurrentVersion;
@@ -86,6 +86,15 @@ public sealed class AutoCompanionState
     /// <summary>Placed Anvil tile.</summary>
     public Point? Anvil;
 
+    /// <summary>Top-left tile of the companion's own storage chest (design §4.4.1). Null until built;
+    /// revalidated against the live chest array before use.</summary>
+    public Point? Chest;
+
+    /// <summary>Cross-session boss-defeat tally (design §4.1). Persisted so repeated wipes across a
+    /// save/reload still escalate the boss recovery ladder. Boss combat itself is a later phase; this
+    /// carries the counter now so the runtime never loses it.</summary>
+    public int BossFailureCount;
+
     /// <summary>True only after the shelter controller revalidated the complete shell, background
     /// walls, entrance, light, comfort item, work surface and storage in the live world.</summary>
     public bool ShelterCompleted;
@@ -99,12 +108,14 @@ public sealed class AutoCompanionState
             [nameof(LifeCrystals)] = LifeCrystals,
             [nameof(LifeFruits)] = LifeFruits,
             [nameof(ManaCrystals)] = ManaCrystals,
+            [nameof(BossFailureCount)] = BossFailureCount,
             [nameof(ShelterCompleted)] = ShelterCompleted
         };
         SavePoint(tag, nameof(HomeAnchor), HomeAnchor);
         SavePoint(tag, nameof(WorkBench), WorkBench);
         SavePoint(tag, nameof(Furnace), Furnace);
         SavePoint(tag, nameof(Anvil), Anvil);
+        SavePoint(tag, nameof(Chest), Chest);
         return tag;
     }
 
@@ -117,11 +128,13 @@ public sealed class AutoCompanionState
         LifeCrystals = tag.ContainsKey(nameof(LifeCrystals)) ? tag.GetInt(nameof(LifeCrystals)) : 0,
         LifeFruits = tag.ContainsKey(nameof(LifeFruits)) ? tag.GetInt(nameof(LifeFruits)) : 0,
         ManaCrystals = tag.ContainsKey(nameof(ManaCrystals)) ? tag.GetInt(nameof(ManaCrystals)) : 0,
+        BossFailureCount = tag.ContainsKey(nameof(BossFailureCount)) ? tag.GetInt(nameof(BossFailureCount)) : 0,
         ShelterCompleted = tag.ContainsKey(nameof(ShelterCompleted)) && tag.GetBool(nameof(ShelterCompleted)),
         HomeAnchor = LoadPoint(tag, nameof(HomeAnchor)),
         WorkBench = LoadPoint(tag, nameof(WorkBench)),
         Furnace = LoadPoint(tag, nameof(Furnace)),
-        Anvil = LoadPoint(tag, nameof(Anvil))
+        Anvil = LoadPoint(tag, nameof(Anvil)),
+        Chest = LoadPoint(tag, nameof(Chest))
     };
 
     private static void SavePoint(TagCompound tag, string key, Point? point)

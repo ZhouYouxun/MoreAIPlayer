@@ -30,6 +30,23 @@ public static class AutoProgressionPlanner
 
     public static AutoPlan Plan(AutoContext ctx)
     {
+        AutoPlan plan = PlanCore(ctx);
+
+        // A gather/mine goal cannot make progress with a full backpack — the old code returned an
+        // endless RetryLater here. Store surplus first instead (design §4.2/§4.4.1). Crafting and
+        // building are left alone: they consume inventory rather than fill it.
+        if (IsGatherGoal(plan.Goal) && !AutoInventory.HasBackpackSpace(ctx.Profile))
+            return AutoPlan.Simple(AutoGoalId.DepositSurplus);
+
+        return plan;
+    }
+
+    private static bool IsGatherGoal(AutoGoalId goal) => goal is
+        AutoGoalId.GatherWood or AutoGoalId.GatherStone or AutoGoalId.GatherGel or
+        AutoGoalId.MineOre or AutoGoalId.MineIronTierOre;
+
+    private static AutoPlan PlanCore(AutoContext ctx)
+    {
         AutoCapabilities cap = ctx.Capabilities;
         AutoCompanionState st = ctx.State;
 

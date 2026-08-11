@@ -11,7 +11,15 @@ public enum PathMoveKind : byte
     /// <summary>Walk, jump or fall toward the waypoint.</summary>
     Move,
     /// <summary>Hold down to fall through the platform under the feet.</summary>
-    DropThroughPlatform
+    DropThroughPlatform,
+    /// <summary>Step onto a rope column and grab it (align, then press up/down).</summary>
+    EnterRope,
+    /// <summary>Climb up the rope toward the waypoint (press up).</summary>
+    ClimbRopeUp,
+    /// <summary>Climb down the rope toward the waypoint (press down).</summary>
+    ClimbRopeDown,
+    /// <summary>Leave the rope onto adjacent standable ground/platform.</summary>
+    ExitRope
 }
 
 public readonly struct PathStep
@@ -30,6 +38,12 @@ public readonly struct PathStep
     }
 
     public Vector2 FeetWorld => new(X * 16f + 8f, Y * 16f + 16f);
+
+    /// <summary>Center of this tile — the point a climbing companion aligns to on a rope column.</summary>
+    public Vector2 TileCenterWorld => new(X * 16f + 8f, Y * 16f + 8f);
+
+    /// <summary>True when reaching this waypoint means being on / grabbing a rope.</summary>
+    public bool IsRopeMove => Kind is PathMoveKind.EnterRope or PathMoveKind.ClimbRopeUp or PathMoveKind.ClimbRopeDown;
 }
 
 /// <summary>Movement capabilities used to generate jump/flight edges.</summary>
@@ -76,7 +90,8 @@ public static class CompanionPathfinder
         public bool Closed;
     }
 
-    public static List<PathStep> FindPath(Point start, Point goal, MovementCaps caps)
+    public static List<PathStep> FindPath(Point start, Point goal, MovementCaps caps,
+        bool allowPlatformDrop = false, int maxDropTiles = NavigationRequest.DefaultSafeDropTiles)
     {
         if (!TrySnapToStand(ref start, 30) || !TrySnapToStand(ref goal, 25))
             return null;
@@ -116,7 +131,7 @@ public static class CompanionPathfinder
                 return Reconstruct(records, currentKey);
 
             neighbors.Clear();
-            GenerateNeighbors(cx, cy, caps, neighbors);
+            GenerateNeighbors(cx, cy, caps, allowPlatformDrop, maxDropTiles, neighbors);
 
             foreach ((int nx, int ny, float cost, PathMoveKind kind) in neighbors)
             {
@@ -152,8 +167,18 @@ public static class CompanionPathfinder
         return path;
     }
 
-    private static void GenerateNeighbors(int x, int y, MovementCaps caps, List<(int, int, float, PathMoveKind)> result)
+    private static void GenerateNeighbors(int x, int y, MovementCaps caps,
+        bool allowPlatformDrop, int maxDropTiles, List<(int, int, float, PathMoveKind)> result)
     {
+        // Hanging on a rope is its own movement mode: from here the only real moves are climbing
+        // the rope up/down and stepping off onto adjacent ground. Ground walk/jump edges do not
+        // apply mid-air, so a rope node never mixes the two.
+        if (CompanionRopeRegistry.IsRope(x, y))
+        {
+            GenerateRopeNeighbors(x, y, result);
+            return;
+        }
+
         // Walking (includes one-tile step-ups and small step-downs).
         for (int direction = -1; direction <= 1; direction += 2)
         {
@@ -188,10 +213,15 @@ public static class CompanionPathfinder
             }
         }
 
-        // Dropping straight down through a platform.
-        if (SupportIsDroppablePlatform(x, y))
+        // Dropping straight down through a platform — only when this travel order explicitly
+        // permits it, and only within the requested safe-drop distance. A goal that merely sits
+        // lower no longer implies permission to fall through the floor; that decision is made by
+        // the caller's NavigationRequest and re-validated at execution time by
+        // CompanionPlatformDrop.TryApprove.
+        if (allowPlatformDrop && SupportIsDroppablePlatform(x, y))
         {
-            for (int ny = y + 1; ny <= y + MaxFallTiles; ny++)
+            int dropLimit = System.Math.Min(MaxFallTiles, System.Math.Max(2, maxDropTiles));
+            for (int ny = y + 1; ny <= y + dropLimit; ny++)
             {
                 if (IsSolid(x, ny) || IsSolid(x - 1, ny) && IsSolid(x + 1, ny))
                     break;
@@ -202,6 +232,9 @@ public static class CompanionPathfinder
                 }
             }
         }
+
+        // Stepping onto a rope column within reach: the rope becomes a cheap vertical corridor.
+        AddEnterRopeEdges(x, y, result);
 
         // Jumping (or flying) up to ledges. The vertical corridor must stay clear as the
         // body rises; platforms are passable from below so they do not block the corridor.
@@ -262,6 +295,79 @@ public static class CompanionPathfinder
         }
     }
 
+    /// <summary>
+    /// Edges out of a rope node: climb up, climb down, and step off onto adjacent standable ground
+    /// or a platform. Vanilla owns the climbing physics; the cost model just keeps ropes cheaper
+    /// than repeatedly jumping a wall yet dearer than flat walking, so a distant rope does not lure
+    /// the search into a huge detour.
+    /// </summary>
+    private static void GenerateRopeNeighbors(int x, int y, List<(int, int, float, PathMoveKind)> result)
+    {
+        const float climbCost = 1.35f;
+        const float exitCost = 1.8f;
+
+        if (CompanionRopeRegistry.IsRope(x, y - 1) && BodyFits(x, y - 1))
+            result.Add((x, y - 1, climbCost, PathMoveKind.ClimbRopeUp));
+
+        if (CompanionRopeRegistry.IsRope(x, y + 1) && BodyFits(x, y + 1))
+            result.Add((x, y + 1, climbCost, PathMoveKind.ClimbRopeDown));
+
+        // Step off sideways onto adjacent ground/platform at a nearby height.
+        for (int direction = -1; direction <= 1; direction += 2)
+        {
+            int nx = x + direction;
+            foreach (int ny in WalkCandidateRows(y))
+            {
+                if (IsStandable(nx, ny))
+                {
+                    result.Add((nx, ny, exitCost + 0.3f * System.Math.Abs(ny - y), PathMoveKind.ExitRope));
+                    break;
+                }
+            }
+        }
+
+        // Step off straight down when the rope ends just above solid ground.
+        if (!CompanionRopeRegistry.IsRope(x, y + 1))
+        {
+            for (int ny = y + 1; ny <= y + 3; ny++)
+            {
+                if (IsSolid(x, ny))
+                    break;
+                if (IsStandable(x, ny))
+                {
+                    result.Add((x, ny, exitCost + 0.3f * (ny - y), PathMoveKind.ExitRope));
+                    break;
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    /// From a standable ground node, an edge onto a rope column whose body the companion could
+    /// grab: the same column or one to either side, with a rope tile somewhere in the body's
+    /// vertical span. The rope node picked is the rope row nearest the current feet.
+    /// </summary>
+    private static void AddEnterRopeEdges(int x, int y, List<(int, int, float, PathMoveKind)> result)
+    {
+        const float enterCost = 2.2f;
+        for (int dx = -1; dx <= 1; dx++)
+        {
+            int nx = x + dx;
+            int bestRow = int.MinValue;
+            // Prefer a rope tile within the body span (rows y-2..y+1) closest to the feet.
+            for (int ny = y - 2; ny <= y + 1; ny++)
+            {
+                if (CompanionRopeRegistry.IsRope(nx, ny) && BodyFits(nx, ny) &&
+                    (bestRow == int.MinValue || System.Math.Abs(ny - y) < System.Math.Abs(bestRow - y)))
+                {
+                    bestRow = ny;
+                }
+            }
+            if (bestRow != int.MinValue)
+                result.Add((nx, bestRow, enterCost + System.Math.Abs(dx) * 0.4f, PathMoveKind.EnterRope));
+        }
+    }
+
     private static IEnumerable<int> WalkCandidateRows(int y)
     {
         yield return y;
@@ -288,7 +394,7 @@ public static class CompanionPathfinder
         int x = tile.X;
         for (int y = tile.Y; y <= tile.Y + maxScanDown; y++)
         {
-            if (IsStandable(x, y))
+            if (IsPathNode(x, y))
             {
                 tile = new Point(x, y);
                 return true;
@@ -298,7 +404,7 @@ public static class CompanionPathfinder
         // Also try snapping upward slightly: the reference point may be inside ground.
         for (int y = tile.Y - 1; y >= tile.Y - 6; y--)
         {
-            if (IsStandable(x, y))
+            if (IsPathNode(x, y))
             {
                 tile = new Point(x, y);
                 return true;
@@ -306,6 +412,11 @@ public static class CompanionPathfinder
         }
         return false;
     }
+
+    /// <summary>A tile the companion can occupy as a path node: standing on ground/platform, or
+    /// hanging on a rope column with room for the body.</summary>
+    private static bool IsPathNode(int x, int y) =>
+        IsStandable(x, y) || (CompanionRopeRegistry.IsRope(x, y) && BodyFits(x, y));
 
     public static bool IsStandable(int x, int y) => BodyFits(x, y) && HasSupport(x, y);
 

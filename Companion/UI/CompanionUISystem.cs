@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using Microsoft.Xna.Framework;
+using MoreAIPlayer.Companion.Automation;
 using MoreAIPlayer.Companion.Hunter;
 using Terraria;
 using Terraria.ID;
@@ -194,8 +195,8 @@ public sealed class CompanionUISystem : ModSystem
                 CompanionEntitySystem.ProjectileOwnerCorrections,
                 CompanionEntitySystem.LeakedContextRecoveries);
 
-            string[] lines = [modeLine, stateLine, itemCheckLine, aimLine, recoveryLine, ownershipLine];
-            Color[] colors =
+            List<string> lines = [modeLine, stateLine, itemCheckLine, aimLine, recoveryLine, ownershipLine];
+            List<Color> colors =
             [
                 new Color(200, 210, 235),
                 new Color(255, 225, 150),
@@ -205,8 +206,17 @@ public sealed class CompanionUISystem : ModSystem
                 new Color(160, 205, 235)
             ];
 
+            if (instance.IsAutoIdentity)
+            {
+                foreach (string line in AutoDiagnostics.BuildLines(instance.AutoBrain.TaskRuntime))
+                {
+                    lines.Add(line);
+                    colors.Add(new Color(120, 220, 255));
+                }
+            }
+
             Vector2 anchor = instance.Entity.Top - Main.screenPosition + new Vector2(0f, -70f);
-            for (int i = 0; i < lines.Length; i++)
+            for (int i = 0; i < lines.Count; i++)
             {
                 Vector2 size = font.MeasureString(lines[i]) * 0.75f;
                 Terraria.Utils.DrawBorderString(Main.spriteBatch, lines[i],
@@ -310,8 +320,8 @@ public sealed class CompanionUISystem : ModSystem
     }
 
     /// <summary>
-    /// A compact diegetic tracker: Hunter Game begins with a distant warning rather than an
-    /// instant ambush, then keeps the nearest threat's distance visible beside the player.
+    /// A compact diegetic tracker: every trial states its win condition first, then the nearest
+    /// threat. Breakout additionally gets a code-drawn edge marker, requiring no new asset.
     /// </summary>
     private static void DrawHunterTracker()
     {
@@ -324,20 +334,34 @@ public sealed class CompanionUISystem : ModSystem
 
         var font = Terraria.GameContent.FontAssets.MouseText.Value;
         const float scale = 0.82f;
-        string stageKey = HunterSystem.ActiveStage == HunterGameStage.PreHardmode
-            ? "HunterStagePreHardmode"
-            : "HunterStageEarlyHardmode";
-        string stageName = Language.GetTextValue($"Mods.MoreAIPlayer.CompanionCommand.{stageKey}");
-        string title = T("HunterTrackerTitle", stageName);
+        string trialName = Language.GetTextValue(
+            $"Mods.MoreAIPlayer.CompanionCommand.{HunterSystem.TrialKey(HunterSystem.ActiveTrial)}");
+        string title = T("HunterTrackerTitle", trialName);
+        string objective;
         string detail;
         Color detailColor;
 
         if (HunterSystem.IsPreparing)
         {
-            detail = T("HunterTrackerPreparing", HunterSystem.PreparationSeconds);
+            objective = T("HunterTrackerPreparing", HunterSystem.PreparationSeconds);
+            detail = T("HunterTrackerSearching");
             detailColor = new Color(255, 205, 110);
         }
-        else if (HunterSystem.TryGetNearestHunter(owner, out HunterInstance hunter, out float distance))
+        else
+        {
+            objective = HunterSystem.ActiveTrial switch
+            {
+                HunterTrialType.Elimination => T("HunterTrackerObjectiveElimination",
+                    HunterSystem.DefeatedHunters, HunterSystem.EliminationTarget),
+                HunterTrialType.Breakout when HunterSystem.TryGetBreakoutDestination(out Vector2 destination) =>
+                    T("HunterTrackerObjectiveBreakout",
+                        System.Math.Max(0, (int)System.MathF.Ceiling(Vector2.Distance(owner.Center, destination) / 16f)),
+                        HunterSystem.ObjectiveSecondsRemaining),
+                _ => T("HunterTrackerObjectiveSurvival", HunterSystem.ObjectiveSecondsRemaining)
+            };
+        }
+
+        if (HunterSystem.TryGetNearestHunter(owner, out HunterInstance hunter, out float distance))
         {
             int tiles = System.Math.Max(1, (int)System.MathF.Ceiling(distance / 16f));
             if (hunter.Entity.dead || hunter.Entity.statLife <= 0)
@@ -365,11 +389,37 @@ public sealed class CompanionUISystem : ModSystem
 
         Vector2 anchor = owner.Top - Main.screenPosition + new Vector2(0f, -66f);
         Vector2 titleSize = font.MeasureString(title) * scale;
+        Vector2 objectiveSize = font.MeasureString(objective) * scale;
         Vector2 detailSize = font.MeasureString(detail) * scale;
         Terraria.Utils.DrawBorderString(Main.spriteBatch, title,
             anchor - new Vector2(titleSize.X * 0.5f, 0f), new Color(255, 95, 95), scale);
+        Terraria.Utils.DrawBorderString(Main.spriteBatch, objective,
+            anchor + new Vector2(-objectiveSize.X * 0.5f, 17f), new Color(255, 225, 145), scale);
         Terraria.Utils.DrawBorderString(Main.spriteBatch, detail,
-            anchor + new Vector2(-detailSize.X * 0.5f, 17f), detailColor, scale);
+            anchor + new Vector2(-detailSize.X * 0.5f, 34f), detailColor, scale);
+
+        DrawBreakoutMarker(owner);
+    }
+
+    private static void DrawBreakoutMarker(Player owner)
+    {
+        if (!HunterSystem.TryGetBreakoutDestination(out Vector2 destination))
+            return;
+
+        Vector2 screenPoint = destination - Main.screenPosition;
+        const float margin = 42f;
+        bool onScreen = screenPoint.X >= margin && screenPoint.X <= Main.screenWidth - margin &&
+                        screenPoint.Y >= margin && screenPoint.Y <= Main.screenHeight - margin;
+        Vector2 marker = new(
+            MathHelper.Clamp(screenPoint.X, margin, Main.screenWidth - margin),
+            MathHelper.Clamp(screenPoint.Y, margin, Main.screenHeight - margin));
+        int tiles = System.Math.Max(0, (int)System.MathF.Ceiling(Vector2.Distance(owner.Center, destination) / 16f));
+        string text = T(onScreen ? "HunterBreakoutMarkerHere" : "HunterBreakoutMarker", tiles);
+        float pulse = 0.72f + 0.28f * System.MathF.Sin(Main.GlobalTimeWrappedHourly * 5f);
+        Color color = new Color(110, 255, 190) * pulse;
+        Vector2 size = Terraria.GameContent.FontAssets.MouseText.Value.MeasureString(text) * 0.8f;
+        Vector2 position = marker - new Vector2(size.X * 0.5f, size.Y * 0.5f);
+        Terraria.Utils.DrawBorderString(Main.spriteBatch, text, position, color, 0.8f);
     }
 
     public override void ModifyInterfaceLayers(List<GameInterfaceLayer> layers)

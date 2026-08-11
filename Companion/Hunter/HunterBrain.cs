@@ -17,7 +17,7 @@ public sealed class HunterBrain
     private readonly CompanionNavigator navigator = new();
 
     public HunterState State { get; private set; } = HunterState.Hunting;
-    private int stateTimer = 7200; // 120s hunting initial
+    private int stateTimer = HuntingDurationTicks;
     private int potionCooldown;
     private Vector2 restingSpot;
     private bool hasRestingSpot;
@@ -28,8 +28,8 @@ public sealed class HunterBrain
     private int aimRefreshTicks;
     private Vector2 aimError;
 
-    public const int HuntingDurationTicks = 7200;  // 2 minutes hunting
-    public const int RestingDurationTicks = 2700;  // 45 seconds resting/developing
+    public const int HuntingDurationTicks = 5400;  // 90 seconds of pressure
+    public const int RestingDurationTicks = 900;   // 15-second tactical reset
     private const int StuckRecoveryTicks = 300;
     private const int RelocationCooldownTicks = 600;
     private const float MeaningfulProgressDistance = 24f;
@@ -37,7 +37,7 @@ public sealed class HunterBrain
     public void ResetForNewLife(Player me)
     {
         State = HunterState.Hunting;
-        stateTimer = HuntingDurationTicks;
+        stateTimer = CurrentHuntingDuration();
         potionCooldown = 0;
         restingSpot = me?.Center ?? Vector2.Zero;
         hasRestingSpot = false;
@@ -78,22 +78,29 @@ public sealed class HunterBrain
         if (aimRefreshTicks > 0)
             aimRefreshTicks--;
 
-        // State cycling
-        stateTimer--;
-        if (stateTimer <= 0)
+        // Breakout is a continuous interception: a hunter never inexplicably stops resting while
+        // the target runs for the exit. Other trials retain short, readable pressure windows.
+        if (!HunterSystem.HuntersMayRest && State == HunterState.Resting)
         {
-            if (State == HunterState.Hunting)
+            State = HunterState.Hunting;
+            stateTimer = CurrentHuntingDuration();
+            hasRestingSpot = false;
+        }
+        else if (HunterSystem.HuntersMayRest)
+        {
+            stateTimer--;
+            if (stateTimer <= 0 && State == HunterState.Hunting)
             {
                 State = HunterState.Resting;
-                stateTimer = RestingDurationTicks;
+                stateTimer = CurrentRestingDuration();
                 restingSpot = me.Center;
                 hasRestingSpot = true;
                 Main.NewText(Language.GetTextValue("Mods.MoreAIPlayer.CompanionCommand.HunterResting", me.name), 255, 200, 100);
             }
-            else
+            else if (stateTimer <= 0)
             {
                 State = HunterState.Hunting;
-                stateTimer = HuntingDurationTicks;
+                stateTimer = CurrentHuntingDuration();
                 hasRestingSpot = false;
                 Main.NewText(Language.GetTextValue("Mods.MoreAIPlayer.CompanionCommand.HunterHunting", me.name), 255, 100, 100);
             }
@@ -127,6 +134,7 @@ public sealed class HunterBrain
     private void UpdateHuntingBehavior(HunterInstance instance, Player me, Player targetPlayer)
     {
         float distance = Vector2.Distance(me.Center, targetPlayer.Center);
+        Vector2 pursuitAnchor = HunterSystem.GetPursuitAnchor(instance, targetPlayer);
 
         // Hunters deliberately enter from well beyond the screen. Only a true long-distance
         // relocation (mirror, pylon, teleporter) snaps them back into the pursuit.
@@ -186,11 +194,11 @@ public sealed class HunterBrain
         // is a real firing lane instead of standing at the preferred distance shooting stone.
         if (!canSeeTarget)
         {
-            navigator.Navigate(me, targetPlayer.Center);
+            navigator.Navigate(me, pursuitAnchor);
         }
         else if (!useFallback && distance > preferredRange + 48f)
         {
-            navigator.Navigate(me, targetPlayer.Center);
+            navigator.Navigate(me, pursuitAnchor);
         }
         else if (!useFallback && distance < preferredRange - 48f)
         {
@@ -201,7 +209,7 @@ public sealed class HunterBrain
         }
         else if (useFallback && distance > 72f)
         {
-            navigator.Navigate(me, targetPlayer.Center);
+            navigator.Navigate(me, pursuitAnchor);
         }
 
         // Jump if stuck or target is higher
@@ -317,4 +325,18 @@ public sealed class HunterBrain
         hasProgressAnchor = true;
         stuckTicks = 0;
     }
+
+    private static int CurrentHuntingDuration() => HunterSystem.ActiveTrial switch
+    {
+        HunterTrialType.Survival => HuntingDurationTicks,
+        HunterTrialType.Elimination => 4500,
+        HunterTrialType.Breakout => int.MaxValue,
+        _ => HuntingDurationTicks
+    };
+
+    private static int CurrentRestingDuration() => HunterSystem.ActiveTrial switch
+    {
+        HunterTrialType.Elimination => 720,
+        _ => RestingDurationTicks
+    };
 }

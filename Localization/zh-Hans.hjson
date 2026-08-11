@@ -15,6 +15,15 @@ Mods: {
 		}
 
 		Configs: {
+			MoreAIPlayerServerConfig: {
+				DisplayName: 幻影伙伴玩法设置
+
+				OrdinaryCompanionsHostileToPlayers: {
+					Label: "[i:BloodyMachete] 普通伙伴可误伤玩家"
+					Tooltip: 默认关闭，仅供娱乐与测试。只影响调试书召唤的普通幻影伙伴；它们彼此为友军，依然只主动锁定敌对 NPC。玩家可以伤害它们，而它们的物品或弹幕攻击接触玩家时也会造成伤害。猎人以及当前或曾经的自动伙伴均不受影响。
+				}
+			}
+
 			MoreAIPlayerClientConfig: {
 				DisplayName: 幻影伙伴客户端设置
 
@@ -161,11 +170,13 @@ Mods: {
 				DisplayName: 猎人书
 				Tooltip:
 					'''
-					左键：开始或结束「猎人游戏」。猎人会先在远处集结，再开始追猎。
-					右键：选择 1 至 3 名猎人并查看游戏状态。
+					左键：开始或放弃当前「猎人试炼」。猎人会先在远处集结，再开始行动。
+					右键：选择 1 至 3 名猎人以及试炼规则。
+					· 生存：在不断复活的猎人追杀下坚持 180 秒。
+					· 讨伐：击败指定数量的猎人；他们会重整后继续参战。
+					· 突围：在 150 秒内抵达远处突破点；猎人会沿路线提前拦截且不会休整。
 					仅开放于困难模式前击败任意 Boss 后至肉山前，以及困难模式开始至世纪之花前；击败肉山或世纪之花会结束当前游戏。
 					猎人只使用当前阶段的预设套装，绝不参考你的防御力。猎人越多，单个猎人的数值越低。
-					角色身边会显示集结倒计时和最近猎人的距离。
 					'''
 			}
 
@@ -349,12 +360,17 @@ Mods: {
 			DiagnosticsRecovery: 自动恢复 ItemCheck {0} · 槽位 {1} · 瞄准 {2} · 连续漏帧 {3}
 			DiagnosticsOwnership: 弹幕归属修复 {0} · 上下文泄漏修复 {1}
 			RightClickOpen: "{0} · 右键打开装备与背包"
-			HunterTrackerTitle: 猎人游戏 · {0}
+			HunterTrackerTitle: 猎人试炼 · {0}
 			HunterTrackerPreparing: 猎人正在远处集结 · {0}s
 			HunterTrackerNearest: 最近猎人：{0} 格
 			HunterTrackerResting: 最近猎人正在休整：{0} 格
 			HunterTrackerReviving: 最近猎人重整中：{0}s
 			HunterTrackerSearching: 正在搜索猎人信号...
+			HunterTrackerObjectiveSurvival: 目标：存活 · 剩余 {0}s
+			HunterTrackerObjectiveElimination: 目标：击败猎人 · {0}/{1}
+			HunterTrackerObjectiveBreakout: 目标：突破点 {0} 格 · 剩余 {1}s
+			HunterBreakoutMarker: ◆ 突破点 · {0} 格
+			HunterBreakoutMarkerHere: ◆ 突破点
 		}
 
 		CompanionCommand: {
@@ -385,21 +401,18 @@ Mods: {
 			HunterNameBravo: 猎人·布拉沃
 			HunterNameCharlie: 猎人·查理
 			HunterNameFallback: 猎人 #{0}
-			HunterModeEnabled: 【猎人游戏】{0}已开始。猎人正在远处集结...
-			HunterModeDisabled: 【猎人游戏】已结束。警报解除。
-			HunterRestarting: 【猎人游戏】下一波猎人正在远处集结...
-			HunterRequiresBoss: 击败困难模式前的任意 Boss 后，才能开始猎人游戏。
-			HunterUnavailablePostPlantera: 世纪之花后不再开放猎人游戏。
-			HunterStageEndedHardmode: 【猎人游戏】肉山已被击败，本次困难模式前的游戏结束。
-			HunterStageEndedPlantera: 【猎人游戏】世纪之花已被击败，本次游戏结束。
+			HunterRequiresBoss: 击败困难模式前的任意 Boss 后，才能开始猎人试炼。
+			HunterUnavailablePostPlantera: 世纪之花后不再开放猎人试炼。
+			HunterStageEndedHardmode: 【猎人试炼】肉山已被击败，本次困难模式前的试炼结束。
+			HunterStageEndedPlantera: 【猎人试炼】世纪之花已被击败，本次试炼结束。
 			HunterStagePreHardmode: 困难模式前追猎
 			HunterStageEarlyHardmode: 困难模式初期追猎
 			HunterStageUnavailable: 当前阶段不可用
 			HunterStageStatus: 游戏阶段：{0}
 			HunterSpawned: 【警告】敌对玩家 {0} 已潜入你的世界！
-			HunterDefeated: 【广播】敌对玩家 {0} 被击败了！将在 60 秒后重构配装复活...
+			HunterDefeated: 【广播】敌对玩家 {0} 被击败！将在 {1} 秒后重整归队...
 			HunterRespawned: 【警告】敌对玩家 {0} 已复活并重新发起追逐！
-			HunterSingleplayerOnly: 猎人追杀模式目前仅支持单人模式。
+			HunterSingleplayerOnly: 猎人试炼目前仅支持单人模式。
 			ScaleSingleplayerOnly: 体型矩阵目前仅支持单人模式。
 			ScaleNoSpace: 此处没有足够空间容纳当前选择的体型。
 			ScalePanelTitle: ◆ 水晶体型矩阵
@@ -409,19 +422,39 @@ Mods: {
 			Disabled: 关
 			HunterResting: "[猎人警告] {0} 暂时拉开距离，开始原地休整与收集资源！"
 			HunterHunting: "[猎人警告] {0} 再次发现了你的踪迹，重新发起追杀！"
-			HunterPanelTitle: ⚔ 猎人追杀模式配置
+			HunterPanelTitle: ⚔ 猎人试炼配置
 			Close: 关闭
-			HunterPanelEnabled: 【模式状态】已开启（点击关闭）
-			HunterPanelDisabled: 【模式状态】已关闭（点击开启）
+			HunterPanelEnabled: 【试炼进行中】点击放弃
+			HunterPanelDisabled: 【试炼未开始】点击开始
 			HunterCountTitle: 设定追杀猎人数量：
 			HunterCount: "{0} 名猎人"
 			HunterStatusTitle: 猎人当前状态：
-			HunterInactive: · 追杀模式未激活
+			HunterInactive: · 猎人试炼尚未开始
 			HunterPanelReviving: · {0}：阵亡复活中（剩余 {1}s）
 			HunterPanelResting: · {0}：原地休整并收集资源
 			HunterPanelHunting: · {0}：正在全力追赶并试图击杀你！
-			HunterRefresh: 🔄 重新构建并派遣猎人小队
-			HunterRefreshed: 已重构并重新派遣敌对猎人小队！
+			HunterRefresh: 🔄 从头开始当前试炼
+			HunterTrialSurvival: 生存
+			HunterTrialElimination: 讨伐
+			HunterTrialBreakout: 突围
+			HunterTrialTypeTitle: 选择试炼规则：
+			HunterTrialSurvivalDescription: 坚持 {0} 秒；猎人阵亡后会重整归队。
+			HunterTrialEliminationDescription: 累计击败 {0} 名猎人；你阵亡则失败。
+			HunterTrialBreakoutDescription: 在 {0} 秒内抵达突破点；猎人会提前拦截。
+			HunterObjectiveStatusTitle: 当前目标：
+			HunterObjectiveNotStarted: 选择规则后开始试炼
+			HunterTrialStartSurvival: 【生存试炼】坚持 {0} 秒。世界阶段：{1}。
+			HunterTrialStartElimination: 【讨伐试炼】击败 {0} 名猎人。世界阶段：{1}。
+			HunterTrialStartBreakout: 【突围试炼】在 {0} 秒内抵达突破点。世界阶段：{1}。
+			HunterTrialAbandoned: 【猎人试炼】试炼已放弃，警报解除。
+			HunterCannotStartDead: 当前角色无法行动，不能开始猎人试炼。
+			HunterTrialRestarting: 【猎人试炼】正在从头重启「{0}」，猎人重新集结...
+			HunterTrialFailedDeath: 【试炼失败】你被击败了。
+			HunterTrialFailedTimeout: 【试炼失败】时间耗尽，未能抵达突破点。
+			HunterTrialVictorySurvival: 【试炼成功】你存活了 {0} 秒，并击败 {1} 名猎人。
+			HunterTrialVictoryElimination: 【试炼成功】你在 {1} 秒内击败了 {0} 名猎人。
+			HunterTrialVictoryBreakout: 【试炼成功】你在 {0} 秒内完成突围，途中击败 {1} 名猎人。
+			HunterDefeatedProgress: 【讨伐进度】{0} 被击败：{1}/{2}；将在 {3} 秒后重整。
 			BuilderModeSmartBuild: 智能建造
 			BuilderModeDefensiveBuild: 防御建造
 			BuilderModeBattlePlatform: 战斗平台

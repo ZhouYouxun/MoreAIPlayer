@@ -843,7 +843,9 @@ public sealed class CompanionBrain
             float standoffMin = RangedStandoffMin * standoffFactor;
             if (distance > standoffMax || !hasLineOfSight)
             {
-                Travel(me, target.Center);
+                // Ranged / magic / summon keep their combat layer: an enemy below is never a
+                // reason to drop off the platform when the shot can be taken from up here.
+                Travel(me, target.Center, NavigationIntent.Combat, allowPlatformDrop: false);
             }
             else if (distance < standoffMin)
             {
@@ -863,7 +865,13 @@ public sealed class CompanionBrain
         {
             float reach = CompanionWeaponBehaviors.GetMeleeReach(me, plan.Weapon) * aggressionFactor;
             if (distance > reach * 0.8f || !hasLineOfSight)
-                Travel(me, target.Center);
+            {
+                // Melee may commit to a single, landing-verified drop only when the enemy is
+                // clearly on a lower layer and cannot be struck from the current one.
+                bool targetClearlyBelow = target.Center.Y > me.Center.Y + 1.5f * 16f;
+                bool mustDropToReach = targetClearlyBelow && !hasLineOfSight;
+                Travel(me, target.Center, NavigationIntent.Combat, allowPlatformDrop: mustDropToReach);
+            }
             else
                 navigator.Idle(me);
         }
@@ -961,7 +969,7 @@ public sealed class CompanionBrain
 
     /// <summary>Navigate toward a goal, clamped to the hold leash while posted so combat chasing
     /// never drags the companion off its anchor.</summary>
-    private void Travel(Player me, Vector2 goal)
+    private void Travel(Player me, Vector2 goal, NavigationIntent intent = NavigationIntent.Follow, bool allowPlatformDrop = false)
     {
         if (combatLeashActive)
         {
@@ -969,7 +977,28 @@ public sealed class CompanionBrain
             if (fromAnchor.Length() > combatLeashRadius)
                 goal = combatLeashAnchor + Vector2.Normalize(fromAnchor) * combatLeashRadius;
         }
-        navigator.Navigate(me, goal);
+        navigator.Navigate(me, new NavigationRequest(goal, intent, allowPlatformDrop,
+            preferKeepElevation: intent == NavigationIntent.Combat));
+    }
+
+    /// <summary>
+    /// Builds a travel order for a non-combat goal, deciding platform-drop permission from the
+    /// intent. Follow / Mine / Build only allow a drop when the goal is clearly on a lower layer;
+    /// a user waypoint and free-roam exploration allow the search to use (still safety-gated) drop
+    /// edges; everything else stays on the current layer.
+    /// </summary>
+    private static NavigationRequest NavRequest(Player me, Vector2 goal, NavigationIntent intent)
+    {
+        bool clearlyBelow = goal.Y > me.Center.Y + 24f;
+        bool allowDrop = intent switch
+        {
+            NavigationIntent.Waypoint => true,
+            NavigationIntent.Explore => true,
+            NavigationIntent.Escape => true,
+            NavigationIntent.Follow or NavigationIntent.Mine or NavigationIntent.Build => clearlyBelow,
+            _ => false
+        };
+        return new NavigationRequest(goal, intent, allowPlatformDrop: allowDrop);
     }
 
     /// <summary>A posted companion only takes a target it can actually shoot/reach from within its
@@ -1146,7 +1175,7 @@ public sealed class CompanionBrain
             Vector2 digCenter = new(observation.ObservedTileX * 16f + 8f, observation.ObservedTileY * 16f + 8f);
             if (Vector2.Distance(me.Center, digCenter) > MiningApproachDistance)
             {
-                navigator.Navigate(me, digCenter);
+                navigator.Navigate(me, NavRequest(me, digCenter, NavigationIntent.Mine));
                 return true;
             }
         }
@@ -1370,7 +1399,7 @@ public sealed class CompanionBrain
         // biggest cause of "mining feels broken". Reach alone, exactly as ItemCheck_UseMiningTools.
         if (!IsTileInMiningReach(me, tool, targetTile.X, targetTile.Y))
         {
-            navigator.Navigate(me, targetCenter);
+            navigator.Navigate(me, NavRequest(me, targetCenter, NavigationIntent.Mine));
             return true;
         }
 
@@ -1544,7 +1573,7 @@ public sealed class CompanionBrain
 
         if (bestDistance > 56f)
         {
-            navigator.Navigate(me, critter.Center);
+            navigator.Navigate(me, NavRequest(me, critter.Center, NavigationIntent.Follow));
             return true;
         }
 
@@ -1663,7 +1692,7 @@ public sealed class CompanionBrain
     private void NavigateToWaypoint(CompanionInstance instance, Player me)
     {
         if (instance.Waypoint is Vector2 waypoint)
-            navigator.Navigate(me, waypoint);
+            navigator.Navigate(me, NavRequest(me, waypoint, NavigationIntent.Waypoint));
     }
 
     /// <summary>Garrison / posted behaviour when there is nothing to fight: sit on the anchor,
@@ -1679,7 +1708,7 @@ public sealed class CompanionBrain
             return;
         }
 
-        navigator.Navigate(me, holdAnchor);
+        navigator.Navigate(me, NavRequest(me, holdAnchor, NavigationIntent.Follow));
     }
 
     private void FollowOwner(Player me, Player owner, float sideOffset, float idleReachX,
@@ -1724,7 +1753,9 @@ public sealed class CompanionBrain
             return;
         }
 
-        navigator.Navigate(me, standPoint);
+        // Following: a platform drop is permitted only when the owner is clearly on a lower layer
+        // (NavRequest gates on the goal being clearly below), and even then the landing is verified.
+        navigator.Navigate(me, NavRequest(me, standPoint, NavigationIntent.Follow));
     }
 
     /// <summary>
@@ -1777,7 +1808,7 @@ public sealed class CompanionBrain
             freeRoamGoalTicks = FreeRoamGoalTimeout;
         }
 
-        navigator.Navigate(me, freeRoamGoal);
+        navigator.Navigate(me, NavRequest(me, freeRoamGoal, NavigationIntent.Explore));
     }
 
     /// <summary>

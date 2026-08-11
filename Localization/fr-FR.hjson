@@ -15,6 +15,15 @@ Mods: {
 		}
 
 		Configs: {
+			MoreAIPlayerServerConfig: {
+				DisplayName: Règles de jeu des compagnons fantômes
+
+				OrdinaryCompanionsHostileToPlayers: {
+					Label: "[i:BloodyMachete] Les compagnons ordinaires peuvent blesser les joueurs"
+					Tooltip: Désactivé par défaut et réservé au divertissement et aux tests. Seuls les compagnons ordinaires invoqués par le livre de débogage sont concernés. Ils restent alliés entre eux et ne ciblent activement que les PNJ hostiles. Les joueurs peuvent les blesser et leurs armes ou projectiles peuvent blesser les joueurs au contact. Les chasseurs et les compagnons automatiques présents ou passés sont exclus.
+				}
+			}
+
 			MoreAIPlayerClientConfig: {
 				DisplayName: Paramètres client des compagnons fantômes
 
@@ -161,12 +170,13 @@ Mods: {
 				DisplayName: Grimoire des chasseurs
 				Tooltip:
 					'''
-					Note : cet objet est encore en test et peut comporter des problèmes.
-					Clic gauche : active ou désactive le mode Traque. Des chasseurs hostiles suivront votre piste.
-					Clic droit : ouvre les réglages de Traque et permet de choisir 1 à 3 chasseurs.
-					L'équipement des chasseurs évolue selon la progression du monde et votre défense. Le mode Traque active le JcJ tant qu'il est en cours.
-					Les chasseurs vous poursuivent pendant 2 minutes, se reposent 45 secondes, puis reprennent la chasse.
-					Les chasseurs vaincus reviennent après 60 secondes avec un nouvel équipement.
+					Clic gauche : lance ou abandonne l'Épreuve des chasseurs choisie. Ils se rassemblent d'abord au loin.
+					Clic droit : choisissez 1 à 3 chasseurs et une règle.
+					· Survie : tenez 180 secondes face à des chasseurs qui reviennent après leur défaite.
+					· Élimination : battez le nombre requis de chasseurs.
+					· Percée : atteignez une sortie lointaine en 150 secondes ; les chasseurs interceptent votre route.
+					Disponible après un boss pré-Hardmode jusqu'au Mur de chair, puis au début du Hardmode jusqu'à Plantera.
+					L'équipement dépend de la phase du monde, jamais de votre défense. Plus ils sont nombreux, plus chacun est faible.
 					'''
 			}
 
@@ -344,12 +354,17 @@ Mods: {
 			DiagnosticsRecovery: Vérification d'objet récupérée {0} · emplacement {1} · visée {2} · ratés consécutifs {3}
 			DiagnosticsOwnership: Propriété des projectiles corrigée {0} · fuites de contexte {1}
 			RightClickOpen: "{0} · Clic droit pour ouvrir équipement et sac"
-			HunterTrackerTitle: Jeu du chasseur · {0}
+			HunterTrackerTitle: Épreuve des chasseurs · {0}
 			HunterTrackerPreparing: Les chasseurs se rassemblent au loin · {0}s
 			HunterTrackerNearest: Chasseur le plus proche : {0} cases
 			HunterTrackerResting: Chasseur le plus proche au repos : {0} cases
 			HunterTrackerReviving: Chasseur le plus proche se regroupe : {0}s
 			HunterTrackerSearching: Recherche des signaux de chasseurs...
+			HunterTrackerObjectiveSurvival: Objectif : survivre · {0}s restantes
+			HunterTrackerObjectiveElimination: Objectif : vaincre les chasseurs · {0}/{1}
+			HunterTrackerObjectiveBreakout: Objectif : sortie à {0} cases · {1}s restantes
+			HunterBreakoutMarker: ◆ Sortie · {0} cases
+			HunterBreakoutMarkerHere: ◆ Sortie
 		}
 
 		CompanionCommand: {
@@ -380,21 +395,18 @@ Mods: {
 			HunterNameBravo: Chasseur · Bravo
 			HunterNameCharlie: Chasseur · Charlie
 			HunterNameFallback: Chasseur #{0}
-			HunterModeEnabled: "[Jeu du chasseur] {0} commencé. Les chasseurs se rassemblent au loin..."
-			HunterModeDisabled: "[Jeu du chasseur] terminé. L'alerte est levée."
-			HunterRestarting: "[Jeu du chasseur] La prochaine vague se rassemble au loin..."
-			HunterRequiresBoss: Battez n'importe quel boss avant le Hardmode pour déverrouiller le Jeu du chasseur.
-			HunterUnavailablePostPlantera: Le Jeu du chasseur n'est plus disponible après Plantera.
-			HunterStageEndedHardmode: "[Jeu du chasseur] Le Mur de chair est tombé. Cette partie pré-Hardmode est terminée."
-			HunterStageEndedPlantera: "[Jeu du chasseur] Plantera est tombée. Cette partie est terminée."
+			HunterRequiresBoss: Battez un boss pré-Hardmode pour déverrouiller les Épreuves des chasseurs.
+			HunterUnavailablePostPlantera: Les Épreuves des chasseurs ne sont plus disponibles après Plantera.
+			HunterStageEndedHardmode: "[Épreuve des chasseurs] Le Mur de chair est tombé. Cette épreuve pré-Hardmode est terminée."
+			HunterStageEndedPlantera: "[Épreuve des chasseurs] Plantera est tombée. Cette épreuve est terminée."
 			HunterStagePreHardmode: Traque pré-Hardmode
 			HunterStageEarlyHardmode: Traque Hardmode initiale
 			HunterStageUnavailable: Aucune phase disponible
 			HunterStageStatus: Phase de jeu : {0}
 			HunterSpawned: "[Avertissement] Le joueur hostile {0} s'est infiltré dans votre monde !"
-			HunterDefeated: "[Annonce] Le joueur hostile {0} a été vaincu ! Il reviendra dans 60 secondes avec un nouvel équipement..."
+			HunterDefeated: "[Annonce] Le joueur hostile {0} a été vaincu ! Regroupement dans {1} secondes..."
 			HunterRespawned: "[Avertissement] Le joueur hostile {0} est revenu et reprend la traque !"
-			HunterSingleplayerOnly: Le mode Traque n'est disponible qu'en solo pour le moment.
+			HunterSingleplayerOnly: Les Épreuves des chasseurs sont réservées au solo pour le moment.
 			ScaleSingleplayerOnly: La matrice de taille n'est disponible qu'en solo pour le moment.
 			ScaleNoSpace: Il n'y a pas assez de place ici pour la taille choisie.
 			ScalePanelTitle: ◆ Matrice de taille cristalline
@@ -404,19 +416,39 @@ Mods: {
 			Disabled: Désactivé
 			HunterResting: "[Alerte de traque] {0} se retire pour se reposer et réunir des provisions !"
 			HunterHunting: "[Alerte de traque] {0} a retrouvé votre piste et reprend la traque !"
-			HunterPanelTitle: ⚔ Réglages du mode Traque
+			HunterPanelTitle: ⚔ Réglages de l'Épreuve des chasseurs
 			Close: Fermer
-			HunterPanelEnabled: "[État du mode] Activé (cliquer pour désactiver)"
-			HunterPanelDisabled: "[État du mode] Désactivé (cliquer pour activer)"
+			HunterPanelEnabled: "[Épreuve active] Cliquer pour abandonner"
+			HunterPanelDisabled: "[Épreuve inactive] Cliquer pour commencer"
 			HunterCountTitle: Nombre de chasseurs :
 			HunterCount: "{0} chasseur(s)"
 			HunterStatusTitle: État des chasseurs :
-			HunterInactive: · Le mode Traque est inactif
+			HunterInactive: · L'Épreuve des chasseurs n'a pas commencé
 			HunterPanelReviving: · {0} : réapparition ({1}s restantes)
 			HunterPanelResting: · {0} : se repose et réunit des provisions
 			HunterPanelHunting: · {0} : se rapproche pour vous abattre !
-			HunterRefresh: 🔄 Reconstruire et déployer l'escouade de chasseurs
-			HunterRefreshed: L'escouade de chasseurs a été reconstruite et redéployée !
+			HunterRefresh: 🔄 Recommencer l'épreuve actuelle
+			HunterTrialSurvival: Survie
+			HunterTrialElimination: Élimination
+			HunterTrialBreakout: Percée
+			HunterTrialTypeTitle: Choisissez une règle :
+			HunterTrialSurvivalDescription: Tenez {0} secondes ; les chasseurs vaincus reviennent.
+			HunterTrialEliminationDescription: Battez {0} chasseurs ; votre mort fait échouer l'épreuve.
+			HunterTrialBreakoutDescription: Atteignez la sortie en {0} secondes ; les chasseurs interceptent.
+			HunterObjectiveStatusTitle: Objectif actuel :
+			HunterObjectiveNotStarted: Choisissez une règle puis commencez l'épreuve
+			HunterTrialStartSurvival: "[Survie] Tenez {0} secondes. Phase du monde : {1}."
+			HunterTrialStartElimination: "[Élimination] Battez {0} chasseurs. Phase du monde : {1}."
+			HunterTrialStartBreakout: "[Percée] Atteignez la sortie en {0} secondes. Phase du monde : {1}."
+			HunterTrialAbandoned: "[Épreuve des chasseurs] Épreuve abandonnée. L'alerte est levée."
+			HunterCannotStartDead: Impossible de commencer l'épreuve sans pouvoir agir.
+			HunterTrialRestarting: "[Épreuve des chasseurs] Redémarrage de {0}. Les chasseurs se regroupent..."
+			HunterTrialFailedDeath: "[Épreuve échouée] Vous avez été vaincu."
+			HunterTrialFailedTimeout: "[Épreuve échouée] Le délai pour atteindre la sortie est écoulé."
+			HunterTrialVictorySurvival: "[Épreuve réussie] {0} secondes survécues et {1} chasseurs vaincus."
+			HunterTrialVictoryElimination: "[Épreuve réussie] {0} chasseurs vaincus en {1} secondes."
+			HunterTrialVictoryBreakout: "[Épreuve réussie] Percée en {0} secondes et {1} chasseurs vaincus."
+			HunterDefeatedProgress: "[Élimination] {0} vaincu : {1}/{2}. Regroupement dans {3} secondes."
 			BuilderModeSmartBuild: Smart Build
 			BuilderModeDefensiveBuild: Defensive Build
 			BuilderModeBattlePlatform: Battle Platform

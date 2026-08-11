@@ -20,7 +20,7 @@ public sealed class CompanionCommandBook : ModItem
     // Clicking this close to a standing waypoint cancels it instead of moving it.
     private const float CancelRadius = 3f * 16f;
 
-    public override string Texture => $"Terraria/Images/Item_{ItemID.WaterBolt}";
+    public override string Texture => "MoreAIPlayer/图片/指挥书";
 
     public override void SetDefaults()
     {
