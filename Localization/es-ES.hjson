@@ -64,6 +64,11 @@ Mods: {
 					Tooltip: Desactivado por defecto. Al recibir daño, los compañeros se teletransportan a lugares seguros y separados cerca de ti.
 				}
 
+				ExtraAccessorySlots: {
+					Label: "[i:CelestialShell] Ranuras extra de accesorios del compañero"
+					Tooltip: Control de cliente de 0 a 7. Al bajar el valor, los objetos se conservan pero sus efectos se desactivan.
+				}
+
 				CompanionsAutoCollectWorldItems: {
 					Label: "[i:TreasureMagnet] Los compañeros recogen objetos del mundo automáticamente"
 					Tooltip: Desactivado por defecto. Al estar apagado, los compañeros no escanean, reservan, persiguen ni recogen objetos del mundo. Actívalo solo tras comprobar la compatibilidad con tu partida y otros mods.
@@ -254,6 +259,8 @@ Mods: {
 			Vanity: Apariencia
 			Dye: Tinte
 			Accessories: Accesorios (por progreso; sin Corazón de demonio)
+			ExtraAccessories: Accesorios adicionales (activados por el control de configuración)
+			ExtraAccessoryLocked: Sube el control de ranuras extra de accesorios del compañero en la configuración del cliente
 			HeadArmorOnly: Solo armadura de cabeza
 			BodyArmorOnly: Solo armadura de torso
 			LegArmorOnly: Solo armadura de piernas

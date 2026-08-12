@@ -114,6 +114,35 @@ public static class AutoInventory
         return false;
     }
 
+    /// <summary>Checks whether the whole incoming stack can be stored without mutating either the
+    /// backpack or the source item. Crafting uses this before consuming ingredients.</summary>
+    public static bool CanFit(CompanionProfile profile, Item incoming)
+    {
+        if (incoming is null || incoming.IsAir)
+            return true;
+
+        int remaining = incoming.stack;
+        foreach (Item stored in profile.Backpack)
+        {
+            if (stored.IsAir || stored.type != incoming.type || stored.prefix != incoming.prefix ||
+                stored.stack >= stored.maxStack)
+                continue;
+            remaining -= stored.maxStack - stored.stack;
+            if (remaining <= 0)
+                return true;
+        }
+
+        foreach (Item stored in profile.Backpack)
+        {
+            if (!stored.IsAir)
+                continue;
+            remaining -= incoming.maxStack;
+            if (remaining <= 0)
+                return true;
+        }
+        return false;
+    }
+
     /// <summary>A pickaxe in the companion's inventory with the highest pick power, or air.</summary>
     public static Item BestPickaxe(CompanionProfile profile) => Best(profile, item => item.pick);
 

@@ -62,9 +62,7 @@ public static class AutoStationController
             }
         }
 
-        return AutoCraftingService.TryCraft(ctx.Instance, ctx.Profile, itemType)
-            ? AutoTaskResult.Running     // item crafted; next tick step 3 places it
-            : AutoTaskResult.RetryLater; // missing materials or not craftable here yet
+        return CraftResult(AutoCraftingService.TryCraft(ctx.Instance, ctx.Profile, itemType));
     }
 
     /// <summary>
@@ -89,9 +87,7 @@ public static class AutoStationController
             }
         }
 
-        return AutoCraftingService.TryCraft(ctx.Instance, ctx.Profile, productType)
-            ? AutoTaskResult.Running
-            : AutoTaskResult.RetryLater;
+        return CraftResult(AutoCraftingService.TryCraft(ctx.Instance, ctx.Profile, productType));
     }
 
     /// <summary>
@@ -118,9 +114,15 @@ public static class AutoStationController
         {
             if (AutoCraftingService.TryCraft(ctx.Instance, ctx.Profile, bar))
                 return AutoTaskResult.Running;
+            if (!AutoCraftingService.IsAvailable)
+                return AutoTaskResult.Faulted;
         }
         return AutoTaskResult.RetryLater;
     }
+
+    private static AutoTaskResult CraftResult(bool crafted) => crafted
+        ? AutoTaskResult.Running
+        : AutoCraftingService.IsAvailable ? AutoTaskResult.RetryLater : AutoTaskResult.Faulted;
 
     private static bool IsTile(Point tile, int tileType) =>
         WorldGen.InWorld(tile.X, tile.Y, 2) && Main.tile[tile.X, tile.Y].HasTile &&

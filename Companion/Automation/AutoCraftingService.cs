@@ -16,6 +16,9 @@ namespace MoreAIPlayer.Companion.Automation;
 /// </summary>
 public static class AutoCraftingService
 {
+    public static bool IsAvailable =>
+        CompanionFaultGuard.IsAvailable(CompanionFaultGuard.AutomationCraftingLane);
+
     /// <summary>
     /// Attempts to craft one batch of <paramref name="targetItemType"/> at the companion's current
     /// position. Returns true only if a real craft happened (ingredients consumed, result added to
@@ -24,7 +27,10 @@ public static class AutoCraftingService
     public static bool TryCraft(CompanionInstance instance, CompanionProfile profile, int targetItemType)
     {
         bool crafted = false;
-        CompanionFaultGuard.Run(CompanionFaultGuard.AutomationCraftingLane,
+        // Crafting consumes real materials and invokes arbitrary RecipeLoader hooks. A fault must
+        // trip only this lane for the session; repeatedly re-entering the same half-mutating hook is
+        // riskier than cooling the plan down and surfacing a blocked reason.
+        CompanionFaultGuard.RunCritical(CompanionFaultGuard.AutomationCraftingLane,
             () => crafted = TryCraftCore(instance.Entity, profile, targetItemType));
         return crafted;
     }
@@ -59,13 +65,15 @@ public static class AutoCraftingService
 
                 Item result = recipe.createItem.Clone();
                 result.Prefix(-1);
+                // Never consume ingredients unless the complete result has a legal destination.
+                // The old path could report success after TryAddToBackpack failed and silently lose
+                // the crafted item — exactly the kind of partial transition hardening must forbid.
+                if (!AutoInventory.CanFit(profile, result))
+                    return false;
                 recipe.Create();                            // consume ingredients + ConsumeItem hooks
                 RecipeLoader.OnCraft(result, recipe, result); // OnCraft hooks (mod effects)
 
-                // Anything that will not fit stays in the world as nothing was over-consumed; the
-                // craft still happened, so report success and let the next tick place/deposit it.
-                AutoInventory.Give(profile, result);
-                return true;
+                return AutoInventory.Give(profile, result);
             }
 
             return false;

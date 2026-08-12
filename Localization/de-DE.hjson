@@ -64,6 +64,11 @@ Mods: {
 					Tooltip: Standardmäßig deaktiviert. Bei Schaden werden Gefährten auf getrennte, sichere Plätze in deiner Nähe teleportiert.
 				}
 
+				ExtraAccessorySlots: {
+					Label: "[i:CelestialShell] Zusätzliche Begleiter-Zubehörplätze"
+					Tooltip: Client-Regler von 0 bis 7. Gespeicherte Gegenstände bleiben erhalten, wenn der Wert gesenkt wird, sind dann aber inaktiv.
+				}
+
 				CompanionsAutoCollectWorldItems: {
 					Label: "[i:TreasureMagnet] Begleiter sammeln Weltgegenstände automatisch ein"
 					Tooltip: Standardmäßig deaktiviert. Ist die Option aus, scannen, reservieren, verfolgen und sammeln Begleiter keine Weltgegenstände. Erst nach einer Kompatibilitätsprüfung mit Spielstand und Mods aktivieren.
@@ -254,6 +259,8 @@ Mods: {
 			Vanity: Kosmetik
 			Dye: Farbe
 			Accessories: Zubehör (Fortschritt; kein Dämonenherz nötig)
+			ExtraAccessories: Zusätzliche Zubehörplätze (über den Konfigurationsregler)
+			ExtraAccessoryLocked: Erhöhe den Regler für zusätzliche Begleiter-Zubehörplätze in der Client-Konfiguration
 			HeadArmorOnly: Nur Kopfrüstung
 			BodyArmorOnly: Nur Körperrüstung
 			LegArmorOnly: Nur Beinrüstung

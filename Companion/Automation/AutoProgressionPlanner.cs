@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using Terraria;
 using Terraria.ID;
 
@@ -35,10 +36,70 @@ public static class AutoProgressionPlanner
         // A gather/mine goal cannot make progress with a full backpack — the old code returned an
         // endless RetryLater here. Store surplus first instead (design §4.2/§4.4.1). Crafting and
         // building are left alone: they consume inventory rather than fill it.
-        if (IsGatherGoal(plan.Goal) && !AutoInventory.HasBackpackSpace(ctx.Profile))
-            return AutoPlan.Simple(AutoGoalId.DepositSurplus);
+        if (!AutoInventory.HasBackpackSpace(ctx.Profile))
+        {
+            bool stationNeedsCrafting = plan.Goal == AutoGoalId.CraftStation &&
+                AutoInventory.FindInventoryIndex(ctx.Me, item => item.type == plan.ItemType) < 0;
+            if (IsGatherGoal(plan.Goal) || plan.Goal is AutoGoalId.CraftGear or AutoGoalId.CraftConsumable ||
+                stationNeedsCrafting)
+            {
+                return AutoPlan.Simple(AutoGoalId.DepositSurplus, AutoPlanKind.Support, 2);
+            }
+        }
+
+        // A repeatedly failing route is not allowed to monopolise the whole run. Keep its hard
+        // objective, cool down this concrete plan, and spend the interval on useful low-risk
+        // preparation from the same early stage. Once the cooldown expires the hard gate wins again.
+        if (ctx.TaskRuntime.IsDeferred(plan) && TryChooseSupportPlan(ctx, plan, out AutoPlan support))
+            return support;
 
         return plan;
+    }
+
+    private static bool TryChooseSupportPlan(AutoContext ctx, AutoPlan deferred, out AutoPlan chosen)
+    {
+        List<(AutoPlan Plan, int Utility)> candidates = [];
+        AutoCapabilities cap = ctx.Capabilities;
+
+        if (!AutoInventory.HasBackpackSpace(ctx.Profile))
+        {
+            chosen = AutoPlan.Simple(AutoGoalId.DepositSurplus, AutoPlanKind.Support, 2);
+            return !ctx.TaskRuntime.IsDeferred(chosen);
+        }
+
+        if (deferred.Goal != AutoGoalId.GatherWood && cap.Wood < WoodStock)
+            candidates.Add((AutoPlan.Gather(AutoGoalId.GatherWood, WoodStock,
+                AutoPlanKind.Support, 2), 70 + WoodStock - cap.Wood));
+
+        if (deferred.Goal != AutoGoalId.GatherStone && cap.Stone < StoneForFurnace)
+            candidates.Add((AutoPlan.Gather(AutoGoalId.GatherStone, StoneForFurnace,
+                AutoPlanKind.Support, 2), 66 + StoneForFurnace - cap.Stone));
+
+        if (cap.Torches < TorchesForFurnace && deferred.Goal != AutoGoalId.GatherGel)
+        {
+            AutoPlan torchPlan = cap.Gel > 0 && cap.Wood > 0
+                ? AutoPlan.Product(ItemID.Torch, AutoPlanKind.Support, 2)
+                : AutoPlan.Simple(AutoGoalId.GatherGel, AutoPlanKind.Support, 2);
+            candidates.Add((torchPlan, 62 + (TorchesForFurnace - cap.Torches) * 3));
+        }
+
+        if (deferred.Goal != AutoGoalId.MineIronTierOre && cap.IronLeadOre < OreForBars)
+            candidates.Add((AutoPlan.Gather(AutoGoalId.MineIronTierOre, OreForBars,
+                AutoPlanKind.Support, 2), 55 + OreForBars - cap.IronLeadOre));
+
+        int bestScore = int.MinValue;
+        chosen = default;
+        foreach ((AutoPlan candidate, int utility) in candidates)
+        {
+            if (ctx.TaskRuntime.IsDeferred(candidate))
+                continue;
+            int score = utility - AutoRiskPolicy.EstimateTaskRisk(ctx, candidate);
+            if (score <= bestScore)
+                continue;
+            bestScore = score;
+            chosen = candidate;
+        }
+        return bestScore != int.MinValue;
     }
 
     private static bool IsGatherGoal(AutoGoalId goal) => goal is
@@ -87,14 +148,14 @@ public static class AutoProgressionPlanner
 
             if (cap.IronLeadOre < OreForBars)
                 return AutoPlan.Gather(AutoGoalId.MineIronTierOre, OreForBars);
-            return AutoPlan.Simple(AutoGoalId.CraftGear); // CraftGear body smelts ore into bars
+            return AutoPlan.Simple(AutoGoalId.CraftGear, AutoPlanKind.Capability); // smelts ore into bars
         }
 
         // 4. Turn real ore into a basic independent loadout. The gear controller equips only items
         // it actually crafted and falls back to more mining when the available bar mixture cannot
         // satisfy the next recipe.
         if (!AutoGearController.HasBasicMetalLoadout(ctx.Profile))
-            return AutoPlan.Simple(AutoGoalId.CraftGear);
+            return AutoPlan.Simple(AutoGoalId.CraftGear, AutoPlanKind.Capability);
 
         // 5. Build a resumable starter room with storage. A generous stock avoids repeatedly
         // abandoning the template halfway through for two more pieces of wood.

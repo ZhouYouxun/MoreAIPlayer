@@ -67,6 +67,7 @@ public sealed class CompanionProfile
     public Item[] Ammo { get; private set; }
     public Item[] Armor { get; private set; }
     public Item[] Accessories { get; private set; }
+    public Item[] ExtraAccessories { get; private set; }
     public Item[] Vanity { get; private set; }
     public Item[] Dyes { get; private set; }
     public Item[] Backpack { get; private set; }
@@ -177,6 +178,7 @@ public sealed class CompanionProfile
         Ammo = CreateEmptyItems(CompanionPlayer.AmmoSize);
         Armor = CreateEmptyItems(CompanionPlayer.ArmorSize);
         Accessories = CreateEmptyItems(CompanionPlayer.AccessorySize);
+        ExtraAccessories = CreateEmptyItems(CompanionPlayer.ExtraAccessorySize);
         Vanity = CreateEmptyItems(CompanionPlayer.VanitySize);
         Dyes = CreateEmptyItems(CompanionPlayer.DyeSize);
         Backpack = CreateEmptyItems(CompanionPlayer.BackpackSize);
@@ -254,6 +256,9 @@ public sealed class CompanionProfile
     /// </summary>
     public Item AccessoryForSlot(int index, int unlockedCount) =>
         index < unlockedCount ? Accessories[index] : lockedAccessoryFiller[index];
+
+    /// <summary>Returns a companion-only extra accessory. Activation is controlled by the client slider.</summary>
+    public Item ExtraAccessoryForSlot(int index) => ExtraAccessories[index];
 
     /// <summary>
     /// Moves items that cannot do a reserved slot's job out of it, once, at load time.
@@ -431,6 +436,7 @@ public sealed class CompanionProfile
             [nameof(Ammo)] = SaveItems(Ammo),
             [nameof(Armor)] = SaveItems(Armor),
             [nameof(Accessories)] = SaveItems(Accessories),
+            [nameof(ExtraAccessories)] = SaveItems(ExtraAccessories),
             [nameof(Vanity)] = SaveItems(Vanity),
             [nameof(Dyes)] = SaveItems(Dyes),
             [nameof(Backpack)] = SaveItems(Backpack),
@@ -466,6 +472,7 @@ public sealed class CompanionProfile
             Ammo = LoadItems(tag, nameof(Ammo), CompanionPlayer.AmmoSize),
             Armor = LoadItems(tag, nameof(Armor), CompanionPlayer.ArmorSize),
             Accessories = LoadItems(tag, nameof(Accessories), CompanionPlayer.AccessorySize),
+            ExtraAccessories = LoadItems(tag, nameof(ExtraAccessories), CompanionPlayer.ExtraAccessorySize),
             Vanity = LoadItems(tag, nameof(Vanity), CompanionPlayer.VanitySize),
             Dyes = LoadItems(tag, nameof(Dyes), CompanionPlayer.DyeSize),
             Backpack = LoadItems(tag, nameof(Backpack), CompanionPlayer.BackpackSize),
@@ -509,6 +516,7 @@ public sealed class CompanionProfile
         profile.Ammo = LoadItems(tag, nameof(Ammo), CompanionPlayer.AmmoSize);
         profile.Armor = LoadItems(tag, nameof(Armor), CompanionPlayer.ArmorSize);
         profile.Accessories = LoadItems(tag, nameof(Accessories), CompanionPlayer.AccessorySize);
+        profile.ExtraAccessories = LoadItems(tag, nameof(ExtraAccessories), CompanionPlayer.ExtraAccessorySize);
         profile.Vanity = LoadItems(tag, nameof(Vanity), CompanionPlayer.VanitySize);
         profile.Dyes = LoadItems(tag, nameof(Dyes), CompanionPlayer.DyeSize);
         profile.Backpack = LoadItems(tag, nameof(Backpack), CompanionPlayer.BackpackSize);

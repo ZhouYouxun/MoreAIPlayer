@@ -35,6 +35,7 @@ public sealed class AutoCompanionBrain
     private int wanderDir = 1;
     private int wanderStuckTicks;
     private float lastWanderX;
+    private long lastBlockedNoticeTick = -3600;
 
     public AutoCompanionBrain()
     {
@@ -105,8 +106,11 @@ public sealed class AutoCompanionBrain
                 Wander(ctx);
                 break;
             case AutoWatchdogAction.Wait:
+                navigator.Idle(me);
+                break;
             case AutoWatchdogAction.Blocked:
                 navigator.Idle(me);
+                AnnounceBlocked(plan);
                 break;
         }
     }
@@ -121,7 +125,19 @@ public sealed class AutoCompanionBrain
         context.Navigator = navigator;
         context.Actuator = actuator;
         context.Capabilities = capabilities;
+        context.TaskRuntime = taskRuntime;
         return context;
+    }
+
+    private void AnnounceBlocked(AutoPlan plan)
+    {
+        long now = (long)Main.GameUpdateCount;
+        if (now - lastBlockedNoticeTick < 1800)
+            return;
+        lastBlockedNoticeTick = now;
+        Main.NewText(Terraria.Localization.Language.GetTextValue(
+            "Mods.MoreAIPlayer.CompanionCommand.AutomationBlocked",
+            plan.Goal.ToString(), taskRuntime.LastFailureReason.ToString()), 255, 160, 120);
     }
 
     private AutoTaskResult ExecutePlan(AutoContext ctx, AutoPlan plan)
@@ -143,8 +159,11 @@ public sealed class AutoCompanionBrain
             case AutoGoalId.CraftGear:
                 return AutoGearController.EnsureBasicMetalLoadout(ctx);
             case AutoGoalId.CraftConsumable:
-                return AutoCraftingService.TryCraft(ctx.Instance, ctx.Profile, plan.ItemType)
-                    ? AutoTaskResult.Running : AutoTaskResult.RetryLater;
+                if (!AutoCraftingService.IsAvailable)
+                    return AutoTaskResult.Faulted;
+                bool crafted = AutoCraftingService.TryCraft(ctx.Instance, ctx.Profile, plan.ItemType);
+                return crafted ? AutoTaskResult.Running :
+                    AutoCraftingService.IsAvailable ? AutoTaskResult.RetryLater : AutoTaskResult.Faulted;
             case AutoGoalId.BuildShelter:
                 return AutoShelterController.Build(ctx);
             case AutoGoalId.DepositSurplus:

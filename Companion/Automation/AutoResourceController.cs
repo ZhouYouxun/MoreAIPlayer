@@ -31,7 +31,9 @@ public static class AutoResourceController
         if (!AutoInventory.HasBackpackSpace(ctx.Profile))
             return AutoTaskResult.RetryLater; // full: let a deposit/tidy goal run first
 
-        Point? tree = AutoWorldKnowledge.FindNearestTree(ctx.Me.Center, ScanRadiusTiles);
+        Point? tree = ResolveTarget(ctx, AutoGoalId.GatherWood,
+            AutoWorldKnowledge.IsChoppableTree,
+            accept => AutoWorldKnowledge.FindNearestTree(ctx.Me.Center, ScanRadiusTiles, accept));
         TryReplant(ctx);
         if (tree is not Point treeTile)
             return AutoTaskResult.AlternativeRequired; // nothing local; relocate
@@ -40,7 +42,11 @@ public static class AutoResourceController
         if (axe < 0)
             return AutoTaskResult.AlternativeRequired;
 
-        ctx.Actuator.MoveAndWorkTile(ctx.Instance, ctx.Me, ctx.Navigator, axe, treeTile);
+        if (!ctx.Actuator.MoveAndWorkTile(ctx.Instance, ctx.Me, ctx.Navigator, axe, treeTile))
+        {
+            ctx.TaskRuntime.RejectActiveTarget(16, 1800);
+            return AutoTaskResult.AlternativeRequired;
+        }
         return AutoTaskResult.Running;
     }
 
@@ -54,7 +60,11 @@ public static class AutoResourceController
         if (!AutoInventory.HasBackpackSpace(ctx.Profile))
             return AutoTaskResult.RetryLater;
 
-        return MineTile(ctx, AutoWorldKnowledge.FindNearestMineable(ctx.Me.Center, ScanRadiusTiles, TileID.Stone));
+        Point? stone = ResolveTarget(ctx, AutoGoalId.GatherStone,
+            point => AutoWorldKnowledge.IsMineableTile(point, TileID.Stone),
+            accept => AutoWorldKnowledge.FindNearestMineable(
+                ctx.Me.Center, ScanRadiusTiles, TileID.Stone, accept));
+        return MineTile(ctx, AutoGoalId.GatherStone, stone);
     }
 
     /// <summary>Mines the nearest basic ore the current pick can break, collecting the ore.</summary>
@@ -67,8 +77,11 @@ public static class AutoResourceController
         if (!AutoInventory.HasBackpackSpace(ctx.Profile))
             return AutoTaskResult.RetryLater;
 
-        Point? ore = AutoWorldKnowledge.FindNearestMineableOfAny(ctx.Me.Center, ScanRadiusTiles, AutoWorldKnowledge.BasicOreTiles);
-        return ore.HasValue ? MineTile(ctx, ore) : ProspectDownward(ctx);
+        Point? ore = ResolveTarget(ctx, AutoGoalId.MineOre,
+            point => AutoWorldKnowledge.IsMineableTileOfAny(point, AutoWorldKnowledge.BasicOreTiles),
+            accept => AutoWorldKnowledge.FindNearestMineableOfAny(
+                ctx.Me.Center, ScanRadiusTiles, AutoWorldKnowledge.BasicOreTiles, accept));
+        return ore.HasValue ? MineTile(ctx, AutoGoalId.MineOre, ore) : ProspectDownward(ctx, AutoGoalId.MineOre);
     }
 
     /// <summary>Mines only the iron-tier ore required by the first anvil. Other metal bars cannot
@@ -84,8 +97,13 @@ public static class AutoResourceController
             return AutoTaskResult.RetryLater;
 
         int[] tiles = [TileID.Iron, TileID.Lead];
-        Point? ore = AutoWorldKnowledge.FindNearestMineableOfAny(ctx.Me.Center, ScanRadiusTiles, tiles);
-        return ore.HasValue ? MineTile(ctx, ore) : ProspectDownward(ctx);
+        Point? ore = ResolveTarget(ctx, AutoGoalId.MineIronTierOre,
+            point => AutoWorldKnowledge.IsMineableTileOfAny(point, tiles),
+            accept => AutoWorldKnowledge.FindNearestMineableOfAny(
+                ctx.Me.Center, ScanRadiusTiles, tiles, accept));
+        return ore.HasValue
+            ? MineTile(ctx, AutoGoalId.MineIronTierOre, ore)
+            : ProspectDownward(ctx, AutoGoalId.MineIronTierOre);
     }
 
     /// <summary>
@@ -101,7 +119,9 @@ public static class AutoResourceController
         if (!AutoInventory.HasBackpackSpace(ctx.Profile))
             return AutoTaskResult.RetryLater;
 
-        Point? pot = AutoWorldKnowledge.FindNearestTileOfType(ctx.Me.Center, ScanRadiusTiles, TileID.Pots);
+        Point? pot = ResolveTarget(ctx, AutoGoalId.GatherGel,
+            point => IsTileType(point, TileID.Pots),
+            accept => AutoWorldKnowledge.FindNearestTileOfType(ctx.Me.Center, ScanRadiusTiles, TileID.Pots, accept));
         if (pot is not Point potTile)
             return AutoTaskResult.AlternativeRequired;
 
@@ -109,7 +129,11 @@ public static class AutoResourceController
         if (pick < 0)
             return AutoTaskResult.AlternativeRequired;
 
-        ctx.Actuator.MoveAndWorkTile(ctx.Instance, ctx.Me, ctx.Navigator, pick, potTile);
+        if (!ctx.Actuator.MoveAndWorkTile(ctx.Instance, ctx.Me, ctx.Navigator, pick, potTile))
+        {
+            ctx.TaskRuntime.RejectActiveTarget(2, 1800);
+            return AutoTaskResult.AlternativeRequired;
+        }
         return AutoTaskResult.Running;
     }
 
@@ -118,7 +142,7 @@ public static class AutoResourceController
         item.type == ItemID.CopperCoin || item.type == ItemID.SilverCoin ||
         item.type == ItemID.GoldCoin || item.type == ItemID.PlatinumCoin;
 
-    private static AutoTaskResult MineTile(AutoContext ctx, Point? target)
+    private static AutoTaskResult MineTile(AutoContext ctx, AutoGoalId goal, Point? target)
     {
         if (target is not Point tile)
             return AutoTaskResult.AlternativeRequired;
@@ -127,7 +151,11 @@ public static class AutoResourceController
         if (pick < 0)
             return AutoTaskResult.AlternativeRequired;
 
-        ctx.Actuator.MoveAndWorkTile(ctx.Instance, ctx.Me, ctx.Navigator, pick, tile);
+        if (!ctx.Actuator.MoveAndWorkTile(ctx.Instance, ctx.Me, ctx.Navigator, pick, tile))
+        {
+            ctx.TaskRuntime.RejectActiveTarget(3, 1800);
+            return AutoTaskResult.AlternativeRequired;
+        }
         return AutoTaskResult.Running;
     }
 
@@ -136,7 +164,7 @@ public static class AutoResourceController
     /// the held pickaxe until a cavern or ore enters the local scan. This is intentionally slow and
     /// physical; it does not reveal or manufacture a remote vein.
     /// </summary>
-    private static AutoTaskResult ProspectDownward(AutoContext ctx)
+    private static AutoTaskResult ProspectDownward(AutoContext ctx, AutoGoalId goal)
     {
         int pick = AutoInventory.BestToolIndex(ctx.Me, item => item.pick);
         if (pick < 0)
@@ -154,7 +182,10 @@ public static class AutoResourceController
                 Tile tile = Main.tile[x, y];
                 if (!tile.HasTile || Main.tileFrameImportant[tile.TileType] || !WorldGen.CanKillTile(x, y))
                     continue;
-                ctx.Actuator.MoveAndWorkTile(ctx.Instance, ctx.Me, ctx.Navigator, pick, new Point(x, y));
+                Point target = new(x, y);
+                ctx.TaskRuntime.SetActiveTarget(goal, target);
+                if (!ctx.Actuator.MoveAndWorkTile(ctx.Instance, ctx.Me, ctx.Navigator, pick, target))
+                    return AutoTaskResult.AlternativeRequired;
                 return AutoTaskResult.Running;
             }
         }
@@ -164,6 +195,23 @@ public static class AutoResourceController
         ctx.Navigator.Navigate(ctx.Me, ctx.Me.Center + new Vector2(ctx.Me.direction * 20f, 96f));
         return AutoTaskResult.Running;
     }
+
+    private static Point? ResolveTarget(AutoContext ctx, AutoGoalId goal,
+        System.Func<Point, bool> valid, System.Func<System.Func<Point, bool>, Point?> find)
+    {
+        AutoTaskRuntime runtime = ctx.TaskRuntime;
+        if (runtime.TryGetActiveTarget(goal, valid, out Point active))
+            return active;
+
+        Point? found = find(point => !runtime.IsTargetRejected(goal, point));
+        if (found is Point target)
+            runtime.SetActiveTarget(goal, target);
+        return found;
+    }
+
+    private static bool IsTileType(Point point, int tileType) =>
+        WorldGen.InWorld(point.X, point.Y, 4) && Main.tile[point.X, point.Y].HasTile &&
+        Main.tile[point.X, point.Y].TileType == tileType;
 
     /// <summary>Picks up nearby drops matching the current goal (its own knocked-loose resources).</summary>
     private static void CollectWanted(AutoContext ctx, System.Func<Item, bool> wanted) =>

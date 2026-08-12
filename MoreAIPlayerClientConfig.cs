@@ -19,6 +19,8 @@ public sealed class MoreAIPlayerClientConfig : ModConfig
 
     public static bool CompanionsRescueOnOwnerHurt => Current?.CompanionsRescueWhenOwnerHurt == true;
 
+    public static int ExtraCompanionAccessorySlots => System.Math.Clamp(Current?.ExtraAccessorySlots ?? 0, 0, 7);
+
     public override ConfigScope Mode => ConfigScope.ClientSide;
 
     // Values are intentionally read through Current at the point of use. OnChanged needs no
@@ -50,6 +52,15 @@ public sealed class MoreAIPlayerClientConfig : ModConfig
     // When enabled, the automatic rescue finds each companion a nearby, open landing spot.
     [DefaultValue(false)]
     public bool CompanionsRescueWhenOwnerHurt;
+
+    // These are companion-owned functional slots, separate from the world's normal accessory
+    // progression. Items stay safely stored when the slider is lowered and become active again
+    // when it is raised. The synthetic companion runtime is singleplayer-only today, so this is
+    // deliberately a client setting rather than a misleading server rule.
+    [DefaultValue(0)]
+    [Range(0, 7)]
+    [Slider]
+    public int ExtraAccessorySlots;
 
     [DefaultValue(false)]
     public bool CompanionsAutoCollectWorldItems;

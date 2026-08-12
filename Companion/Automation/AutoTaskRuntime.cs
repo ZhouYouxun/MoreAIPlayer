@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using Microsoft.Xna.Framework;
 using Terraria;
 using Terraria.ID;
@@ -48,6 +49,7 @@ public sealed class AutoTaskRuntime
 
     public AutoGoalId CurrentGoal = AutoGoalId.Idle;
     public AutoGoalId CurrentStep = AutoGoalId.Idle;
+    public long CurrentPlanKey;
     public long GoalStartedTick;
     public long StepStartedTick;
 
@@ -74,12 +76,31 @@ public sealed class AutoTaskRuntime
     public Vector2 LastKnownPosition;
     public Point LastTargetTile = new(-1, -1);
 
+    /// <summary>The controller-owned target retained across ticks. Without this, every scan selects
+    /// the same nearest bad tree/ore/pot again and the watchdog cannot actually change targets.</summary>
+    public Point? ActiveTargetTile;
+    public AutoGoalId ActiveTargetGoal = AutoGoalId.Idle;
+    public float BestTargetDistanceSquared = float.MaxValue;
+
+    /// <summary>Incremented when a controller observes a real world-side accomplishment such as its
+    /// retained target tile disappearing. Inventory counts alone miss that progress.</summary>
+    public long ProgressSerial;
+    public long LastObservedProgressSerial;
+
     /// <summary>While the game tick is below this, the current (repeatedly RetryLater'd or blocked)
     /// goal is on backoff and is not re-executed — the fix for infinite same-frame retries.</summary>
     public long BlockedUntilTick;
 
     /// <summary>Cross-session: number of times a boss attempt has ended in defeat/wipe.</summary>
     public int BossFailureCount;
+
+    private const int RejectedTargetCapacity = 24;
+    private const int PlanDeferralCapacity = 16;
+    private readonly List<RejectedTarget> rejectedTargets = [];
+    private readonly Dictionary<long, long> deferredPlans = [];
+
+    public int RejectedTargetCount => rejectedTargets.Count;
+    public int DeferredPlanCount => deferredPlans.Count;
 
     // Ring log of the most recent state transitions (design §4.3). Transient; write-on-transition
     // only, so it never spams per frame.
@@ -92,6 +113,7 @@ public sealed class AutoTaskRuntime
     {
         CurrentGoal = AutoGoalId.Idle;
         CurrentStep = AutoGoalId.Idle;
+        CurrentPlanKey = 0;
         AttemptCount = 0;
         RecoveryLevel = 0;
         TicksWithoutProgress = 0;
@@ -100,6 +122,133 @@ public sealed class AutoTaskRuntime
         LastFailureReason = AutoBlockReason.None;
         BlockedUntilTick = 0;
         LastTargetTile = new Point(-1, -1);
+        ClearActiveTarget();
+        ProgressSerial = 0;
+        LastObservedProgressSerial = 0;
+        rejectedTargets.Clear();
+        deferredPlans.Clear();
+    }
+
+    public bool TryGetActiveTarget(AutoGoalId goal, System.Func<Point, bool> valid, out Point target)
+    {
+        if (ActiveTargetGoal == goal && ActiveTargetTile is Point active && valid(active))
+        {
+            target = active;
+            return true;
+        }
+
+        // A target which was valid on the previous tick and is now gone is world progress, not a
+        // navigation failure. This distinction is important for trees and mined blocks.
+        if (ActiveTargetGoal == goal && ActiveTargetTile.HasValue)
+            RecordWorldProgress();
+        ClearActiveTarget();
+        target = default;
+        return false;
+    }
+
+    public void SetActiveTarget(AutoGoalId goal, Point target)
+    {
+        if (ActiveTargetGoal == goal && ActiveTargetTile == target)
+            return;
+        ActiveTargetGoal = goal;
+        ActiveTargetTile = target;
+        LastTargetTile = target;
+        BestTargetDistanceSquared = float.MaxValue;
+        Log($"target {goal} {target.X},{target.Y}");
+    }
+
+    public void ClearActiveTarget()
+    {
+        ActiveTargetGoal = AutoGoalId.Idle;
+        ActiveTargetTile = null;
+        BestTargetDistanceSquared = float.MaxValue;
+    }
+
+    public void RejectActiveTarget(int radiusTiles, int cooldownTicks = 7200)
+    {
+        if (ActiveTargetTile is not Point target)
+            return;
+
+        PruneExpiredTargets((long)Main.GameUpdateCount);
+        if (rejectedTargets.Count >= RejectedTargetCapacity)
+            rejectedTargets.RemoveAt(0);
+        rejectedTargets.Add(new RejectedTarget(ActiveTargetGoal, target,
+            System.Math.Max(1, radiusTiles), (long)Main.GameUpdateCount + cooldownTicks));
+        Log($"reject {ActiveTargetGoal} {target.X},{target.Y}");
+        ClearActiveTarget();
+    }
+
+    public bool IsTargetRejected(AutoGoalId goal, Point target)
+    {
+        long now = (long)Main.GameUpdateCount;
+        PruneExpiredTargets(now);
+        foreach (RejectedTarget rejected in rejectedTargets)
+        {
+            if (rejected.Goal != goal)
+                continue;
+            int dx = rejected.Center.X - target.X;
+            int dy = rejected.Center.Y - target.Y;
+            if (dx * dx + dy * dy <= rejected.RadiusTiles * rejected.RadiusTiles)
+                return true;
+        }
+        return false;
+    }
+
+    public void RecordWorldProgress() => ProgressSerial++;
+
+    public void Defer(AutoPlan plan, int ticks)
+    {
+        if (deferredPlans.Count >= PlanDeferralCapacity && !deferredPlans.ContainsKey(plan.StableKey))
+        {
+            long oldestKey = 0;
+            long oldestUntil = long.MaxValue;
+            foreach ((long key, long until) in deferredPlans)
+            {
+                if (until < oldestUntil)
+                {
+                    oldestKey = key;
+                    oldestUntil = until;
+                }
+            }
+            deferredPlans.Remove(oldestKey);
+        }
+        deferredPlans[plan.StableKey] = (long)Main.GameUpdateCount + System.Math.Max(60, ticks);
+        Log($"defer {plan.Goal} +{ticks}t");
+    }
+
+    public bool IsDeferred(AutoPlan plan)
+    {
+        if (!deferredPlans.TryGetValue(plan.StableKey, out long until))
+            return false;
+        if (until > (long)Main.GameUpdateCount)
+            return true;
+        deferredPlans.Remove(plan.StableKey);
+        return false;
+    }
+
+    private void PruneExpiredTargets(long now)
+    {
+        for (int i = rejectedTargets.Count - 1; i >= 0; i--)
+        {
+            if (rejectedTargets[i].UntilTick <= now)
+                rejectedTargets.RemoveAt(i);
+        }
+    }
+
+    private readonly struct RejectedTarget
+    {
+        public readonly AutoGoalId Goal;
+        public readonly Point Center;
+        public readonly int RadiusTiles;
+        public readonly long UntilTick;
+
+        public RejectedTarget(AutoGoalId goal, Point center, int radiusTiles, long untilTick)
+        {
+            Goal = goal;
+            Center = center;
+            RadiusTiles = radiusTiles;
+            UntilTick = untilTick;
+        }
     }
 
     public void Log(string entry)

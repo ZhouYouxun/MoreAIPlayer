@@ -40,7 +40,7 @@ public static class AutoGearController
     public static bool HasBasicMetalLoadout(CompanionProfile profile)
     {
         bool pick = AutoInventory.BestPickaxe(profile).pick >= BetterThanCopperPickPower;
-        bool weapon = FindBestWeapon(profile) is Item item && !item.IsAir;
+        bool weapon = AutoRiskPolicy.HasAdequateEarlyWeapon(profile);
         bool armour = !profile.Armor[0].IsAir && !profile.Armor[1].IsAir && !profile.Armor[2].IsAir;
         return pick && weapon && armour;
     }
@@ -72,6 +72,8 @@ public static class AutoGearController
 
             if (TryCraftNextMissing(ctx))
                 return AutoTaskResult.Running;
+            if (!AutoCraftingService.IsAvailable)
+                return AutoTaskResult.Faulted;
         }
 
         // No currently available bar recipe could close the next loadout gap. Mine another real
@@ -83,7 +85,9 @@ public static class AutoGearController
     {
         if (AutoInventory.BestPickaxe(ctx.Profile).pick < BetterThanCopperPickPower && TryAny(ctx, Picks))
             return true;
-        if (FindBestWeapon(ctx.Profile) is null && TryAny(ctx, Swords))
+        // Any equivalent world/mod drop closes this gap. Only craft a prescribed fallback when the
+        // actual held loadout does not already meet the capability threshold.
+        if (!AutoRiskPolicy.HasAdequateEarlyWeapon(ctx.Profile) && TryAny(ctx, Swords))
             return true;
 
         for (int slot = 0; slot < ArmourBySlot.Length; slot++)
@@ -108,7 +112,8 @@ public static class AutoGearController
     {
         MoveBestBackpackItem(profile, item => item.pick >= BetterThanCopperPickPower,
             CompanionProfile.PickSlot, compare: item => item.pick);
-        MoveBestBackpackItem(profile, IsWeapon, CompanionProfile.FirstCombatSlot, compare: item => item.damage);
+        MoveBestBackpackItem(profile, IsWeapon, CompanionProfile.FirstCombatSlot,
+            compare: AutoRiskPolicy.WeaponCapability);
 
         for (int slot = 0; slot < 3; slot++)
         {
@@ -151,22 +156,6 @@ public static class AutoGearController
         }
         if (best >= 0)
             (profile.Armor[slot], profile.Backpack[best]) = (profile.Backpack[best], profile.Armor[slot]);
-    }
-
-    private static Item FindBestWeapon(CompanionProfile profile)
-    {
-        Item best = null;
-        foreach (Item item in profile.Hotbar)
-        {
-            if (IsWeapon(item) && (best is null || item.damage > best.damage))
-                best = item;
-        }
-        foreach (Item item in profile.Backpack)
-        {
-            if (IsWeapon(item) && (best is null || item.damage > best.damage))
-                best = item;
-        }
-        return best;
     }
 
     private static bool IsWeapon(Item item) => item is not null && !item.IsAir && item.damage > 0 &&

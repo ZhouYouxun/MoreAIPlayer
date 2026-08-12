@@ -25,6 +25,7 @@ public static class AutoDiagnostics
             $"result: {runtime.LastResult}  reason: {runtime.LastFailureReason}",
             $"noProgress: {runtime.TicksWithoutProgress}t  noMetric: {runtime.TicksWithoutMetricChange}t",
             $"attempts: {runtime.AttemptCount}  recoveryLv: {runtime.RecoveryLevel}",
+            $"rejected targets: {runtime.RejectedTargetCount}  deferred plans: {runtime.DeferredPlanCount}",
         ];
 
         if (runtime.LastTargetTile.X >= 0 && runtime.LastTargetTile.Y >= 0)

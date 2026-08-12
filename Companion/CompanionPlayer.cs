@@ -20,6 +20,9 @@ public sealed class CompanionPlayer : ModPlayer
     /// world-dependent subset — see <see cref="CompanionSlotRules.UnlockedAccessorySlots"/>.</summary>
     public const int AccessorySize = 7;
 
+    /// <summary>Maximum number of companion-only accessory slots exposed by the client slider.</summary>
+    public const int ExtraAccessorySize = 7;
+
     /// <summary>The dedicated bug-net slot. One slot, its own inventory mapping.</summary>
     public const int NetSize = 1;
 
@@ -330,8 +333,29 @@ public sealed class CompanionPlayer : ModPlayer
             return;
 
         CompanionInstance instance = CompanionEntitySystem.GetBySlot(Player.whoAmI);
-        if (instance is not null && instance.TryGetContext(out Player owner, out _))
-            PrepareCompanionLifeForVanillaUpdate(instance, owner);
+        if (instance is null || !instance.TryGetContext(out Player owner, out CompanionProfile profile))
+            return;
+
+        ApplyExtraAccessoryEffects(profile);
+        PrepareCompanionLifeForVanillaUpdate(instance, owner);
+    }
+
+    /// <summary>
+    /// Applies the companion's optional accessory row through the same public vanilla/mod-loader
+    /// equipment pipeline used by a real modded accessory slot. These items deliberately do not
+    /// occupy Player.armor: that array has only the seven native functional accessory positions.
+    /// </summary>
+    private void ApplyExtraAccessoryEffects(CompanionProfile profile)
+    {
+        int activeSlots = MoreAIPlayerClientConfig.ExtraCompanionAccessorySlots;
+        for (int i = 0; i < activeSlots; i++)
+        {
+            Item accessory = profile.ExtraAccessoryForSlot(i);
+            if (accessory.IsAir)
+                continue;
+
+            Player.ApplyEquipFunctional(accessory, false);
+        }
     }
 
     public override void PostUpdate()
@@ -395,7 +419,7 @@ public sealed class CompanionPlayer : ModPlayer
     {
         int sharedMaxLife = instance.AutoMaxLife > 0
             ? instance.AutoMaxLife
-            : System.Math.Max(100, System.Math.Max(owner.statLifeMax, owner.statLifeMax2));
+            : System.Math.Max(100, owner.statLifeMax2);
         Player.statLifeMax = sharedMaxLife;
         Player.statLifeMax2 = sharedMaxLife;
 
@@ -404,13 +428,6 @@ public sealed class CompanionPlayer : ModPlayer
             instance.PersistentLife = sharedMaxLife;
             instance.PersistentLifeInitialized = true;
         }
-        else if (instance.PersistentLife > 0 && instance.LastSharedLifeMax > 0 &&
-            instance.PersistentLife >= instance.LastSharedLifeMax)
-        {
-            // Fully healed stays fully healed when the owner gains or loses max life.
-            instance.PersistentLife = sharedMaxLife;
-        }
-
         if (Player.dead || instance.PersistentLife <= 0)
         {
             Player.statLife = 0;
@@ -429,7 +446,7 @@ public sealed class CompanionPlayer : ModPlayer
     {
         int sharedMaxLife = instance.AutoMaxLife > 0
             ? instance.AutoMaxLife
-            : System.Math.Max(100, System.Math.Max(owner.statLifeMax, owner.statLifeMax2));
+            : System.Math.Max(100, owner.statLifeMax2);
         Player.statLifeMax = sharedMaxLife;
         Player.statLifeMax2 = sharedMaxLife;
 
@@ -481,7 +498,46 @@ public sealed class CompanionPlayer : ModPlayer
 
         using VirtualPlayerExecutionContext.Scope scope =
             VirtualPlayerExecutionContext.Enter(Player, healAim, false, false, null);
-        CompanionFaultGuard.RunCritical(CompanionFaultGuard.HealingPotionLane, Player.QuickHeal);
+
+        if (HasStoredHealingPotion())
+        {
+            CompanionFaultGuard.RunCritical(CompanionFaultGuard.HealingPotionLane, Player.QuickHeal);
+            return;
+        }
+
+        // A companion begins with an inexhaustible, progression-appropriate emergency potion.
+        // It is inserted only for QuickHeal's vanilla use path and restored immediately after,
+        // so it plays/behaves like the real item without creating an item or consuming a slot.
+        const int virtualPotionSlot = CompanionPlayer.HotbarSize + CompanionPlayer.BackpackSize - 1;
+        Item displaced = Player.inventory[virtualPotionSlot];
+        Player.inventory[virtualPotionSlot] = new Item(DefaultHealingPotionType());
+        try
+        {
+            CompanionFaultGuard.RunCritical(CompanionFaultGuard.HealingPotionLane, Player.QuickHeal);
+        }
+        finally
+        {
+            Player.inventory[virtualPotionSlot] = displaced;
+        }
+    }
+
+    private bool HasStoredHealingPotion()
+    {
+        for (int i = 0; i < Player.inventory.Length; i++)
+        {
+            Item item = Player.inventory[i];
+            if (item is not null && !item.IsAir && item.potion && item.healLife > 0)
+                return true;
+        }
+
+        return false;
+    }
+
+    private static int DefaultHealingPotionType()
+    {
+        if (NPC.downedMoonlord)
+            return ItemID.SuperHealingPotion;
+        return Main.hardMode ? ItemID.GreaterHealingPotion : ItemID.HealingPotion;
     }
 
     public override bool CanBeHitByProjectile(Projectile proj)

@@ -18,4 +18,5 @@ public sealed class AutoContext
     public CompanionNavigator Navigator;
     public AutoActuator Actuator;
     public AutoCapabilities Capabilities;
+    public AutoTaskRuntime TaskRuntime;
 }

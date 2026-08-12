@@ -64,6 +64,11 @@ Mods: {
 					Tooltip: Disabled by default. When enabled, being hurt recalls companions to separate nearby spots that are clear of terrain, hazards, and nearby threats. If no safe spot is found, they stay put.
 				}
 
+				ExtraAccessorySlots: {
+					Label: "[i:CelestialShell] Extra companion accessory slots"
+					Tooltip: Client-side slider, from 0 to 7. Saving enables that many companion-only accessory slots. Lowering it keeps the items safely stored but disables their effects.
+				}
+
 				CompanionsAutoCollectWorldItems: {
 					Label: "[i:TreasureMagnet] Companions automatically collect world items"
 					Tooltip: Disabled by default. When off, companions do not scan, reserve, approach, or collect world drops. Enable only after confirming compatibility with your save and other mods.
@@ -260,6 +265,8 @@ Mods: {
 			Vanity: Vanity
 			Dye: Dye
 			Accessories: Accessories (progress-based; no Demon Heart needed)
+			ExtraAccessories: Extra accessories (enabled by the config slider)
+			ExtraAccessoryLocked: Raise the Extra Companion Accessory Slots slider in client config to use this slot
 			HeadArmorOnly: Head armor only
 			BodyArmorOnly: Body armor only
 			LegArmorOnly: Leg armor only

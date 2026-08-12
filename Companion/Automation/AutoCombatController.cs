@@ -22,10 +22,12 @@ public static class AutoCombatController
             return AutoTaskResult.Succeeded;
 
         // Pots are safer and also supply coins; prefer them before deliberately entering combat.
-        Point? pot = AutoWorldKnowledge.FindNearestTileOfType(ctx.Me.Center, 46, TileID.Pots);
-        if (pot.HasValue)
-            return AutoResourceController.LootPots(ctx);
+        AutoTaskResult potResult = AutoResourceController.LootPots(ctx);
+        if (potResult != AutoTaskResult.AlternativeRequired)
+            return potResult;
 
+        // No usable pot remains in this area (including temporarily rejected bad targets). This is
+        // the real plan B, not another scan that immediately selects the same pot again.
         NPC target = FindNearestSlime(ctx.Me.Center);
         if (target is null)
             return AutoTaskResult.AlternativeRequired;

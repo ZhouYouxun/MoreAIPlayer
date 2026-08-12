@@ -44,7 +44,7 @@ public sealed class AutoWatchdog
     private const int RetryBackoffBaseTicks = 30;
     private const int RetryBackoffCapTicks = 600;   // 10s
     private const int BlockedRetryTicks = 300;       // 5s between blocked-state re-checks
-    private const int MaxRetryAttemptsBeforeAlternative = 5;
+    private const int MaxRetryAttemptsBeforeAlternative = 3;
 
     private readonly AutoTaskRuntime runtime;
 
@@ -56,7 +56,9 @@ public sealed class AutoWatchdog
     /// Called before running the plan so a repeatedly-failing goal idles instead of spinning.</summary>
     public bool OnBackoff(AutoPlan plan)
     {
-        return runtime.CurrentGoal == plan.Goal &&
+        if (runtime.IsDeferred(plan))
+            return true;
+        return runtime.CurrentPlanKey == plan.StableKey &&
                runtime.BlockedUntilTick > (long)Main.GameUpdateCount;
     }
 
@@ -67,10 +69,11 @@ public sealed class AutoWatchdog
         long now = (long)Main.GameUpdateCount;
 
         // Goal change resets the per-goal window and recovery ladder.
-        if (runtime.CurrentGoal != plan.Goal)
+        if (runtime.CurrentPlanKey != plan.StableKey)
         {
-            runtime.Log($"goal {runtime.CurrentGoal}->{plan.Goal}");
+            runtime.Log($"plan {runtime.CurrentGoal}->{plan.Goal} ({plan.ItemType}/{plan.Amount})");
             runtime.CurrentGoal = plan.Goal;
+            runtime.CurrentPlanKey = plan.StableKey;
             runtime.GoalStartedTick = now;
             runtime.StepStartedTick = now;
             runtime.AttemptCount = 0;
@@ -78,9 +81,12 @@ public sealed class AutoWatchdog
             runtime.TicksWithoutProgress = 0;
             runtime.TicksWithoutMetricChange = 0;
             runtime.LastProgressSignature = AutoTaskRuntime.ComputeSignature(ctx, plan);
+            runtime.LastObservedProgressSerial = runtime.ProgressSerial;
             runtime.WindowStartPosition = ctx.Me.Center;
             runtime.BlockedUntilTick = 0;
             runtime.LastFailureReason = AutoBlockReason.None;
+            if (runtime.ActiveTargetGoal != plan.Goal)
+                runtime.ClearActiveTarget();
         }
 
         runtime.LastResult = result;
@@ -91,11 +97,39 @@ public sealed class AutoWatchdog
         bool metricChanged = signature != runtime.LastProgressSignature;
         runtime.LastProgressSignature = signature;
 
-        // Travel progress: has the companion relocated meaningfully within this soft window?
-        bool relocated = Vector2.DistanceSquared(ctx.Me.Center, runtime.WindowStartPosition) >
-            AutoTaskRuntime.ProgressDistanceTiles * 16f * (AutoTaskRuntime.ProgressDistanceTiles * 16f);
+        bool worldChanged = runtime.ProgressSerial != runtime.LastObservedProgressSerial;
+        runtime.LastObservedProgressSerial = runtime.ProgressSerial;
 
-        if (metricChanged)
+        // Travel progress must be toward the retained target. Raw movement in any direction let an
+        // unreachable tree look healthy forever while the companion paced back and forth.
+        bool approachedTarget = false;
+        bool relocated = false;
+        if (runtime.ActiveTargetTile is Point activeTarget)
+        {
+            Vector2 targetWorld = new(activeTarget.X * 16f + 8f, activeTarget.Y * 16f + 8f);
+            float distanceSquared = Vector2.DistanceSquared(ctx.Me.Center, targetWorld);
+            if (runtime.BestTargetDistanceSquared == float.MaxValue)
+            {
+                runtime.BestTargetDistanceSquared = distanceSquared;
+            }
+            else
+            {
+                float bestDistance = System.MathF.Sqrt(runtime.BestTargetDistanceSquared);
+                float currentDistance = System.MathF.Sqrt(distanceSquared);
+                if (currentDistance + 24f < bestDistance)
+                {
+                    approachedTarget = true;
+                    runtime.BestTargetDistanceSquared = distanceSquared;
+                }
+            }
+        }
+        else
+        {
+            relocated = Vector2.DistanceSquared(ctx.Me.Center, runtime.WindowStartPosition) >
+                AutoTaskRuntime.ProgressDistanceTiles * 16f * (AutoTaskRuntime.ProgressDistanceTiles * 16f);
+        }
+
+        if (metricChanged || worldChanged)
         {
             runtime.TicksWithoutMetricChange = 0;
             runtime.TicksWithoutProgress = 0;
@@ -107,7 +141,7 @@ public sealed class AutoWatchdog
         else
         {
             runtime.TicksWithoutMetricChange++;
-            if (relocated)
+            if (approachedTarget || relocated)
             {
                 runtime.TicksWithoutProgress = 0;
                 runtime.WindowStartPosition = ctx.Me.Center;
@@ -123,6 +157,7 @@ public sealed class AutoWatchdog
         {
             case AutoTaskResult.Succeeded:
                 runtime.Log($"{plan.Goal} succeeded");
+                runtime.ClearActiveTarget();
                 runtime.AttemptCount = 0;
                 runtime.RecoveryLevel = 0;
                 runtime.LastFailureReason = AutoBlockReason.None;
@@ -142,6 +177,7 @@ public sealed class AutoWatchdog
 
             case AutoTaskResult.AlternativeRequired:
                 // The local target is gone/unreachable: climb toward relocation immediately.
+                RejectCurrentTarget(plan.Goal);
                 return Escalate(ctx, plan, now, AutoBlockReason.NoAlternative);
 
             case AutoTaskResult.Running:
@@ -186,6 +222,15 @@ public sealed class AutoWatchdog
         runtime.WindowStartPosition = ctx.Me.Center;
         runtime.Log($"{plan.Goal} recover L{runtime.RecoveryLevel} ({reason})");
 
+        int deferLevel = System.Math.Clamp(plan.FailureBudget, 2, 4);
+        if (runtime.RecoveryLevel == deferLevel)
+        {
+            RejectCurrentTarget(plan.Goal);
+            runtime.Defer(plan, DeferralTicks(plan.Kind));
+            ctx.Navigator.Reset();
+            return AutoWatchdogAction.Recover;
+        }
+
         switch (runtime.RecoveryLevel)
         {
             case 1:
@@ -194,23 +239,25 @@ public sealed class AutoWatchdog
                 return AutoWatchdogAction.Continue;
 
             case 2:
-                // Clear the path cache and repath from the live position.
+                // The repath did not help. Reject the retained target cluster so the controller's
+                // next bounded scan is forced to choose a genuinely different tree/vein/pot.
+                RejectCurrentTarget(plan.Goal);
                 ctx.Navigator.Reset();
-                return AutoWatchdogAction.Continue;
+                return AutoWatchdogAction.Recover;
 
             case 3:
+                // A plan with a larger budget gets one more relocation window before deferral.
+                ctx.Navigator.Reset();
+                return AutoWatchdogAction.Recover;
+
             case 4:
-                // Relocate so a different same-type target/route comes into range. (A dedicated
-                // alternate-route provider — fishing when no boots, buying when short — is a later
-                // flow phase; until then, relocation is the honest same-type-target fallback.)
+                // Return toward the known checkpoint under ordinary navigation first.
                 ctx.Navigator.Reset();
                 return AutoWatchdogAction.Recover;
 
             case 5:
-            case 6:
-                // Return to the shelter/spawn checkpoint. A single safe teleport is allowed for a
-                // pure non-boss navigation deadlock — never across an unopened world gate, and never
-                // as routine pathing.
+                // One safe checkpoint teleport is allowed for a pure non-boss navigation deadlock
+                // — never across an unopened world gate, and never as routine pathing.
                 RelocateToCheckpoint(ctx);
                 return AutoWatchdogAction.Recover;
 
@@ -218,6 +265,25 @@ public sealed class AutoWatchdog
                 return EnterBlocked(reason, now);
         }
     }
+
+    private void RejectCurrentTarget(AutoGoalId goal)
+    {
+        int radius = goal switch
+        {
+            AutoGoalId.GatherWood => 16,
+            AutoGoalId.GatherStone or AutoGoalId.MineOre or AutoGoalId.MineIronTierOre => 3,
+            _ => 2
+        };
+        runtime.RejectActiveTarget(radius);
+    }
+
+    private static int DeferralTicks(AutoPlanKind kind) => kind switch
+    {
+        AutoPlanKind.Optional => 3600,
+        AutoPlanKind.Capability => 1200,
+        AutoPlanKind.Support => 600,
+        _ => 600
+    };
 
     private AutoWatchdogAction EnterBlocked(AutoBlockReason reason, long now)
     {

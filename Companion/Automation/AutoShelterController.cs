@@ -61,8 +61,7 @@ public static class AutoShelterController
         {
             if (ctx.Capabilities.Gel <= 0)
                 return AutoResourceController.LootPots(ctx);
-            return AutoCraftingService.TryCraft(ctx.Instance, ctx.Profile, ItemID.Torch)
-                ? AutoTaskResult.Running : AutoTaskResult.RetryLater;
+            return CraftResult(AutoCraftingService.TryCraft(ctx.Instance, ctx.Profile, ItemID.Torch));
         }
         if (!HasTileInRoom(anchor, TileID.Containers) && !AutoInventory.Has(ctx.Profile, ItemID.Chest))
         {
@@ -85,9 +84,12 @@ public static class AutoShelterController
             ctx.Navigator.Navigate(ctx.Me, TileCenter(bench));
             return AutoTaskResult.Running;
         }
-        return AutoCraftingService.TryCraft(ctx.Instance, ctx.Profile, itemType)
-            ? AutoTaskResult.Running : AutoTaskResult.RetryLater;
+        return CraftResult(AutoCraftingService.TryCraft(ctx.Instance, ctx.Profile, itemType));
     }
+
+    private static AutoTaskResult CraftResult(bool crafted) => crafted
+        ? AutoTaskResult.Running
+        : AutoCraftingService.IsAvailable ? AutoTaskResult.RetryLater : AutoTaskResult.Faulted;
 
     private static bool TryPlaceMissingShell(AutoContext ctx, Point a)
     {

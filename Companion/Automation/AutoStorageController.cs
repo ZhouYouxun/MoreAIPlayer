@@ -113,9 +113,9 @@ public static class AutoStorageController
             }
         }
 
-        return AutoCraftingService.TryCraft(ctx.Instance, ctx.Profile, ItemID.Chest)
-            ? AutoTaskResult.Running
-            : AutoTaskResult.RetryLater;
+        bool crafted = AutoCraftingService.TryCraft(ctx.Instance, ctx.Profile, ItemID.Chest);
+        return crafted ? AutoTaskResult.Running :
+            AutoCraftingService.IsAvailable ? AutoTaskResult.RetryLater : AutoTaskResult.Faulted;
     }
 
     private static int FindNearbyChestId(Player me, int radiusTiles)

@@ -64,6 +64,11 @@ Mods: {
 					Tooltip: Desativado por padrão. Os companheiros se teleportam para locais seguros e separados perto de você.
 				}
 
+				ExtraAccessorySlots: {
+					Label: "[i:CelestialShell] Espaços extras de acessórios do companheiro"
+					Tooltip: Controle do cliente de 0 a 7. Reduzir o valor mantém os itens guardados, mas desativa seus efeitos.
+				}
+
 				CompanionsAutoCollectWorldItems: {
 					Label: "[i:TreasureMagnet] Companheiros coletam itens do mundo automaticamente"
 					Tooltip: Desativado por padrão. Quando desligado, os companheiros não examinam, reservam, perseguem nem coletam itens do mundo. Ative somente após confirmar a compatibilidade com seu mundo e outros mods.
@@ -254,6 +259,8 @@ Mods: {
 			Vanity: Visual
 			Dye: Corante
 			Accessories: Acessórios (progresso; sem Coração Demoníaco)
+			ExtraAccessories: Acessórios extras (ativados pelo controle de configuração)
+			ExtraAccessoryLocked: Aumente o controle de espaços extras de acessórios do companheiro na configuração do cliente
 			HeadArmorOnly: Apenas armadura de cabeça
 			BodyArmorOnly: Apenas armadura de corpo
 			LegArmorOnly: Apenas armadura de pernas

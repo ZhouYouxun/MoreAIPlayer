@@ -64,6 +64,11 @@ Mods: {
 					Tooltip: Disattivato per impostazione predefinita. I compagni si teletrasportano in posizioni sicure e separate vicino a te.
 				}
 
+				ExtraAccessorySlots: {
+					Label: "[i:CelestialShell] Slot accessori aggiuntivi del compagno"
+					Tooltip: Cursore client da 0 a 7. Riducendolo, gli oggetti restano salvati ma i loro effetti si disattivano.
+				}
+
 				CompanionsAutoCollectWorldItems: {
 					Label: "[i:TreasureMagnet] I compagni raccolgono automaticamente gli oggetti del mondo"
 					Tooltip: Disattivato per impostazione predefinita. Quando è disattivato, i compagni non cercano, prenotano, raggiungono né raccolgono oggetti del mondo. Attivalo solo dopo aver verificato la compatibilità con il salvataggio e le altre mod.
@@ -254,6 +259,8 @@ Mods: {
 			Vanity: Aspetto
 			Dye: Tintura
 			Accessories: Accessori (progressi; nessun Cuore del demone)
+			ExtraAccessories: Accessori aggiuntivi (abilitati dal cursore di configurazione)
+			ExtraAccessoryLocked: Aumenta il cursore degli slot accessori aggiuntivi del compagno nella configurazione client
 			HeadArmorOnly: Solo armatura per la testa
 			BodyArmorOnly: Solo armatura per il torso
 			LegArmorOnly: Solo armatura per le gambe

@@ -64,6 +64,11 @@ Mods: {
 					Tooltip: Domyślnie wyłączone. Towarzysze teleportują się na bezpieczne, oddzielne miejsca obok ciebie.
 				}
 
+				ExtraAccessorySlots: {
+					Label: "[i:CelestialShell] Dodatkowe sloty akcesoriów towarzysza"
+					Tooltip: Suwak klienta od 0 do 7. Obniżenie wartości zachowuje przedmioty, ale wyłącza ich efekty.
+				}
+
 				CompanionsAutoCollectWorldItems: {
 					Label: "[i:TreasureMagnet] Towarzysze automatycznie zbierają przedmioty świata"
 					Tooltip: Domyślnie wyłączone. Gdy opcja jest wyłączona, towarzysze nie skanują, nie rezerwują, nie podchodzą ani nie zbierają przedmiotów świata. Włącz ją dopiero po sprawdzeniu zgodności z zapisem i innymi modami.
@@ -254,6 +259,8 @@ Mods: {
 			Vanity: Wygląd
 			Dye: Barwnik
 			Accessories: Akcesoria (postęp; bez Serca Demona)
+			ExtraAccessories: Dodatkowe akcesoria (włączane suwakiem konfiguracji)
+			ExtraAccessoryLocked: Zwiększ suwak dodatkowych slotów akcesoriów towarzysza w konfiguracji klienta
 			HeadArmorOnly: Tylko pancerz głowy
 			BodyArmorOnly: Tylko pancerz tułowia
 			LegArmorOnly: Tylko pancerz nóg

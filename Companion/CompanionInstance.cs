@@ -309,7 +309,7 @@ public sealed class CompanionInstance
             AssignIfChanged(me.armor, 3 + i, profile.AccessoryForSlot(i, unlockedAccessories));
 
         // Max HP tracks the owner's effective max (Life Fruit, accessories, buffs all folded
-        // into statLifeMax2), so the companion always shares the owner's health pool — except the
+        // into statLifeMax2), so the companion always shares the owner's maximum health — except the
         // automation companion, which grows its own base from crystals it collects. Accessories
         // still add on top because vanilla builds statLifeMax2 from this statLifeMax each update.
         me.statLifeMax = AutoMaxLife > 0 ? AutoMaxLife : System.Math.Max(100, owner.statLifeMax2);

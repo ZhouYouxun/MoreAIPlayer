@@ -26,21 +26,32 @@ public static class AutoWorldKnowledge
     ];
 
     /// <summary>Nearest choppable tree tile within <paramref name="radius"/> tiles, or null.</summary>
-    public static Point? FindNearestTree(Vector2 center, int radius)
+    public static Point? FindNearestTree(Vector2 center, int radius, Func<Point, bool> accept = null)
     {
         return FindNearest(center, radius, (x, y, tile) =>
-            Main.tileAxe[tile.TileType] && WorldGen.CanKillTile(x, y));
+            Main.tileAxe[tile.TileType] && WorldGen.CanKillTile(x, y), accept);
+    }
+
+    public static bool IsChoppableTree(Point point)
+    {
+        if (!WorldGen.InWorld(point.X, point.Y, 4))
+            return false;
+        Tile tile = Main.tile[point.X, point.Y];
+        return tile.HasTile && Main.tileAxe[tile.TileType] && WorldGen.CanKillTile(point.X, point.Y);
     }
 
     /// <summary>Nearest tile of the given type within radius that can be legally broken, or null.</summary>
-    public static Point? FindNearestMineable(Vector2 center, int radius, int tileType)
+    public static Point? FindNearestMineable(Vector2 center, int radius, int tileType,
+        Func<Point, bool> accept = null)
     {
         return FindNearest(center, radius, (x, y, tile) =>
-            tile.TileType == tileType && !Main.tileFrameImportant[tile.TileType] && WorldGen.CanKillTile(x, y));
+            tile.TileType == tileType && !Main.tileFrameImportant[tile.TileType] && WorldGen.CanKillTile(x, y),
+            accept);
     }
 
     /// <summary>Nearest tile of any of the given types within radius that can be legally broken.</summary>
-    public static Point? FindNearestMineableOfAny(Vector2 center, int radius, int[] tileTypes)
+    public static Point? FindNearestMineableOfAny(Vector2 center, int radius, int[] tileTypes,
+        Func<Point, bool> accept = null)
     {
         return FindNearest(center, radius, (x, y, tile) =>
         {
@@ -52,17 +63,19 @@ public static class AutoWorldKnowledge
                     return true;
             }
             return false;
-        });
+        }, accept);
     }
 
     /// <summary>Nearest tile of an exact type within radius (frame-important allowed, e.g. a placed
     /// crafting station), or null. Used to find and revalidate the companion's own stations.</summary>
-    public static Point? FindNearestTileOfType(Vector2 center, int radius, int tileType)
+    public static Point? FindNearestTileOfType(Vector2 center, int radius, int tileType,
+        Func<Point, bool> accept = null)
     {
-        return FindNearest(center, radius, (x, y, tile) => tile.TileType == tileType);
+        return FindNearest(center, radius, (x, y, tile) => tile.TileType == tileType, accept);
     }
 
-    private static Point? FindNearest(Vector2 center, int radius, Func<int, int, Tile, bool> match)
+    private static Point? FindNearest(Vector2 center, int radius, Func<int, int, Tile, bool> match,
+        Func<Point, bool> accept = null)
     {
         Point origin = center.ToTileCoordinates();
         Point best = default;
@@ -76,7 +89,8 @@ public static class AutoWorldKnowledge
                 if (!WorldGen.InWorld(x, y, 4))
                     continue;
                 Tile tile = Main.tile[x, y];
-                if (!tile.HasTile || !match(x, y, tile))
+                Point point = new(x, y);
+                if (!tile.HasTile || !match(x, y, tile) || (accept is not null && !accept(point)))
                     continue;
 
                 float distance = Vector2.DistanceSquared(center, new Vector2(x * 16f + 8f, y * 16f + 8f));
@@ -89,6 +103,31 @@ public static class AutoWorldKnowledge
             }
         }
         return found ? best : null;
+    }
+
+    public static bool IsMineableTile(Point point, int tileType)
+    {
+        if (!WorldGen.InWorld(point.X, point.Y, 4))
+            return false;
+        Tile tile = Main.tile[point.X, point.Y];
+        return tile.HasTile && tile.TileType == tileType && !Main.tileFrameImportant[tile.TileType] &&
+            WorldGen.CanKillTile(point.X, point.Y);
+    }
+
+    public static bool IsMineableTileOfAny(Point point, int[] tileTypes)
+    {
+        if (!WorldGen.InWorld(point.X, point.Y, 4))
+            return false;
+        Tile tile = Main.tile[point.X, point.Y];
+        if (!tile.HasTile || Main.tileFrameImportant[tile.TileType] ||
+            !WorldGen.CanKillTile(point.X, point.Y))
+            return false;
+        foreach (int type in tileTypes)
+        {
+            if (tile.TileType == type)
+                return true;
+        }
+        return false;
     }
 
     /// <summary>

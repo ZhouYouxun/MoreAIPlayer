@@ -44,7 +44,7 @@ public sealed class CompanionInventoryUI : UIState, ICompanionPanelState
     {
         panel = new DraggableUIPanel();
         panel.Width.Set(630f, 0f);
-        panel.Height.Set(752f, 0f);
+        panel.Height.Set(830f, 0f);
         panel.HAlign = 0.5f;
         panel.VAlign = 0.5f;
         if (initialPanelPosition is Vector2 position)
@@ -130,16 +130,32 @@ public sealed class CompanionInventoryUI : UIState, ICompanionPanelState
                 drawContext: ItemSlot.Context.EquipAccessory));
         }
 
+        const float extraAccessoryTopY = equipTopY + SlotStep + 24f;
+        const float extraAccessoryBottomY = extraAccessoryTopY + CompanionItemSlot.SlotSize;
+        AddLabel(panel, T("ExtraAccessories"), ColumnTwo, equipTopY + SlotStep + 6f);
+        for (int i = 0; i < data.ExtraAccessories.Length; i++)
+        {
+            int capturedIndex = i;
+            panel.Append(CreateSlot(
+                data.ExtraAccessories, i, CompanionSlotRules.IsAccessory, T("AccessoryOnly"),
+                ColumnTwo + i * SlotStep, extraAccessoryTopY,
+                isLocked: () => capturedIndex >= MoreAIPlayerClientConfig.ExtraCompanionAccessorySlots,
+                lockedText: T("ExtraAccessoryLocked"),
+                drawContext: ItemSlot.Context.EquipAccessory));
+        }
+
         // Tucked under the accessory row, filling the space beside the three equip columns.
         // Non-Chinese status labels are naturally wider; this scale keeps the six live rows
         // inside the accessory-side column without changing the panel's low-resolution fit.
         statsText = new UIText(string.Empty, 0.76f);
         statsText.Left.Set(ColumnTwo, 0f);
-        statsText.Top.Set(equipTopY + SlotStep + 12f, 0f);
+        statsText.Top.Set(extraAccessoryBottomY + 12f, 0f);
         panel.Append(statsText);
 
         // ── Group 2: weapon bar ──────────────────────────────────────────────────────────
-        const float equipBottomY = equipTopY + SlotStep * 2f + CompanionItemSlot.SlotSize;
+        // The status readout occupies the right column below the optional accessory row.
+        // Reserve its height before starting the weapon and backpack groups underneath.
+        const float equipBottomY = extraAccessoryBottomY + 100f;
         const float weaponLabelY = equipBottomY + GroupGap;
         const float weaponTopY = weaponLabelY + LabelGap + 18f; // two label lines
 

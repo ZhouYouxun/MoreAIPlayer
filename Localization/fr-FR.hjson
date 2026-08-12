@@ -64,6 +64,11 @@ Mods: {
 					Tooltip: Désactivé par défaut. Les compagnons se téléportent près de vous sur des emplacements sûrs et distincts.
 				}
 
+				ExtraAccessorySlots: {
+					Label: "[i:CelestialShell] Emplacements d'accessoires supplémentaires du compagnon"
+					Tooltip: Curseur client de 0 à 7. Réduire la valeur conserve les objets mais désactive leurs effets.
+				}
+
 				CompanionsAutoCollectWorldItems: {
 					Label: "[i:TreasureMagnet] Les compagnons ramassent automatiquement les objets du monde"
 					Tooltip: Désactivé par défaut. Lorsqu'elle est désactivée, les compagnons ne cherchent, ne réservent, ne poursuivent et ne ramassent aucun objet du monde. Activez-la seulement après avoir vérifié la compatibilité avec votre sauvegarde et vos mods.
@@ -254,6 +259,8 @@ Mods: {
 			Vanity: Apparence
 			Dye: Teinture
 			Accessories: Accessoires (progression ; sans Cœur de démon)
+			ExtraAccessories: Accessoires supplémentaires (activés par le curseur de configuration)
+			ExtraAccessoryLocked: Augmentez le curseur des emplacements d'accessoires supplémentaires du compagnon dans la configuration cliente
 			HeadArmorOnly: Armure de tête uniquement
 			BodyArmorOnly: Armure de torse uniquement
 			LegArmorOnly: Armure de jambes uniquement

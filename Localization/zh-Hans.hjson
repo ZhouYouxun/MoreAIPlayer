@@ -64,6 +64,11 @@ Mods: {
 					Tooltip: 默认关闭。开启后，受伤会将伙伴传送到你周围彼此分开、避开实体方块、危险地块和附近威胁的位置；找不到安全落点时，伙伴会留在原地。
 				}
 
+				ExtraAccessorySlots: {
+					Label: "[i:CelestialShell] 额外伙伴饰品栏"
+					Tooltip: 客户端滑块，范围为 0 到 7。保存后会启用对应数量的伙伴专属额外饰品栏；调低时其中的物品会保留，但暂不生效。
+				}
+
 				CompanionsAutoCollectWorldItems: {
 					Label: "[i:TreasureMagnet] 伙伴自动拾取世界掉落物"
 					Tooltip: 默认关闭。关闭时伙伴不会扫描、预约、靠近或拾取地面掉落物；确认存档和其他模组兼容后再手动开启。
@@ -260,6 +265,8 @@ Mods: {
 			Vanity: 时装
 			Dye: 染料
 			Accessories: 饰品（栏位随难度与肉山进度自动解锁，无需恶魔之心）
+			ExtraAccessories: 额外饰品（由配置滑块启用）
+			ExtraAccessoryLocked: 请在客户端配置中提高“额外伙伴饰品栏”滑块后使用此栏位
 			HeadArmorOnly: 这里只能放头部盔甲
 			BodyArmorOnly: 这里只能放身体盔甲
 			LegArmorOnly: 这里只能放腿部盔甲
