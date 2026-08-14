@@ -255,6 +255,7 @@ public sealed class AutoCompanionBrain
             instance.PersistentLifeInitialized = true;
             instance.LastSharedLifeMax = me.statLifeMax;
             instance.AutoHealCooldownTicks = 0;
+            instance.AutoManaCooldownTicks = 0;
             CompanionEntitySystem.ResetCompanionDamageState(instance);
             CompanionBrain.ResetCorpseGibs(me);
             ReviveAtSafeSpot(me, state);

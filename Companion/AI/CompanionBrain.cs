@@ -1,8 +1,10 @@
 using Microsoft.Xna.Framework;
 using MoreAIPlayer.Companion.Building;
+using MoreAIPlayer.Companion.Commands;
 using MoreAIPlayer.Reflection.CalamityMod;
 using Terraria;
 using Terraria.ID;
+using Terraria.Localization;
 using Terraria.ModLoader;
 
 namespace MoreAIPlayer.Companion.AI;
@@ -187,9 +189,12 @@ public sealed class CompanionBrain
     // Summon upkeep: filling the summon slots outranks attacking, so it needs a way out of
     // a staff that never fills them (a modded minion taking 0 slots, a slot cap of 0).
     private bool summonedLastTick;
-    private float minionSlotsAtSummonStart;
-    private int fruitlessSummons;
-    private int summonBackoff;
+    private bool summonedSentryLastTick;
+    private float summonProgressAtStart;
+    private int fruitlessMinionSummons;
+    private int fruitlessSentrySummons;
+    private int minionSummonBackoff;
+    private int sentrySummonBackoff;
 
     // Attack feedback is deliberately local to Attack / Free Roam. Those two modes are allowed
     // to adapt their position; Escort and Garrison must respect their defensive posts instead.
@@ -213,6 +218,7 @@ public sealed class CompanionBrain
     // Watchdog for an item animation that never ends: how long the brain waits for the slot it
     // wants before taking it by force. 1.5s is longer than any legitimate weapon animation.
     private const int BlockedAttackForceTicks = 90;
+    private const float FlailSpinDistance = 10f * 16f;
     private int blockedAttackTicks;
 
     private readonly record struct FishingSpot(Vector2 AimWorld, int WaterTiles);
@@ -307,7 +313,7 @@ public sealed class CompanionBrain
         // Free-roam is a proactive hunter: it engages any valid enemy inside its leash around the
         // owner, not just close threats and bosses. Other modes pass 0 and keep the old gating.
         float huntRadius = mode == CompanionMode.FreeRoam ? FreeRoamLeash : 0f;
-        NPC target = SelectTarget(me, owner, ownerData, huntRadius);
+        NPC target = SelectTarget(me, owner, ownerData, profile, huntRadius);
 
         // Escort guards rather than hunts. It previously refused to target anything at all,
         // which is not what "follow and defend" means: a bodyguard that stands next to its
@@ -396,6 +402,14 @@ public sealed class CompanionBrain
         {
             HoldAtAnchor(me, owner);
         }
+        else if (profile.WheelCommandsActive && profile.WorkMode == CompanionWorkMode.Exploration &&
+                 profile.ExplorationLighting && TryLightAtCurrentPosition(instance, me, profile))
+        {
+        }
+        else if (profile.WheelCommandsActive && profile.WorkMode == CompanionWorkMode.Farming &&
+                 TryPerformMiningOrTreeWork(instance, me, owner, ownerData, profile))
+        {
+        }
         else if (mode == CompanionMode.Catch && TryCatchNearbyCritter(instance, me, profile))
         {
         }
@@ -410,15 +424,17 @@ public sealed class CompanionBrain
         {
             // 自由行动: wander the owner's vicinity on its own when there is nothing to fight.
             // Placed ahead of build/follow so a free-roamer neither builds nor shadows the owner.
-            FreeRoamWander(me, owner);
+            FreeRoamWander(instance, profile, me, owner);
         }
-        else if (CompanionBuildingSystem.ShouldRecallForBuild(instance, owner))
+        else if ((!profile.WheelCommandsActive || profile.WorkMode == CompanionWorkMode.Building) &&
+                 CompanionBuildingSystem.ShouldRecallForBuild(instance, owner))
         {
             // Battle platform: the companion fell/was knocked off the bridge while the owner is
             // still up on it. Snap back to the owner's side and resume laying platforms.
             TeleportBeside(me, owner);
         }
-        else if (CompanionBuildingSystem.TryPerformBuildWork(instance, owner, profile, navigator))
+        else if ((!profile.WheelCommandsActive || profile.WorkMode == CompanionWorkMode.Building) &&
+                 CompanionBuildingSystem.TryPerformBuildWork(instance, owner, profile, navigator))
         {
         }
         // The public contract is that companions never take world drops on their own. More
@@ -491,6 +507,12 @@ public sealed class CompanionBrain
         {
             instance.ReviveTicksLeft = IsBossFightActive() ? BossReviveTicks : NormalReviveTicks;
             CompanionEntitySystem.ResetCompanionDamageState(instance);
+            if (MoreAIPlayerClientConfig.Current?.UseChatForCompanionReviveTimer == true)
+            {
+                int seconds = (int)System.Math.Ceiling(instance.ReviveTicksLeft / 60f);
+                Main.NewText(Language.GetTextValue(
+                    "Mods.MoreAIPlayer.CompanionCommand.ReviveChatStarted", me.name, seconds), 255, 120, 110);
+            }
         }
 
         instance.ReviveTicksLeft--;
@@ -504,9 +526,15 @@ public sealed class CompanionBrain
             instance.PersistentLifeInitialized = true;
             instance.LastSharedLifeMax = me.statLifeMax;
             instance.AutoHealCooldownTicks = 0;
+            instance.AutoManaCooldownTicks = 0;
             CompanionEntitySystem.ResetCompanionDamageState(instance);
             ResetCorpseGibs(me);
             TeleportBeside(me, owner);
+            if (MoreAIPlayerClientConfig.Current?.UseChatForCompanionReviveTimer == true)
+            {
+                Main.NewText(Language.GetTextValue(
+                    "Mods.MoreAIPlayer.CompanionCommand.ReviveChatFinished", me.name), 120, 255, 150);
+            }
             if (instance.TryGetContext(out _, out CompanionProfile profile))
                 profile.Mode = CompanionMode.Attack;
             softHoldActive = false;
@@ -570,8 +598,16 @@ public sealed class CompanionBrain
         return false;
     }
 
-    private NPC SelectTarget(Player me, Player owner, CompanionPlayer data, float huntRadius = 0f)
+    private NPC SelectTarget(Player me, Player owner, CompanionPlayer data, CompanionProfile profile, float huntRadius = 0f)
     {
+        // The wheel's Idle shell is intentionally peaceful. The old books still select their
+        // historical modes directly and therefore retain their exact combat behaviour.
+        if (profile.WheelCommandsActive && profile.WorkMode == CompanionWorkMode.Idle)
+        {
+            currentTarget = -1;
+            return null;
+        }
+        CompanionInstance commandInstance = CompanionEntitySystem.GetBySlot(me.whoAmI);
         // A failed search deliberately has the same short cache as a successful one.
         // Previously currentTarget == -1 bypassed this block, causing the companion to
         // enumerate every active NPC on every idle frame. Besides being unnecessary, a
@@ -601,6 +637,13 @@ public sealed class CompanionBrain
 
             float ownerDistance = Vector2.Distance(owner.Center, candidate.Center);
             float companionDistance = Vector2.Distance(me.Center, candidate.Center);
+            bool utilityWork = profile.WheelCommandsActive &&
+                profile.WorkMode is (CompanionWorkMode.Exploration or CompanionWorkMode.Building or CompanionWorkMode.Farming);
+            if (utilityWork && System.Math.Min(ownerDistance, companionDistance) > 20f * 16f)
+                continue;
+            if (profile.WheelCommandsActive && profile.WorkMode == CompanionWorkMode.Combat &&
+                profile.CombatCommand == CombatCommand.Patrol && instanceCommandAreaRejects(candidate))
+                continue;
             if (ownerDistance > MaximumCombatRange && companionDistance > MaximumCombatRange)
                 continue;
 
@@ -615,6 +658,18 @@ public sealed class CompanionBrain
                 continue;
 
             float score = ScoreTarget(candidate, ownerDistance, companionDistance, requested, closeThreat, boss, miniBoss);
+            if (profile.WheelCommandsActive && profile.WorkMode == CompanionWorkMode.Combat)
+            {
+                score += profile.CombatCommand switch
+                {
+                    CombatCommand.SelfDefense => -companionDistance * 24f,
+                    CombatCommand.ProtectOwner => requested ? 900_000f : -ownerDistance * 24f,
+                    CombatCommand.SharedTarget => requested ? 1_500_000f : 0f,
+                    CombatCommand.Patrol when commandInstance?.HasCommandArea == true =>
+                        -Vector2.Distance(commandInstance.CommandAnchor, candidate.Center) * 18f,
+                    _ => 0f
+                };
+            }
             if (score > bestScore)
             {
                 bestScore = score;
@@ -623,6 +678,12 @@ public sealed class CompanionBrain
         }
 
         return IsValidTarget(currentTarget) ? Main.npc[currentTarget] : null;
+
+        bool instanceCommandAreaRejects(NPC candidate)
+        {
+            return commandInstance is not null && commandInstance.HasCommandArea &&
+                !commandInstance.CommandArea.Contains(candidate.Center.ToPoint());
+        }
     }
 
     /// <summary>
@@ -751,33 +812,45 @@ public sealed class CompanionBrain
         // slot check. Attacking matters more than retrying it every animation cycle.
         if (summonedLastTick && lastUseCompleted)
         {
-            if (me.slotsMinions > minionSlotsAtSummonStart)
-                fruitlessSummons = 0;
-            else if (++fruitlessSummons >= 3)
+            float progress = summonedSentryLastTick ? CountOwnedSentries(me) : me.slotsMinions;
+            if (progress > summonProgressAtStart)
             {
-                fruitlessSummons = 0;
-                summonBackoff = 600;
+                if (summonedSentryLastTick)
+                    fruitlessSentrySummons = 0;
+                else
+                    fruitlessMinionSummons = 0;
+            }
+            else if (summonedSentryLastTick && ++fruitlessSentrySummons >= 3)
+            {
+                fruitlessSentrySummons = 0;
+                sentrySummonBackoff = 600;
+            }
+            else if (!summonedSentryLastTick && ++fruitlessMinionSummons >= 3)
+            {
+                fruitlessMinionSummons = 0;
+                minionSummonBackoff = 600;
             }
         }
         summonedLastTick = false;
 
-        if (summonBackoff > 0)
-        {
-            summonBackoff--;
-            return;
-        }
+        if (minionSummonBackoff > 0)
+            minionSummonBackoff--;
+        if (sentrySummonBackoff > 0)
+            sentrySummonBackoff--;
 
-        int staffSlot = FindSummonStaffSlot(me, profile);
+        int staffSlot = FindSummonStaffSlot(me, profile, minionSummonBackoff <= 0,
+            sentrySummonBackoff <= 0, out bool isSentry);
         if (staffSlot < 0)
             return;
 
         if (me.itemAnimation == 0)
-            minionSlotsAtSummonStart = me.slotsMinions;
+            summonProgressAtStart = isSentry ? CountOwnedSentries(me) : me.slotsMinions;
 
         // Staffs spawn their minion on the player regardless of aim; a point just ahead keeps
         // the companion facing the way it is already looking.
         UseHeldItem(instance, me, staffSlot, me.Center + new Vector2(me.direction * 64f, -16f));
         summonedLastTick = true;
+        summonedSentryLastTick = isSentry;
     }
 
     /// <summary>
@@ -786,18 +859,23 @@ public sealed class CompanionBrain
     /// cooldown forever; now the player says explicitly which staff is the one to keep topped
     /// up. Returns the entity inventory index to cast, or -1 when there is nothing to do.
     /// </summary>
-    private static int FindSummonStaffSlot(Player me, CompanionProfile profile)
+    private static int FindSummonStaffSlot(Player me, CompanionProfile profile, bool allowMinion,
+        bool allowSentry, out bool isSentry)
     {
-        Item staff = profile.SummonWeapon;
-        if (!CompanionWeaponBehaviors.IsSummonStaff(staff))
-            return -1;
+        isSentry = false;
+        Item minionStaff = profile.SummonWeapon;
+        if (allowMinion && CompanionWeaponBehaviors.IsMinionStaff(minionStaff) && me.slotsMinions < me.maxMinions)
+            return CompanionInstance.HotbarToInventoryIndex(CompanionProfile.SummonSlot);
 
-        // Sentries are capped separately from minions, by maxTurrets.
-        bool hasRoom = CompanionWeaponBehaviors.IsSentryStaff(staff)
-            ? CountOwnedSentries(me) < me.maxTurrets
-            : me.slotsMinions < me.maxMinions;
+        Item sentryStaff = profile.SentryWeapon;
+        if (allowSentry && CompanionWeaponBehaviors.IsSentryStaff(sentryStaff) &&
+            CountOwnedSentries(me) < me.maxTurrets)
+        {
+            isSentry = true;
+            return CompanionInstance.HotbarToInventoryIndex(CompanionProfile.SentrySlot);
+        }
 
-        return hasRoom ? CompanionInstance.HotbarToInventoryIndex(CompanionProfile.SummonSlot) : -1;
+        return -1;
     }
 
     private static int CountOwnedSentries(Player me)
@@ -836,6 +914,17 @@ public sealed class CompanionBrain
         float distance = Vector2.Distance(me.Center, target.Center);
         bool hasLineOfSight = Collision.CanHitLine(me.Center, 1, 1, target.Center, 1, 1);
         (bool isCloseCombat, float standoffFactor, float aggressionFactor) = CombatFactors(me, plan, adaptiveCombat);
+
+        if (CompanionWeaponBehaviors.IsFlailWeapon(plan.Weapon))
+        {
+            // Close targets are guarded by spinning in place. At range, close only until the
+            // target is inside throwing distance; never backpedal merely because it approached.
+            if (distance > GenericProjectileUseRange || !hasLineOfSight)
+                Travel(me, target.Center, NavigationIntent.Combat, allowPlatformDrop: false);
+            else
+                navigator.Idle(me);
+            return;
+        }
 
         if (plan.UsesProjectile && !isCloseCombat)
         {
@@ -884,6 +973,40 @@ public sealed class CompanionBrain
         float distance = Vector2.Distance(me.Center, target.Center);
         bool hasLineOfSight = Collision.CanHitLine(me.Center, 1, 1, target.Center, 1, 1);
         (bool isCloseCombat, float standoffFactor, float aggressionFactor) = CombatFactors(me, plan, adaptiveCombat);
+
+        if (CompanionWeaponBehaviors.IsFlailWeapon(plan.Weapon))
+        {
+            if (distance > GenericProjectileUseRange || !hasLineOfSight)
+            {
+                AttackState = distance > GenericProjectileUseRange
+                    ? CompanionAttackState.Approaching
+                    : CompanionAttackState.NoLineOfSight;
+                FaceToward(me, target.Center);
+                return;
+            }
+
+            Vector2 flailAim = ComputeInterceptAim(me, target, plan.Weapon, profile);
+            if (distance <= FlailSpinDistance)
+            {
+                // Keep the button held while the enemy is close: vanilla Flail AI remains in
+                // its spinning phase and repeatedly covers the companion's immediate space.
+                UseHeldItem(instance, me, plan.Slot, flailAim);
+            }
+            else if (!CompanionWeaponBehaviors.HasActiveFlailProjectile(me))
+            {
+                // Start one new spin. On the following tick the live projectile is detected and
+                // input stays released, which makes vanilla throw it. Wait for its return before
+                // beginning the next throw.
+                UseHeldItem(instance, me, plan.Slot, flailAim);
+            }
+            else
+            {
+                instance.AimWorld = flailAim;
+                FaceToward(me, target.Center);
+                AttackState = CompanionAttackState.Attacking;
+            }
+            return;
+        }
 
         // Defensive pre-attack: an enemy closing in from behind cover gets met with attacks
         // before it breaks line of sight, instead of the companion standing idle.
@@ -1142,12 +1265,20 @@ public sealed class CompanionBrain
         if (miningLightCooldown > 0)
             miningLightCooldown--;
 
+        bool wheelExploration = profile.WheelCommandsActive && profile.WorkMode == CompanionWorkMode.Exploration;
+
         // The pick comes from the dedicated slot and nowhere else. Scanning the whole inventory
         // turned any pickaxe the companion happened to be carrying into a licence to dig, which
         // is the loose behaviour the pick slot exists to tighten up.
         int pickaxeSlot = !profile.PickTool.IsAir && CompanionSlotRules.IsPickaxe(profile.PickTool)
             ? CompanionInstance.HotbarToInventoryIndex(CompanionProfile.PickSlot)
             : -1;
+        if (pickaxeSlot >= 0 && wheelExploration && profile.ExplorationGathering)
+        {
+            Point ore = FindNearestExposedOreTile(me.Center, 14);
+            if (ore.X >= 0)
+                return MoveAndWorkTile(instance, me, pickaxeSlot, ore);
+        }
         if (pickaxeSlot >= 0 && observation.MiningObservationTime > 0)
         {
             Item pick = me.inventory[pickaxeSlot];
@@ -1180,15 +1311,79 @@ public sealed class CompanionBrain
             }
         }
 
-        int axeSlot = FindToolInventoryIndex(profile, item => item.axe > 0);
-        if (axeSlot >= 0 && observation.TreeAssistTime > 0)
+        int axeSlot = !profile.AxeTool.IsAir && CompanionSlotRules.IsAxe(profile.AxeTool)
+            ? CompanionInstance.HotbarToInventoryIndex(CompanionProfile.AxeSlot)
+            : -1;
+        bool autonomousTreeFarm = profile.WheelCommandsActive && profile.WorkMode == CompanionWorkMode.Farming &&
+            profile.FarmingCommand is FarmingCommand.TreeFarm or FarmingCommand.Combined;
+        if (axeSlot >= 0 && (observation.TreeAssistTime > 0 || autonomousTreeFarm))
         {
-            Point treeTile = FindNearestTreeTile(owner.Center, 20);
+            Vector2 center = autonomousTreeFarm && instance.HasCommandArea ? instance.CommandAnchor : owner.Center;
+            Point treeTile = FindNearestTreeTile(center, 20);
             if (treeTile.X >= 0)
                 return MoveAndWorkTile(instance, me, axeSlot, treeTile);
         }
 
         return false;
+    }
+
+    private bool TryLightAtCurrentPosition(CompanionInstance instance, Player me, CompanionProfile profile)
+    {
+        if (miningLightCooldown > 0)
+            return false;
+        Point anchor = me.Center.ToTileCoordinates();
+        if (!WorldGen.InWorld(anchor.X, anchor.Y, 5) || Lighting.Brightness(anchor.X, anchor.Y) > MiningDarknessThreshold)
+            return false;
+
+        if (me.wet || Main.tile[anchor.X, anchor.Y].LiquidAmount > 0)
+        {
+            int glowstickSlot = FindToolInventoryIndex(profile, IsGlowstick);
+            if (glowstickSlot < 0)
+                return false;
+            navigator.Idle(me);
+            UseHeldItem(instance, me, glowstickSlot, me.Center);
+            miningLightCooldown = MiningLightCooldownTicks;
+            return true;
+        }
+
+        int torchSlot = FindToolInventoryIndex(profile, IsTorch);
+        Point placement = FindNearbyTorchPlacement(me);
+        if (torchSlot < 0 || placement.X < 0)
+            return false;
+        navigator.Idle(me);
+        instance.WorkTile = placement;
+        UseHeldItem(instance, me, torchSlot, new Vector2(placement.X * 16f + 8f, placement.Y * 16f + 8f));
+        miningLightCooldown = MiningLightCooldownTicks;
+        return true;
+    }
+
+    private static Point FindNearestExposedOreTile(Vector2 center, int radiusInTiles)
+    {
+        Point origin = center.ToTileCoordinates();
+        Point best = new(-1, -1);
+        float bestDistance = float.MaxValue;
+        for (int x = origin.X - radiusInTiles; x <= origin.X + radiusInTiles; x++)
+        {
+            for (int y = origin.Y - radiusInTiles; y <= origin.Y + radiusInTiles; y++)
+            {
+                if (!WorldGen.InWorld(x, y, 3))
+                    continue;
+                Tile tile = Main.tile[x, y];
+                if (!tile.HasTile || !IsOreTile(tile.TileType) || !WorldGen.CanKillTile(x, y))
+                    continue;
+                bool exposed = !Main.tile[x - 1, y].HasTile || !Main.tile[x + 1, y].HasTile ||
+                    !Main.tile[x, y - 1].HasTile || !Main.tile[x, y + 1].HasTile;
+                if (!exposed)
+                    continue;
+                float distance = Vector2.DistanceSquared(center, new Vector2(x * 16f + 8f, y * 16f + 8f));
+                if (distance < bestDistance)
+                {
+                    bestDistance = distance;
+                    best = new Point(x, y);
+                }
+            }
+        }
+        return best;
     }
 
     /// <summary>
@@ -1764,9 +1959,11 @@ public sealed class CompanionBrain
     /// the owner walks off, the next goal — and any current pause — is pulled back toward them, and
     /// the ordinary far-away / stuck teleport policy still recalls the companion if it ends up lost.
     /// </summary>
-    private void FreeRoamWander(Player me, Player owner)
+    private void FreeRoamWander(CompanionInstance instance, CompanionProfile profile, Player me, Player owner)
     {
-        float ownerDistance = Vector2.Distance(me.Center, owner.Center);
+        bool useCommandZone = UsesCapturedCommandZone(profile) && instance.HasCommandArea;
+        Vector2 home = useCommandZone ? instance.CommandAnchor : owner.Center;
+        float ownerDistance = Vector2.Distance(me.Center, home);
 
         // Dwell: standing at a reached spot, doing nothing in particular for a random beat.
         if (freeRoamDwellTicks > 0)
@@ -1803,7 +2000,8 @@ public sealed class CompanionBrain
 
         if (!hasFreeRoamGoal)
         {
-            freeRoamGoal = PickFreeRoamGoal(me, owner, ownerDistance);
+            freeRoamGoal = PickFreeRoamGoal(me, home, ownerDistance,
+                useCommandZone ? instance.CommandArea : null);
             hasFreeRoamGoal = true;
             freeRoamGoalTicks = FreeRoamGoalTimeout;
         }
@@ -1817,21 +2015,37 @@ public sealed class CompanionBrain
     /// a point floating in mid-air. Outside the leash it heads back toward the owner; occasionally
     /// it "checks in" by visiting the owner directly.
     /// </summary>
-    private static Vector2 PickFreeRoamGoal(Player me, Player owner, float ownerDistance)
+    private static Vector2 PickFreeRoamGoal(Player me, Vector2 home, float ownerDistance, Rectangle? commandArea)
     {
         int direction;
         if (ownerDistance > FreeRoamLeash)
-            direction = owner.Center.X >= me.Center.X ? 1 : -1; // outside the leash: come back in
+            direction = home.X >= me.Center.X ? 1 : -1; // outside the leash: come back in
         else if (Main.rand.NextBool(5))
-            return owner.Center;                                // occasional check-in visit
+            return home;                                        // occasional check-in visit
         else
             direction = Main.rand.NextBool() ? 1 : -1;
 
         float reach = FreeRoamLeash * Main.rand.NextFloat(0.25f, 1f);
-        float x = owner.Center.X + direction * reach;
-        float y = owner.Center.Y + Main.rand.NextFloat(-48f, 48f);
+        float x = home.X + direction * reach;
+        float y = home.Y + Main.rand.NextFloat(-48f, 48f);
+        if (commandArea is Rectangle area)
+        {
+            x = MathHelper.Clamp(x, area.Left + 24f, area.Right - 24f);
+            y = MathHelper.Clamp(y, area.Top + 24f, area.Bottom - 24f);
+        }
         return new Vector2(x, y);
     }
+
+    private static bool UsesCapturedCommandZone(CompanionProfile profile) =>
+        profile.WheelCommandsActive && (profile.WorkMode switch
+        {
+            CompanionWorkMode.Idle => profile.IdleCommand == IdleCommand.FreeActivity,
+            CompanionWorkMode.Combat => profile.CombatCommand == CombatCommand.Patrol,
+            CompanionWorkMode.Exploration => profile.ExplorationCommand == ExplorationCommand.FreeExplore,
+            CompanionWorkMode.Capturing => true,
+            CompanionWorkMode.Farming => true,
+            _ => false
+        });
 
     private void UpdateTeleportPolicy(CompanionInstance instance, Player me, Player owner, CompanionPlayer ownerData,
         CompanionProfile profile, CompanionMode mode, bool posted)

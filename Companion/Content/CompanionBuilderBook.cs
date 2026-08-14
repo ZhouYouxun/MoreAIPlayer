@@ -60,6 +60,11 @@ public sealed class CompanionBuilderBook : ModItem
         }
 
         CompanionPlayer data = player.GetModPlayer<CompanionPlayer>();
+        foreach (CompanionInstance companion in CompanionCommandBook.OwnedActiveCompanions(player.whoAmI))
+        {
+            if (companion.TryGetContext(out _, out CompanionProfile profile))
+                profile.WheelCommandsActive = false;
+        }
         data.BuildTacticActive = !data.BuildTacticActive;
 
         if (data.BuildTacticActive)

@@ -5,6 +5,11 @@
 
 Mods: {
 	MoreAIPlayer: {
+		Keybinds: {
+			// CompanionWheel.DisplayName: Command Wheel
+			CompanionRescue.DisplayName: Awaryjne przywołanie towarzyszy
+		}
+
 		Fault: {
 			SubsystemError: "[Widmowy Towarzysz] Podsystem {0} napotkał błąd wewnętrzny i został na razie pominięty. Gra działa dalej."
 			CompanionDisabled: "[Widmowy Towarzysz] Towarzysz wielokrotnie powodował błędy i został bezpiecznie usunięty, aby chronić grę."
@@ -12,6 +17,8 @@ Mods: {
 			CircuitOpened: "[Widmowy Towarzysz] {0} napotkał błąd i został wstrzymany na tę sesję świata. Pozostałe systemy działają dalej."
 			CircuitStillOpen: "[Widmowy Towarzysz] Ryzykowna operacja pozostaje wstrzymana po błędzie. Wczytaj świat ponownie przed kolejną próbą."
 			BackpackDropBlocked: "[Widmowy Towarzysz] Opróżnij plecak jest domyślnie wyłączone, aby chronić zapis. Włącz je w ustawieniach dopiero po sprawdzeniu zgodności."
+			// BackpackRecovered: "[Phantom Companion] A companion data error was found at {0}. The affected state was cleaned and refreshed automatically."
+			// BackpackRecoveryFailed: "[Phantom Companion] A companion error at {0} could not be refreshed safely, so the affected panel was closed. Details were written to the log."
 		}
 
 		Configs: {
@@ -42,6 +49,11 @@ Mods: {
 				ShowCompanionHealthBars: {
 					// Label: "[i:LifeCrystal] Show companion health bars"
 					// Tooltip: Disabled by default. Companions occupy real player slots, so the game already draws a health bar over them. Enable to also show the mod's own bar below each companion.
+				}
+
+				UseChatForCompanionReviveTimer: {
+					Label: "[i:RecallPotion] Powiadomienia o odrodzeniu na czacie"
+					Tooltip: Domyślnie wyłączone. Zastępuje licznik nad graczem wiadomością przy śmierci i po odrodzeniu.
 				}
 
 				AllowRightClickOpenBackpack: {
@@ -81,9 +93,18 @@ Mods: {
 			}
 		}
 
-		Keybinds.CompanionRescue.DisplayName: Awaryjne przywołanie towarzyszy
-
 		Items: {
+			PhantomStaff: {
+				// DisplayName: Phantom Staff
+				/* Tooltip:
+					'''
+					Left click: summon or recall this staff's bound companion near you
+					Right click: open the bound companion's backpack while summoned
+					With this staff in your inventory, press the Command Wheel key to command the first summoned staff
+					Each staff remembers one companion. The original books remain fully usable.
+					''' */
+			}
+
 			DamageTestDummy: {
 				DisplayName: Króliczek
 				Tooltip:
@@ -101,6 +122,8 @@ Mods: {
 				Updates: Będę go dalej aktualizować, ulepszać towarzyszy i naprawiać problemy zgłaszane przez graczy.
 				Compatibility: Popularne bronie z dużych modów będą z czasem otrzymywać dedykowaną zgodność.
 				Complexity: Bronie o podobnym wyglądzie mogą działać wewnętrznie zupełnie inaczej, więc część z nich wymaga znacznie więcej czasu na bezpieczną obsługę. Dziękuję za cierpliwość.
+				BetaControlsFirstLine: Ta wersja beta ma obecnie dwie metody sterowania: sześć książek albo Widmowy Kostur z kołem poleceń.
+				BetaControlsSecondLine: Wybierz wygodniejszą; sterowanie zostanie później uproszczone i uporządkowane.
 				ConfigSuggestion: Warto zajrzeć do opcji konfiguracji.
 				Tooltip: Informacje o stanie rozwoju i opcjach konfiguracji.
 			}
@@ -258,7 +281,7 @@ Mods: {
 			Armor: Pancerz
 			Vanity: Wygląd
 			Dye: Barwnik
-			Accessories: Akcesoria (postęp; bez Serca Demona)
+			Accessories: Akcesoria
 			ExtraAccessories: Dodatkowe akcesoria (włączane suwakiem konfiguracji)
 			ExtraAccessoryLocked: Zwiększ suwak dodatkowych slotów akcesoriów towarzysza w konfiguracji klienta
 			HeadArmorOnly: Tylko pancerz głowy
@@ -270,16 +293,24 @@ Mods: {
 			DyeOnly: Tylko barwniki
 			AccessoryOnly: Tylko akcesoria
 			WeaponBar: Broń   Niebieski=obrona  Szary=kilof  Żółty=przyzwanie
-			WeaponPriority: 7 środkowych slotów to zwykła broń; priorytet od lewej → prawej
+			WeaponPriority: 6 środkowych slotów to zwykła broń; priorytet od lewej → prawej
 			GuardWeaponOnly: Obrona: dowolna broń poza kilofem, siekierą i młotem
 			PickaxeOnly: Kilof: tylko zwykłe kilofy; bez narzędzi wielofunkcyjnych
-			SummonWeaponOnly: Przyzwanie: tylko kostury przyzwań lub strażników; bez biczów
-			WeaponOnly: Tylko broń, kilofy, siekiery lub młoty
+			AxeOnly: Tylko siekiery
+			HammerOnly: Tylko młoty
+			HealingPotionOnly: Tylko mikstury życia
+			ManaPotionOnly: Tylko mikstury many
+			SummonWeaponOnly: Sługa: tylko kostury sług; bez strażników i biczów
+			SentryWeaponOnly: Strażnik: tylko kostury strażników
+			WeaponOnly: Tylko aktywna broń bojowa
 			RightClick: Prawy
 			LeftClick: Lewy
 			DecisionStealth: Decyzja: skradanie
 			DecisionNormal: Decyzja: zwykły atak
-			Ammo: Amunicja (pierwsze 4 sloty mają priorytet; ostatnie 2 są dodatkowe)
+			Ammo: Amunicja
+			LifeValue: Życie {0}/{1}
+			ManaValue: Mana {0}/{1}
+			DefenseValue: Obrona {0}
 			AmmoOnly: Tylko strzały, pociski i inna amunicja
 			Tools: Siatka / Wędka / Hak / Wierzchowiec
 			NetOnly: Tylko zwykła, lawoodporna lub złota siatka
@@ -290,8 +321,9 @@ Mods: {
 			WaitingForTarget: Oczekiwanie na cel
 			GuardSlotWeapon: Obrona · {0}
 			SummonSlotWeapon: Przyzwanie · {0}
+			SentrySlotWeapon: Strażnik · {0}
 			NumberedSlotWeapon: Miejsce {0} · {1}
-			NoRotationWeapon: Uwaga: sloty 3–9 nie mają zwykłej broni; używany jest slot rezerwowy
+			NoRotationWeapon: Uwaga: sloty 3–8 nie mają zwykłej broni; używany jest slot rezerwowy
 			ModeFallback: "{0} (powrót z {1}: {2})"
 			StatsMode: Tryb: {0}
 			StatsWeapon: Automatyczny wybór: {0}
@@ -330,7 +362,7 @@ Mods: {
 			ModeMiningDescription: Kopie z tobą, wydobywa rudę i oświetla drogę
 			ModeCatchRequirement: Wymaga siatki w odpowiednim slocie
 			ModeFishingRequirement: Wymaga wędki w odpowiednim slocie oraz przynęty na pasku lub w plecaku
-			ModeMiningRequirement: Wymaga kilofa w slocie 2
+			ModeMiningRequirement: Wymaga kilofa w slocie 6
 			AvoidNoThreat: Nie wykryto zagrożenia
 			AvoidReacting: Reaguje
 			AvoidHolding: Utrzymuje pozycję
@@ -375,6 +407,56 @@ Mods: {
 		}
 
 		CompanionCommand: {
+			// StaffUnbound: This Phantom Staff has not chosen a companion yet. Left click once to bind it.
+			// StaffNotSummoned: Summon this staff's companion before opening its backpack.
+			// StaffUnboundTooltip: Unbound - left click to choose or create a companion
+			// StaffBoundTooltip: Bound to {0} - {1}
+			// StaffStored: stored
+			// StaffActive: summoned
+			// WheelNoActiveStaff: No summoned Phantom Staff was found in your inventory.
+			// WheelRecall: Hold to recall
+			// WheelBackpack: Open backpack
+			// WheelSwitchWork: Work: {0}
+			// WheelChooseWork: Choose work mode
+			// WheelChooseWorkHint: Click a sector; the wheel will return to commands
+			// WheelCurrentWork: Current: {0}
+			// WheelHoldRecall: Keep holding - release to cancel
+			// WheelWorkChanged: "{0} switched to {1}."
+			// WheelCommandChanged: "{0}: {1}"
+			// WheelOn: On
+			// WheelOff: Off
+			// WheelWorkIdle: Idle
+			// WheelWorkCombat: Combat
+			// WheelWorkExploration: Exploration
+			// WheelWorkBuilding: Building
+			// WheelWorkFarming: Farming
+			// WheelWorkFishing: Fishing
+			// WheelWorkCapturing: Capturing
+			// WheelCommandIdleStay: Stay
+			// WheelCommandIdleFollow: Follow
+			// WheelCommandIdleFree: Free activity
+			// WheelCommandCombatSelf: Self-defense
+			// WheelCommandCombatProtect: Protect player
+			// WheelCommandCombatShared: Attack same target
+			// WheelCommandCombatPatrol: Patrol
+			// WheelCommandCombatGarrison: Garrison
+			// WheelCommandExploreFollow: Follow
+			// WheelCommandExploreFree: Free exploration
+			// WheelCommandExploreLight: Lighting
+			// WheelCommandExploreSafety: Hazard removal
+			// WheelCommandExploreGather: Gathering
+			// WheelCommandBuildPlatform: Platform building
+			// WheelCommandBuildDefensive: Defensive building
+			// WheelCommandBuildDestroy: Destruction
+			// WheelCommandFarmTree: Tree farm
+			// WheelCommandFarmHerb: Herb garden
+			// WheelCommandFarmPumpkin: Pumpkin farm
+			// WheelCommandFarmCombined: Combined farm
+			// WheelCommandFishingFish: Fishing
+			// WheelCommandFishingWater: Fill water
+			// WheelCommandCaptureFixed: Fixed capture
+			// WheelCommandCaptureFree: Free capture
+			// WheelCommandCaptureBreak: Clear debris
 			AutomationSingleplayerOnly: Księga automatyzacji na razie działa tylko w trybie jednoosobowym.
 			AutomationAlreadyActive: Ten automatyczny towarzysz jest już zajęty; ponowne kliknięcie go nie zresetuje.
 			AutomationNoFreeSlot: Obecnie nie ma wolnego miejsca dla automatycznego towarzysza.
@@ -392,6 +474,8 @@ Mods: {
 			NoCompanion: Nie masz przywołanych widmowych towarzyszy.
 			SingleplayerOnly: Widmowi towarzysze są na razie dostępni tylko w trybie jednoosobowym.
 			Reviving: "{0} wraca za {1}s"
+			ReviveChatStarted: "{0} został pokonany i wróci za {1}s."
+			ReviveChatFinished: "{0} odrodził się."
 			QuickAccess: "{0} · Kliknij, aby otworzyć ekwipunek i plecak"
 			LootBrag: Zobacz, co udało mi się znaleźć!
 			DumpAll: Wyrzuć wszystko

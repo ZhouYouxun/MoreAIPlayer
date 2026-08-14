@@ -5,6 +5,11 @@
 
 Mods: {
 	MoreAIPlayer: {
+		Keybinds: {
+			// CompanionWheel.DisplayName: Command Wheel
+			CompanionRescue.DisplayName: Экстренный призыв спутников
+		}
+
 		Fault: {
 			SubsystemError: "[Призрачный спутник] Подсистема {0} столкнулась с внутренней ошибкой и пока пропущена. Игра продолжает работать."
 			CompanionDisabled: "[Призрачный спутник] Спутник многократно ошибался и был безопасно удалён для защиты игры."
@@ -12,6 +17,8 @@ Mods: {
 			CircuitOpened: "[Призрачный спутник] {0} столкнулась с ошибкой и приостановлена на эту сессию мира. Остальные системы продолжают работать."
 			CircuitStillOpen: "[Призрачный спутник] Рискованная операция остаётся приостановленной после ошибки. Перезагрузите мир перед новой попыткой."
 			BackpackDropBlocked: "[Призрачный спутник] Очистить рюкзак по умолчанию отключено для защиты сохранения. Включайте в настройках только после проверки совместимости."
+			// BackpackRecovered: "[Phantom Companion] A companion data error was found at {0}. The affected state was cleaned and refreshed automatically."
+			// BackpackRecoveryFailed: "[Phantom Companion] A companion error at {0} could not be refreshed safely, so the affected panel was closed. Details were written to the log."
 		}
 
 		Configs: {
@@ -42,6 +49,11 @@ Mods: {
 				ShowCompanionHealthBars: {
 					// Label: "[i:LifeCrystal] Show companion health bars"
 					// Tooltip: Disabled by default. Companions occupy real player slots, so the game already draws a health bar over them. Enable to also show the mod's own bar below each companion.
+				}
+
+				UseChatForCompanionReviveTimer: {
+					Label: "[i:RecallPotion] Сообщать о возрождении в чате"
+					Tooltip: По умолчанию выключено. Заменяет таймер над игроком сообщениями при смерти и возрождении.
 				}
 
 				AllowRightClickOpenBackpack: {
@@ -81,9 +93,18 @@ Mods: {
 			}
 		}
 
-		Keybinds.CompanionRescue.DisplayName: Экстренный призыв спутников
-
 		Items: {
+			PhantomStaff: {
+				// DisplayName: Phantom Staff
+				/* Tooltip:
+					'''
+					Left click: summon or recall this staff's bound companion near you
+					Right click: open the bound companion's backpack while summoned
+					With this staff in your inventory, press the Command Wheel key to command the first summoned staff
+					Each staff remembers one companion. The original books remain fully usable.
+					''' */
+			}
+
 			DamageTestDummy: {
 				DisplayName: Кролик
 				Tooltip:
@@ -101,6 +122,8 @@ Mods: {
 				Updates: Я буду продолжать обновлять его, улучшать спутников и исправлять проблемы, о которых сообщают игроки.
 				Compatibility: Популярное оружие из крупных модов со временем получит отдельную поддержку совместимости.
 				Complexity: Похожее оружие может иметь совершенно разные внутренние механики, поэтому некоторым экземплярам требуется гораздо больше времени для безопасной поддержки. Спасибо за терпение.
+				BetaControlsFirstLine: В этой бета-версии сейчас есть два способа управления: шесть книг или Призрачный посох с колесом команд.
+				BetaControlsSecondLine: Выберите удобный вариант; позже управление будет упрощено и приведено в порядок.
 				ConfigSuggestion: Загляните в параметры конфигурации.
 				Tooltip: Сведения о разработке и параметрах конфигурации.
 			}
@@ -258,7 +281,7 @@ Mods: {
 			Armor: Броня
 			Vanity: Стиль
 			Dye: Краситель
-			Accessories: Аксессуары (прогресс; без Сердца демона)
+			Accessories: Аксессуары
 			ExtraAccessories: Дополнительные аксессуары (включаются ползунком настроек)
 			ExtraAccessoryLocked: Увеличьте ползунок дополнительных слотов аксессуаров спутника в настройках клиента
 			HeadArmorOnly: Только броня для головы
@@ -270,16 +293,24 @@ Mods: {
 			DyeOnly: Только красители
 			AccessoryOnly: Только аксессуары
 			WeaponBar: Оружие   Синий=защита  Серый=кирка  Жёлтый=призыв
-			WeaponPriority: 7 средних ячеек — обычное оружие; приоритет слева → направо
+			WeaponPriority: 6 средних ячеек — обычное оружие; приоритет слева → направо
 			GuardWeaponOnly: Защита: любое оружие, кроме кирок, топоров и молотов
 			PickaxeOnly: Кирка: только обычные кирки; комбинированные инструменты не подходят
-			SummonWeaponOnly: Призыв: только посохи призыва или турелей; хлысты не подходят
-			WeaponOnly: Только оружие, кирки, топоры или молоты
+			AxeOnly: Только топоры
+			HammerOnly: Только молоты
+			HealingPotionOnly: Только лечебные зелья
+			ManaPotionOnly: Только зелья маны
+			SummonWeaponOnly: Миньон: только посохи миньонов; турели и хлысты не подходят
+			SentryWeaponOnly: Турель: только посохи турелей
+			WeaponOnly: Только активное боевое оружие
 			RightClick: ПКМ
 			LeftClick: ЛКМ
 			DecisionStealth: Решение: скрытность
 			DecisionNormal: Решение: обычная атака
-			Ammo: Боеприпасы (первые 4 важнее; последние 2 дополнительные)
+			Ammo: Боеприпасы
+			LifeValue: Жизнь {0}/{1}
+			ManaValue: Мана {0}/{1}
+			DefenseValue: Защита {0}
 			AmmoOnly: Только стрелы, пули и другие боеприпасы
 			Tools: Сачок / Удочка / Крюк / Транспорт
 			NetOnly: Только обычный, лавостойкий или золотой сачок
@@ -290,8 +321,9 @@ Mods: {
 			WaitingForTarget: Ожидание цели
 			GuardSlotWeapon: Защита · {0}
 			SummonSlotWeapon: Призыв · {0}
+			SentrySlotWeapon: Турель · {0}
 			NumberedSlotWeapon: Ячейка {0} · {1}
-			NoRotationWeapon: Внимание: в ячейках 3–9 нет обычного оружия; используется резерв
+			NoRotationWeapon: Внимание: в ячейках 3–8 нет обычного оружия; используется резерв
 			ModeFallback: "{0} (возврат из {1}: {2})"
 			StatsMode: Режим: {0}
 			StatsWeapon: Автовыбор: {0}
@@ -330,7 +362,7 @@ Mods: {
 			ModeMiningDescription: Копает вместе с вами, добывает руду и освещает путь
 			ModeCatchRequirement: Нужен сачок в ячейке сачка
 			ModeFishingRequirement: Нужны удочка в ячейке удочки и наживка на панели или в рюкзаке
-			ModeMiningRequirement: Нужна кирка в ячейке 2
+			ModeMiningRequirement: Нужна кирка в ячейке 6
 			AvoidNoThreat: Угроз не обнаружено
 			AvoidReacting: Реагирует
 			AvoidHolding: Удерживает позицию
@@ -375,6 +407,56 @@ Mods: {
 		}
 
 		CompanionCommand: {
+			// StaffUnbound: This Phantom Staff has not chosen a companion yet. Left click once to bind it.
+			// StaffNotSummoned: Summon this staff's companion before opening its backpack.
+			// StaffUnboundTooltip: Unbound - left click to choose or create a companion
+			// StaffBoundTooltip: Bound to {0} - {1}
+			// StaffStored: stored
+			// StaffActive: summoned
+			// WheelNoActiveStaff: No summoned Phantom Staff was found in your inventory.
+			// WheelRecall: Hold to recall
+			// WheelBackpack: Open backpack
+			// WheelSwitchWork: Work: {0}
+			// WheelChooseWork: Choose work mode
+			// WheelChooseWorkHint: Click a sector; the wheel will return to commands
+			// WheelCurrentWork: Current: {0}
+			// WheelHoldRecall: Keep holding - release to cancel
+			// WheelWorkChanged: "{0} switched to {1}."
+			// WheelCommandChanged: "{0}: {1}"
+			// WheelOn: On
+			// WheelOff: Off
+			// WheelWorkIdle: Idle
+			// WheelWorkCombat: Combat
+			// WheelWorkExploration: Exploration
+			// WheelWorkBuilding: Building
+			// WheelWorkFarming: Farming
+			// WheelWorkFishing: Fishing
+			// WheelWorkCapturing: Capturing
+			// WheelCommandIdleStay: Stay
+			// WheelCommandIdleFollow: Follow
+			// WheelCommandIdleFree: Free activity
+			// WheelCommandCombatSelf: Self-defense
+			// WheelCommandCombatProtect: Protect player
+			// WheelCommandCombatShared: Attack same target
+			// WheelCommandCombatPatrol: Patrol
+			// WheelCommandCombatGarrison: Garrison
+			// WheelCommandExploreFollow: Follow
+			// WheelCommandExploreFree: Free exploration
+			// WheelCommandExploreLight: Lighting
+			// WheelCommandExploreSafety: Hazard removal
+			// WheelCommandExploreGather: Gathering
+			// WheelCommandBuildPlatform: Platform building
+			// WheelCommandBuildDefensive: Defensive building
+			// WheelCommandBuildDestroy: Destruction
+			// WheelCommandFarmTree: Tree farm
+			// WheelCommandFarmHerb: Herb garden
+			// WheelCommandFarmPumpkin: Pumpkin farm
+			// WheelCommandFarmCombined: Combined farm
+			// WheelCommandFishingFish: Fishing
+			// WheelCommandFishingWater: Fill water
+			// WheelCommandCaptureFixed: Fixed capture
+			// WheelCommandCaptureFree: Free capture
+			// WheelCommandCaptureBreak: Clear debris
 			AutomationSingleplayerOnly: Книга автоматизации пока только для одиночной игры.
 			AutomationAlreadyActive: Этот автоматический спутник уже занят; повторный клик его не сбросит.
 			AutomationNoFreeSlot: Сейчас нет свободного слота для автоматического спутника.
@@ -392,6 +474,8 @@ Mods: {
 			NoCompanion: У вас нет призванных призрачных спутников.
 			SingleplayerOnly: Призрачные спутники пока доступны только в одиночной игре.
 			Reviving: "{0} возрождается через {1}с"
+			ReviveChatStarted: "{0} повержен и возродится через {1}с."
+			ReviveChatFinished: "{0} возродился."
 			QuickAccess: "{0} · Нажмите, чтобы открыть снаряжение и рюкзак"
 			LootBrag: Смотри, что мне попалось!
 			DumpAll: Выложить всё

@@ -149,6 +149,7 @@ public static class CompanionModeWheel
             }
 
             profile.Mode = chosen;
+            profile.WheelCommandsActive = false;
         }
 
         Player owner = Main.LocalPlayer;

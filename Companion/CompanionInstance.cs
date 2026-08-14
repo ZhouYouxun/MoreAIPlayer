@@ -153,6 +153,7 @@ public sealed class CompanionInstance
     /// every frame.
     /// </summary>
     public int AutoHealCooldownTicks;
+    public int AutoManaCooldownTicks;
 
     /// <summary>Owner/identity of the last friendly whip that granted the companion buff. A whip
     /// can overlap for several update ticks; this pair makes one swing grant the effect once.</summary>
@@ -190,6 +191,13 @@ public sealed class CompanionInstance
     /// forever for a natural itemAnimation == 0 that will never come.
     /// </summary>
     public int ActiveItemType = -1;
+
+    /// <summary>The world-space screen rectangle and center captured when the wheel issues a
+    /// patrol/free-work command. New specialist controllers use these without changing the old
+    /// navigator or combat engine.</summary>
+    public Rectangle CommandArea;
+    public Vector2 CommandAnchor;
+    public bool HasCommandArea;
 
     public Player Owner => OwnerWhoAmI >= 0 && OwnerWhoAmI < Main.maxPlayers
         ? Main.player[OwnerWhoAmI]

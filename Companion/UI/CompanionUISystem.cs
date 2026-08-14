@@ -19,6 +19,10 @@ public sealed class CompanionUISystem : ModSystem
     private UIState inventoryUI;
     private int targetSlot = -1;
     private Vector2? inventoryPanelPosition;
+    private bool pendingPanelRecovery;
+    private bool recoverAppearancePage;
+    private string pendingRecoverySource;
+    private Exception pendingRecoveryException;
 
     public static bool IsOpen => instance?.inventoryUI is not null;
     public static int TargetSlot => instance?.targetSlot ?? -1;
@@ -37,6 +41,7 @@ public sealed class CompanionUISystem : ModSystem
         inventoryUI?.Deactivate();
         CompanionModeWheel.Close();
         CompanionBuilderModeWheel.Close();
+        PhantomCommandWheel.Close();
         CompanionManagerPanel.CloseInstant();
         HunterConfigPanel.CloseInstant();
         PlayerScaleMatrixPanel.CloseInstant();
@@ -45,6 +50,9 @@ public sealed class CompanionUISystem : ModSystem
         inventoryUI = null;
         targetSlot = -1;
         inventoryPanelPosition = null;
+        pendingPanelRecovery = false;
+        pendingRecoverySource = null;
+        pendingRecoveryException = null;
     }
 
     public override void OnWorldUnload()
@@ -52,6 +60,7 @@ public sealed class CompanionUISystem : ModSystem
         Close();
         CompanionModeWheel.Close();
         CompanionBuilderModeWheel.Close();
+        PhantomCommandWheel.Close();
         CompanionManagerPanel.CloseInstant();
         HunterConfigPanel.CloseInstant();
         PlayerScaleMatrixPanel.CloseInstant();
@@ -72,12 +81,8 @@ public sealed class CompanionUISystem : ModSystem
         // whatever it was holding the moment the panel opened.
         companion.ForceReleaseChanneledWeapon();
 
-        instance.inventoryPanelPosition = (instance.inventoryUI as ICompanionPanelState)?.PanelPosition ?? instance.inventoryPanelPosition;
-        instance.inventoryUI = new CompanionInventoryUI(profile, companionSlot, instance.inventoryPanelPosition);
-        instance.inventoryUI.Activate();
-        instance.userInterface.SetState(instance.inventoryUI);
-        instance.targetSlot = companionSlot;
-        Main.playerInventory = true;
+        instance.pendingPanelRecovery = false;
+        instance.ShowPanel(profile, companionSlot, appearancePage: false, recoveryAttempt: false);
     }
 
     public static void Close()
@@ -89,6 +94,9 @@ public sealed class CompanionUISystem : ModSystem
         instance.inventoryPanelPosition = (instance.inventoryUI as ICompanionPanelState)?.PanelPosition ?? instance.inventoryPanelPosition;
         instance.inventoryUI = null;
         instance.targetSlot = -1;
+        instance.pendingPanelRecovery = false;
+        instance.pendingRecoverySource = null;
+        instance.pendingRecoveryException = null;
     }
 
     /// <summary>Replaces the equipment/backpack page with the companion's dresser page.</summary>
@@ -102,18 +110,21 @@ public sealed class CompanionUISystem : ModSystem
             return;
 
         instance.inventoryPanelPosition = panelPosition ?? (instance.inventoryUI as ICompanionPanelState)?.PanelPosition;
-        instance.inventoryUI?.Deactivate();
-        instance.inventoryUI = new CompanionAppearanceUI(profile, companionSlot, instance.inventoryPanelPosition);
-        instance.inventoryUI.Activate();
-        instance.userInterface.SetState(instance.inventoryUI);
-        instance.targetSlot = companionSlot;
-        Main.playerInventory = true;
+        instance.pendingPanelRecovery = false;
+        instance.ShowPanel(profile, companionSlot, appearancePage: true, recoveryAttempt: false);
     }
 
     public override void UpdateUI(GameTime gameTime)
     {
         CompanionModeWheel.UpdateInput();
         CompanionBuilderModeWheel.UpdateInput();
+        PhantomCommandWheel.UpdateInput();
+
+        if (pendingPanelRecovery)
+        {
+            RecoverPanel();
+            return;
+        }
 
         if (inventoryUI is null || userInterface is null)
             return;
@@ -130,7 +141,14 @@ public sealed class CompanionUISystem : ModSystem
             return;
         }
 
-        userInterface.Update(gameTime);
+        try
+        {
+            userInterface.Update(gameTime);
+        }
+        catch (Exception exception)
+        {
+            QueuePanelRecovery("UI update", exception);
+        }
     }
 
     /// <summary>
@@ -138,7 +156,7 @@ public sealed class CompanionUISystem : ModSystem
     /// "nothing I changed had any effect" can be told apart from "the change did not help" —
     /// three rounds of fixes were evaluated without that distinction being available.
     /// </summary>
-    public const string BuildStamp = "2026-08-07 #37 damage-builder-hunter-hardening";
+    public const string BuildStamp = "2026-08-13 #39 command-wheel-line-render-hotfix";
 
     /// <summary>Draws a live decision readout over each companion only when the player has
     /// explicitly enabled the client-side diagnostic configuration.</summary>
@@ -296,7 +314,8 @@ public sealed class CompanionUISystem : ModSystem
     /// are waiting to come back. One line per reviving companion.</summary>
     private static void DrawReviveTimers()
     {
-        if (Main.gameMenu || Main.netMode != Terraria.ID.NetmodeID.SinglePlayer)
+        if (Main.gameMenu || Main.netMode != Terraria.ID.NetmodeID.SinglePlayer ||
+            MoreAIPlayerClientConfig.Current?.UseChatForCompanionReviveTimer == true)
             return;
 
         Player owner = Main.LocalPlayer;
@@ -444,6 +463,15 @@ public sealed class CompanionUISystem : ModSystem
             InterfaceScaleType.Game));
 
         layers.Insert(mouseTextIndex, new LegacyGameInterfaceLayer(
+            "MoreAIPlayer: Phantom Command Wheel",
+            () =>
+            {
+                PhantomCommandWheel.Draw();
+                return true;
+            },
+            InterfaceScaleType.UI));
+
+        layers.Insert(mouseTextIndex, new LegacyGameInterfaceLayer(
             "MoreAIPlayer: Companion Mode Wheel",
             () =>
             {
@@ -519,10 +547,103 @@ public sealed class CompanionUISystem : ModSystem
             "MoreAIPlayer: Companion Inventory",
             () =>
             {
-                userInterface.Draw(Main.spriteBatch, new GameTime());
+                try
+                {
+                    userInterface.Draw(Main.spriteBatch, new GameTime());
+                }
+                catch (Exception exception)
+                {
+                    QueuePanelRecovery("UI draw", exception);
+                }
                 return true;
             },
             InterfaceScaleType.UI));
+    }
+
+    private bool ShowPanel(CompanionProfile profile, int companionSlot, bool appearancePage, bool recoveryAttempt)
+    {
+        try
+        {
+            inventoryPanelPosition = (inventoryUI as ICompanionPanelState)?.PanelPosition ?? inventoryPanelPosition;
+            inventoryUI?.Deactivate();
+            inventoryUI = appearancePage
+                ? new CompanionAppearanceUI(profile, companionSlot, inventoryPanelPosition)
+                : new CompanionInventoryUI(profile, companionSlot, inventoryPanelPosition);
+            inventoryUI.Activate();
+            userInterface.SetState(inventoryUI);
+            targetSlot = companionSlot;
+            Main.playerInventory = true;
+            return true;
+        }
+        catch (Exception exception)
+        {
+            if (recoveryAttempt)
+            {
+                SafeClearPanel();
+                CompanionFaultGuard.ReportRecovered($"profile {profile.Id}, UI rebuild", exception, false);
+            }
+            else
+            {
+                targetSlot = companionSlot;
+                recoverAppearancePage = appearancePage;
+                QueuePanelRecovery($"profile {profile.Id}, UI open", exception);
+            }
+            return false;
+        }
+    }
+
+    private void QueuePanelRecovery(string source, Exception exception)
+    {
+        if (pendingPanelRecovery)
+            return;
+        recoverAppearancePage = inventoryUI is CompanionAppearanceUI || recoverAppearancePage;
+        pendingPanelRecovery = true;
+        pendingRecoverySource = source;
+        pendingRecoveryException = exception;
+    }
+
+    private void RecoverPanel()
+    {
+        pendingPanelRecovery = false;
+        int slot = targetSlot;
+        bool appearancePage = recoverAppearancePage;
+        string source = pendingRecoverySource ?? $"slot {slot}, UI";
+        Exception originalException = pendingRecoveryException;
+        pendingRecoverySource = null;
+        pendingRecoveryException = null;
+        SafeClearPanel(keepTarget: true);
+
+        CompanionInstance companion = CompanionEntitySystem.GetBySlot(slot);
+        if (companion is null || !companion.TryGetContext(out Player owner, out CompanionProfile profile))
+        {
+            targetSlot = -1;
+            if (originalException is not null)
+                CompanionFaultGuard.ReportRecovered(source, originalException, false);
+            return;
+        }
+
+        try
+        {
+            profile.RepairRuntimeState();
+            companion.BindProfile(owner, profile);
+            bool rebuilt = ShowPanel(profile, slot, appearancePage, recoveryAttempt: true);
+            if (originalException is not null)
+                CompanionFaultGuard.ReportRecovered(source, originalException, rebuilt);
+        }
+        catch (Exception exception)
+        {
+            SafeClearPanel();
+            CompanionFaultGuard.ReportRecovered($"profile {profile.Id}, state rebind", exception, false);
+        }
+    }
+
+    private void SafeClearPanel(bool keepTarget = false)
+    {
+        try { userInterface?.SetState(null); } catch { }
+        try { inventoryUI?.Deactivate(); } catch { }
+        inventoryUI = null;
+        if (!keepTarget)
+            targetSlot = -1;
     }
 
     private static string T(string key, params object[] args) =>

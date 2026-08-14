@@ -202,6 +202,8 @@ public sealed class CompanionEntitySystem : ModSystem
             !owner.active || owner.whoAmI != Main.myPlayer || FindByProfile(owner.whoAmI, profile.Id) is not null)
             return false;
 
+        VirtualPlayerExecutionContext.RegisterRealPlayer(owner);
+
         // The automation companion is independent of the owner's minion economy: it does not need a
         // free minion slot to be summoned and never spends one while it runs.
         if (!profile.IsAutoRunning && owner.slotsMinions + 1.0f > owner.maxMinions)
@@ -340,8 +342,12 @@ public sealed class CompanionEntitySystem : ModSystem
 
     private static void Release(int slot)
     {
-        if (!BySlot.Remove(slot, out CompanionInstance instance))
+        if (!BySlot.TryGetValue(slot, out CompanionInstance instance))
             return;
+
+        // Restore while the slot is still registered. Foreign projectile OnKill hooks run below;
+        // removing first made a leaked identity invisible to IsVirtualSlot during cleanup.
+        RestoreHijackedLocalPlayer();
 
         try
         {
@@ -368,6 +374,10 @@ public sealed class CompanionEntitySystem : ModSystem
         finally
         {
             DeactivateAndRestoreSlot(slot, instance);
+            // Keep the registration alive through every foreign OnKill hook, restore any identity
+            // it leaked, and only then make the synthetic slot unrecognisable to the guard.
+            RestoreHijackedLocalPlayer();
+            BySlot.Remove(slot);
         }
     }
 
@@ -595,6 +605,9 @@ public sealed class CompanionEntitySystem : ModSystem
 
     public override void UpdateUI(GameTime gameTime)
     {
+        // UI and camera consumers must never inherit a virtual identity from a later-loaded
+        // update hook, even if every item/projectile scope restored correctly on our side.
+        RestoreHijackedLocalPlayer();
         // Edge detection is tracked every frame so a fresh press is never missed even when
         // another system already consumed Main.mouseRightRelease this frame.
         bool freshRightPress = Main.mouseRight && !previousMouseRight;
@@ -814,6 +827,8 @@ public sealed class CompanionEntitySystem : ModSystem
     }
 
     public override void PostUpdateProjectiles() => RestoreHijackedLocalPlayer();
+
+    public override void ModifyScreenPosition() => RestoreHijackedLocalPlayer();
 
     public override void PostUpdateEverything()
     {

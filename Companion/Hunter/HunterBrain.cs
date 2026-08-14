@@ -33,6 +33,7 @@ public sealed class HunterBrain
     private const int StuckRecoveryTicks = 300;
     private const int RelocationCooldownTicks = 600;
     private const float MeaningfulProgressDistance = 24f;
+    private const float FlailSpinDistance = 10f * 16f;
 
     public void ResetForNewLife(Player me)
     {
@@ -64,7 +65,9 @@ public sealed class HunterBrain
         me.controlJump = false;
         me.controlUseItem = false;
         me.controlUseTile = false;
-        me.releaseUseItem = me.itemAnimation == 0;
+        // Releasing is a real input edge for channelled weapons. Keeping this false for the
+        // whole animation made flails spin forever until the hunter lost its target.
+        me.releaseUseItem = true;
         me.releaseUseTile = true;
         navigator.UpdateOwnedDoors(me);
         instance.WantsUseItem = false;
@@ -178,12 +181,21 @@ public sealed class HunterBrain
         {
             me.selectedItem = selectedSlot;
 
-            // Non-auto-reuse weapons must release controlUseItem while animating so releaseUseItem resets for next shot
-            bool allowPress = weapon.autoReuse || me.itemAnimation == 0;
+            bool isFlail = CompanionWeaponBehaviors.IsFlailWeapon(weapon);
+            bool activeFlail = isFlail && CompanionWeaponBehaviors.HasActiveFlailProjectile(me);
+            bool keepFlailSpinning = isFlail && distance <= FlailSpinDistance;
+
+            // A close flail remains held and spinning. A distant flail gets one initial press,
+            // then remains released until its thrown projectile has returned. Other channelled
+            // weapons keep their existing continuous-input behavior.
+            bool allowPress = isFlail
+                ? keepFlailSpinning || !activeFlail && me.itemAnimation == 0
+                : weapon.autoReuse || me.itemAnimation == 0;
             if (allowPress)
             {
                 instance.WantsUseItem = true;
                 me.controlUseItem = true;
+                me.releaseUseItem = me.itemAnimation == 0;
             }
         }
 

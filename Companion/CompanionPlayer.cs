@@ -215,12 +215,61 @@ public sealed class CompanionPlayer : ModPlayer
         if (!tag.ContainsKey(nameof(Profiles)))
         {
             if (tag.ContainsKey(nameof(CompanionProfile.Hotbar)))
-                Profiles.Add(CompanionProfile.LoadLegacy(0, Player, tag));
+            {
+                try
+                {
+                    Profiles.Add(CompanionProfile.LoadLegacy(0, Player, tag));
+                }
+                catch (System.Exception exception)
+                {
+                    Profiles.Add(CompanionProfile.Create(0, Player, true));
+                    CompanionFaultGuard.ReportRecovered("legacy profile metadata", exception, true);
+                }
+            }
             return;
         }
 
-        foreach (TagCompound savedProfile in tag.GetList<TagCompound>(nameof(Profiles)))
-            Profiles.Add(CompanionProfile.Load(savedProfile));
+        int fallbackId = 0;
+        IList<TagCompound> savedProfiles;
+        try
+        {
+            savedProfiles = tag.GetList<TagCompound>(nameof(Profiles));
+        }
+        catch (System.Exception exception)
+        {
+            CompanionFaultGuard.ReportRecovered("profile list", exception, true);
+            return;
+        }
+
+        foreach (TagCompound savedProfile in savedProfiles)
+        {
+            try
+            {
+                CompanionProfile loaded = CompanionProfile.Load(savedProfile);
+                loaded.RepairRuntimeState();
+                Profiles.Add(loaded);
+                fallbackId = System.Math.Max(fallbackId, loaded.Id + 1);
+            }
+            catch (System.Exception exception)
+            {
+                int recoveredId = fallbackId++;
+                try
+                {
+                    if (savedProfile.ContainsKey(nameof(CompanionProfile.Id)))
+                        recoveredId = System.Math.Max(recoveredId, savedProfile.GetInt(nameof(CompanionProfile.Id)));
+                }
+                catch
+                {
+                    // The ID itself is malformed; the generated unique ID below is the safe choice.
+                }
+
+                while (Profiles.Exists(profile => profile.Id == recoveredId))
+                    recoveredId++;
+                fallbackId = System.Math.Max(fallbackId, recoveredId + 1);
+                Profiles.Add(CompanionProfile.RecoverInventory(recoveredId, Player, savedProfile));
+                CompanionFaultGuard.ReportRecovered($"profile {recoveredId} metadata", exception, true);
+            }
+        }
     }
 
     public int WhipBuffTimer;
@@ -386,9 +435,10 @@ public sealed class CompanionPlayer : ModPlayer
                 if (instance.TryGetContext(out Player owner, out _))
                     CaptureCompanionLifeAfterVanillaUpdate(instance, owner);
 
-                Player.statMana = Player.statManaMax2;
                 if (instance.AutoHealCooldownTicks > 0)
                     instance.AutoHealCooldownTicks--;
+                if (instance.AutoManaCooldownTicks > 0)
+                    instance.AutoManaCooldownTicks--;
 
                 // Do not turn a helper into a panic-drinking machine. It waits until it is
                 // genuinely hurt, consumes at most one potion, then observes that potion's own
@@ -403,6 +453,15 @@ public sealed class CompanionPlayer : ModPlayer
                         instance.PersistentLife = System.Math.Clamp(Player.statLife, 1, Player.statLifeMax2);
                         instance.AutoHealCooldownTicks = System.Math.Max(60, Player.potionDelay);
                     }
+                }
+
+                if (!Player.dead && instance.AutoManaCooldownTicks <= 0 && Player.statManaMax2 > 0 &&
+                    Player.statMana * 4 <= Player.statManaMax2 && HasStoredManaPotion())
+                {
+                    int manaBefore = Player.statMana;
+                    TryUseManaPotion(instance);
+                    if (Player.statMana > manaBefore)
+                        instance.AutoManaCooldownTicks = 60;
                 }
             }
         }
@@ -501,7 +560,7 @@ public sealed class CompanionPlayer : ModPlayer
 
         if (HasStoredHealingPotion())
         {
-            CompanionFaultGuard.RunCritical(CompanionFaultGuard.HealingPotionLane, Player.QuickHeal);
+            RunQuickPotionWithPreferred(CompanionProfile.HealingPotionSlot, healing: true);
             return;
         }
 
@@ -513,7 +572,7 @@ public sealed class CompanionPlayer : ModPlayer
         Player.inventory[virtualPotionSlot] = new Item(DefaultHealingPotionType());
         try
         {
-            CompanionFaultGuard.RunCritical(CompanionFaultGuard.HealingPotionLane, Player.QuickHeal);
+            RunQuickPotionWithPreferred(CompanionProfile.HealingPotionSlot, healing: true);
         }
         finally
         {
@@ -531,6 +590,68 @@ public sealed class CompanionPlayer : ModPlayer
         }
 
         return false;
+    }
+
+    private bool HasStoredManaPotion()
+    {
+        for (int i = 0; i < Player.inventory.Length; i++)
+        {
+            Item item = Player.inventory[i];
+            if (item is not null && !item.IsAir && item.potion && item.healMana > 0)
+                return true;
+        }
+        return false;
+    }
+
+    private void TryUseManaPotion(CompanionInstance instance)
+    {
+        Vector2 aim = instance.AimWorld == Vector2.Zero
+            ? Player.Center + new Vector2(Player.direction * 160f, 0f)
+            : instance.AimWorld;
+        using VirtualPlayerExecutionContext.Scope scope =
+            VirtualPlayerExecutionContext.Enter(Player, aim, false, false, null);
+        RunQuickPotionWithPreferred(CompanionProfile.ManaPotionSlot, healing: false);
+    }
+
+    /// <summary>The dedicated potion slot wins even when a stronger potion exists in the
+    /// backpack. If it is empty, the untouched vanilla search naturally falls back to backpack
+    /// potions. Other potion types remain visible throughout.</summary>
+    private void RunQuickPotionWithPreferred(int preferredInventorySlot, bool healing)
+    {
+        Item preferred = Player.inventory[preferredInventorySlot];
+        bool preferredValid = preferred is not null && !preferred.IsAir && preferred.potion &&
+            (healing ? preferred.healLife > 0 : preferred.healMana > 0);
+        if (!preferredValid)
+        {
+            CompanionFaultGuard.RunCritical(CompanionFaultGuard.HealingPotionLane,
+                healing ? Player.QuickHeal : Player.QuickMana);
+            return;
+        }
+
+        List<(int Slot, Item Item)> hidden = [];
+        for (int i = 0; i < Player.inventory.Length; i++)
+        {
+            if (i == preferredInventorySlot)
+                continue;
+            Item item = Player.inventory[i];
+            bool competes = item is not null && !item.IsAir && item.potion &&
+                (healing ? item.healLife > 0 : item.healMana > 0);
+            if (!competes)
+                continue;
+            hidden.Add((i, item));
+            Player.inventory[i] = new Item();
+        }
+
+        try
+        {
+            CompanionFaultGuard.RunCritical(CompanionFaultGuard.HealingPotionLane,
+                healing ? Player.QuickHeal : Player.QuickMana);
+        }
+        finally
+        {
+            foreach ((int slot, Item item) in hidden)
+                Player.inventory[slot] = item;
+        }
     }
 
     private static int DefaultHealingPotionType()

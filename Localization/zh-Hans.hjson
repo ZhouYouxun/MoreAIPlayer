@@ -5,6 +5,11 @@
 
 Mods: {
 	MoreAIPlayer: {
+		Keybinds: {
+			CompanionWheel.DisplayName: 轮盘
+			CompanionRescue.DisplayName: 伙伴紧急呼唤
+		}
+
 		Fault: {
 			SubsystemError: "[幻影伙伴] 子系统 {0} 内部出错，已暂时跳过本次运行；游戏继续正常运行。"
 			CompanionDisabled: "[幻影伙伴] 一个伙伴反复出错，已被安全移除以保护游戏。"
@@ -12,6 +17,8 @@ Mods: {
 			CircuitOpened: "[幻影伙伴] {0} 出错，已在本次世界会话中暂停；其他伙伴功能仍会继续运行。"
 			CircuitStillOpen: "[幻影伙伴] 某项高风险伙伴操作因先前错误而保持暂停。请重载世界后再尝试。"
 			BackpackDropBlocked: "[幻影伙伴] 为保护存档，伙伴背包的“全部丢出”默认关闭。确认兼容性后可在配置中手动开启。"
+			BackpackRecovered: "[幻影伙伴] 在 {0} 检测到伙伴数据错误，已自动清理受影响状态并刷新。"
+			BackpackRecoveryFailed: "[幻影伙伴] {0} 的伙伴错误无法安全刷新，已关闭受影响界面；详细来源已写入日志。"
 		}
 
 		Configs: {
@@ -42,6 +49,11 @@ Mods: {
 				ShowCompanionHealthBars: {
 					Label: "[i:LifeCrystal] 显示伙伴血条"
 					Tooltip: 默认关闭。伙伴占用真实玩家槽位，游戏本身已经会在其头顶画一条血条；开启后会额外在每个伙伴脚下再画一条本模组自己的血条。
+				}
+
+				UseChatForCompanionReviveTimer: {
+					Label: "[i:RecallPotion] 在聊天栏提示伙伴复活"
+					Tooltip: 默认关闭，继续在玩家头顶显示当前倒计时；开启后改为阵亡时和复活时各发送一条聊天提示。
 				}
 
 				AllowRightClickOpenBackpack: {
@@ -81,9 +93,18 @@ Mods: {
 			}
 		}
 
-		Keybinds.CompanionRescue.DisplayName: 伙伴紧急呼唤
-
 		Items: {
+			PhantomStaff: {
+				DisplayName: 幻影法杖
+				Tooltip:
+					'''
+					左键：在身边放出或收回此法杖绑定的伙伴
+					右键：伙伴已放出时，直接打开其背包
+					法杖位于物品栏时，按“轮盘”键指挥最靠前且已放出伙伴
+					每根法杖记住一名伙伴；原有书本与界面全部保留可用
+					'''
+			}
+
 			DamageTestDummy: {
 				DisplayName: 小兔兔
 				Tooltip:
@@ -101,6 +122,8 @@ Mods: {
 				Updates: 我会持续更新、完善伙伴功能，并处理玩家遇到的各种问题。
 				Compatibility: 后续会逐步为各大型模组的热门武器制作点对点兼容。
 				Complexity: 外观相近的武器，底层代码机制可能完全不同；有些兼容需要更多时间才能安全完成，感谢理解与耐心等待。
+				BetaControlsFirstLine: 当前为测试版，有六本书和一个幻影法杖加轮盘两种操控方式
+				BetaControlsSecondLine: 挑选一种合适的使用即可，后续会进行简化和整理
 				ConfigSuggestion: 【考虑去看看配置选项】
 				Tooltip: 查看开发说明与配置选项。
 			}
@@ -264,7 +287,7 @@ Mods: {
 			Armor: 盔甲
 			Vanity: 时装
 			Dye: 染料
-			Accessories: 饰品（栏位随难度与肉山进度自动解锁，无需恶魔之心）
+			Accessories: 饰品
 			ExtraAccessories: 额外饰品（由配置滑块启用）
 			ExtraAccessoryLocked: 请在客户端配置中提高“额外伙伴饰品栏”滑块后使用此栏位
 			HeadArmorOnly: 这里只能放头部盔甲
@@ -276,16 +299,24 @@ Mods: {
 			DyeOnly: 这里只能放染料
 			AccessoryOnly: 这里只能放饰品
 			WeaponBar: 武器栏　蓝＝防身位　灰＝镐位　黄＝召唤位
-			WeaponPriority: 中间 7 格为普通武器，优先级：左 → 右
+			WeaponPriority: 中间 6 格为普通武器，优先级：左 → 右
 			GuardWeaponOnly: 防身位：可放任意武器（镐、斧、锤除外）
-			PickaxeOnly: 镐位：只能放镐（兼具斧或锤的多功能工具不收）
-			SummonWeaponOnly: 召唤位：只能放召唤杖或哨兵杖（鞭子不算）
-			WeaponOnly: 这里可放武器（含召唤武器）、镐、斧或锤
+			PickaxeOnly: 这里只能放镐
+			AxeOnly: 这里只能放斧
+			HammerOnly: 这里只能放锤
+			HealingPotionOnly: 这里只能放生命恢复药水
+			ManaPotionOnly: 这里只能放魔力恢复药水
+			SummonWeaponOnly: 仆从位：只能放仆从召唤杖（哨兵杖和鞭子不算）
+			SentryWeaponOnly: 哨兵位：只能放哨兵召唤杖
+			WeaponOnly: 这里只能放普通攻击武器
 			RightClick: 右键
 			LeftClick: 左键
 			DecisionStealth: 决策：潜伏
 			DecisionNormal: 决策：普攻
-			Ammo: 弹药（前 4 格优先，后 2 格为扩展位）
+			Ammo: 弹药
+			LifeValue: 生命 {0}/{1}
+			ManaValue: 魔力 {0}/{1}
+			DefenseValue: 防御 {0}
 			AmmoOnly: 这里只能放箭、子弹等弹药
 			Tools: 虫网 / 鱼竿 / 钩爪 / 坐骑
 			NetOnly: 这里只能放捕虫网、地狱捕虫网或金虫网
@@ -295,9 +326,10 @@ Mods: {
 			Backpack: 背包
 			WaitingForTarget: 等待目标
 			GuardSlotWeapon: 防身位 · {0}
-			SummonSlotWeapon: 召唤位 · {0}
+			SummonSlotWeapon: 仆从位 · {0}
+			SentrySlotWeapon: 哨兵位 · {0}
 			NumberedSlotWeapon: "{0} 号位 · {1}"
-			NoRotationWeapon: 注意：3–9 号位没有普通武器，正在动用保留位应急
+			NoRotationWeapon: 注意：3–8 号位没有普通武器，正在动用保留位应急
 			ModeFallback: "{0}（已从「{1}」回退：{2}）"
 			StatsMode: 模式：{0}
 			StatsWeapon: 当前自动选择：{0}
@@ -336,7 +368,7 @@ Mods: {
 			ModeMiningDescription: 跟着主人挖掘，顺路采矿并照明
 			ModeCatchRequirement: 需要捕虫网槽内有网
 			ModeFishingRequirement: 需要鱼竿槽内有钓竿，且快捷栏或背包内有鱼饵
-			ModeMiningRequirement: 需要镐位（2 号格）内有镐
+			ModeMiningRequirement: 需要镐位（6 号格）内有镐
 			AvoidNoThreat: 未发现威胁
 			AvoidReacting: 正在反应
 			AvoidHolding: 保持位置
@@ -381,6 +413,56 @@ Mods: {
 		}
 
 		CompanionCommand: {
+			StaffUnbound: 这根幻影法杖尚未绑定伙伴；左键使用一次即可绑定。
+			StaffNotSummoned: 请先放出这根法杖绑定的伙伴，再打开背包。
+			StaffUnboundTooltip: 未绑定——左键选择或创建伙伴
+			StaffBoundTooltip: 已绑定 {0}——{1}
+			StaffStored: 已收回
+			StaffActive: 已放出
+			WheelNoActiveStaff: 物品栏中没有找到已经放出伙伴的幻影法杖。
+			WheelRecall: 长按收回
+			WheelBackpack: 打开背包
+			WheelSwitchWork: 工作：{0}
+			WheelChooseWork: 选择工作模式
+			WheelChooseWorkHint: 点击扇区，随后返回指令轮盘
+			WheelCurrentWork: 当前：{0}
+			WheelHoldRecall: 继续按住；中途松开即取消
+			WheelWorkChanged: "{0} 已切换至{1}模式。"
+			WheelCommandChanged: "{0}：{1}"
+			WheelOn: 开
+			WheelOff: 关
+			WheelWorkIdle: 空闲
+			WheelWorkCombat: 战斗
+			WheelWorkExploration: 探险
+			WheelWorkBuilding: 建造
+			WheelWorkFarming: 农场
+			WheelWorkFishing: 钓鱼
+			WheelWorkCapturing: 捕捉
+			WheelCommandIdleStay: 挂机
+			WheelCommandIdleFollow: 跟随
+			WheelCommandIdleFree: 自由活动
+			WheelCommandCombatSelf: 自卫
+			WheelCommandCombatProtect: 保护玩家
+			WheelCommandCombatShared: 攻击同一目标
+			WheelCommandCombatPatrol: 巡逻
+			WheelCommandCombatGarrison: 驻守
+			WheelCommandExploreFollow: 跟随
+			WheelCommandExploreFree: 自由探索
+			WheelCommandExploreLight: 照明
+			WheelCommandExploreSafety: 排险
+			WheelCommandExploreGather: 采集
+			WheelCommandBuildPlatform: 平台建造
+			WheelCommandBuildDefensive: 防御建造
+			WheelCommandBuildDestroy: 破坏
+			WheelCommandFarmTree: 树场
+			WheelCommandFarmHerb: 草药园
+			WheelCommandFarmPumpkin: 南瓜园
+			WheelCommandFarmCombined: 综合
+			WheelCommandFishingFish: 钓鱼
+			WheelCommandFishingWater: 蓄水
+			WheelCommandCaptureFixed: 定点捕捉
+			WheelCommandCaptureFree: 自由捕捉
+			WheelCommandCaptureBreak: 破坏杂草碎石
 			AutomationSingleplayerOnly: 自动书暂时仅支持单人模式。
 			AutomationAlreadyActive: 这位自动伙伴已经在忙了，再点也不会刷新它。
 			AutomationNoFreeSlot: 现在没有空余槽位可以召唤自动伙伴。
@@ -398,6 +480,8 @@ Mods: {
 			NoCompanion: 当前没有已召唤的幻影伙伴。
 			SingleplayerOnly: 幻影伙伴目前仅支持单人模式。
 			Reviving: "{0} 复活中 {1}s"
+			ReviveChatStarted: "{0} 已阵亡，将在 {1} 秒后复活。"
+			ReviveChatFinished: "{0} 已复活。"
 			QuickAccess: "{0} · 点击打开装备与背包"
 			LootBrag: 看看我捡的好东西！
 			DumpAll: 全部倒出

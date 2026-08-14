@@ -60,9 +60,6 @@ public static class CompanionWeaponBehaviors
         // keeps its swarm role (GuardPlan) and the summon slot its upkeep role — this is purely
         // about not standing idle while holding a perfectly good weapon. The pick slot is never
         // considered: swinging a pickaxe at an enemy is not an attack.
-        ConsiderSlot(companion, target, inventory, CompanionProfile.GuardSlot, ref immediate, ref fallback);
-        ConsiderSlot(companion, target, inventory, CompanionProfile.SummonSlot, ref immediate, ref fallback);
-
         return immediate ?? fallback;
     }
 
@@ -79,7 +76,7 @@ public static class CompanionWeaponBehaviors
             return;
 
         Item weapon = inventory.Hotbar[slot];
-        if (weapon.IsAir || !CompanionSlotRules.IsAllowedWeapon(weapon) || weapon.pick > 0 || weapon.axe > 0 || weapon.hammer > 0)
+        if (weapon.IsAir || !CompanionSlotRules.IsRegularWeapon(weapon))
             return;
 
         // Staffs are not attack weapons: the brain fires them separately to keep the summon
@@ -142,14 +139,10 @@ public static class CompanionWeaponBehaviors
     /// </summary>
     public static CompanionWeaponPlan GuardPlan(CompanionProfile inventory)
     {
-        Item weapon = inventory.GuardWeapon;
-        if (!weapon.IsAir && CompanionSlotRules.IsGuardWeapon(weapon))
-            return MakePlan(CompanionProfile.GuardSlot, weapon);
-
         for (int slot = CompanionProfile.FirstCombatSlot; slot < CompanionProfile.EndCombatSlot; slot++)
         {
             Item candidate = inventory.Hotbar[slot];
-            if (candidate.IsAir || !CompanionSlotRules.IsGuardWeapon(candidate) || IsSummonStaff(candidate))
+            if (candidate.IsAir || !CompanionSlotRules.IsRegularWeapon(candidate))
                 continue;
             return MakePlan(slot, candidate);
         }
@@ -172,6 +165,33 @@ public static class CompanionWeaponBehaviors
 
     /// <summary>True for the subset of summon staffs that place a stationary sentry.</summary>
     public static bool IsSentryStaff(Item item) => IsSummonStaff(item) && item.sentry;
+
+    /// <summary>True for ordinary minion staffs, excluding the separately maintained sentry role.</summary>
+    public static bool IsMinionStaff(Item item) => IsSummonStaff(item) && !item.sentry;
+
+    /// <summary>
+    /// Generic flail detection shared by companions and hunters. Vanilla flails and modded
+    /// flails following tModLoader's standard contract advertise the Flail projectile AI style,
+    /// so this does not need a brittle list of item names.
+    /// </summary>
+    public static bool IsFlailWeapon(Item item) =>
+        item is not null && !item.IsAir && item.shoot > ProjectileID.None &&
+        ContentSamples.ProjectilesByType.TryGetValue(item.shoot, out Projectile sample) &&
+        sample.aiStyle == ProjAIStyleID.Flail;
+
+    /// <summary>Whether this player still owns a live flail, including its thrown/returning phases.</summary>
+    public static bool HasActiveFlailProjectile(Player player)
+    {
+        if (player is null)
+            return false;
+
+        foreach (Projectile projectile in Main.ActiveProjectiles)
+        {
+            if (projectile.owner == player.whoAmI && projectile.aiStyle == ProjAIStyleID.Flail)
+                return true;
+        }
+        return false;
+    }
 
     /// <summary>
     /// How close the companion must be for a direct melee swing to connect. Pure swing
@@ -213,6 +233,11 @@ public static class CompanionWeaponBehaviors
         {
             return false;
         }
+
+        // A flail can spin as a close guard weapon, but releasing it is also a real ranged
+        // attack. Its dedicated combat path chooses between those phases from target distance.
+        if (IsFlailWeapon(weapon))
+            return false;
 
         if (ContentSamples.ProjectilesByType.TryGetValue(weapon.shoot, out Projectile sample) &&
             (sample.aiStyle == ProjAIStyleID.Spear || sample.aiStyle == ProjAIStyleID.Flail ||

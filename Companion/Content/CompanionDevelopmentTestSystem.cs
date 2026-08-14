@@ -202,9 +202,9 @@ public sealed class CompanionDevelopmentTestSystem : ModSystem
 
     private static void PrepareTestLoadout(CompanionProfile profile)
     {
-        profile.Hotbar[CompanionProfile.GuardSlot] = new Item(ItemID.CopperBroadsword);
+        profile.Hotbar[CompanionProfile.FirstCombatSlot] = new Item(ItemID.CopperBroadsword);
         profile.Hotbar[CompanionProfile.PickSlot] = new Item(ItemID.CopperPickaxe);
-        profile.Hotbar[CompanionProfile.FirstCombatSlot] = new Item(ItemID.WoodenBow);
+        profile.Hotbar[CompanionProfile.FirstCombatSlot + 1] = new Item(ItemID.WoodenBow);
         profile.Ammo[0] = new Item(ItemID.WoodenArrow, 200);
         profile.Net[0] = new Item(ItemID.BugNet);
         profile.Rod[0] = new Item(ItemID.WoodFishingPole);

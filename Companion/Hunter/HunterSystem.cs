@@ -745,6 +745,8 @@ public sealed class HunterSystem : ModSystem
                 continue;
             }
 
+            AdvanceHunterBuffTimers(instance, me);
+
             bool updated = CompanionFaultGuard.Run($"hunter update #{slot}", () =>
             {
                 instance.Brain.Update(instance, localPlayer);
@@ -782,6 +784,57 @@ public sealed class HunterSystem : ModSystem
             foreach (int slot in faultedSlots)
                 RetireHunter(slot, announceFault: true);
         }
+    }
+
+    /// <summary>
+    /// Player.UpdateBuffs only decrements buff time for Main.myPlayer. Hunters deliberately do
+    /// not occupy that global slot, so without this mirror poison, burning and every other timed
+    /// debuff last forever. A newly applied expert-mode debuff also receives the same world
+    /// multiplier that Player.AddBuff normally reserves for the local player.
+    /// </summary>
+    private static void AdvanceHunterBuffTimers(HunterInstance instance, Player hunter)
+    {
+        System.Array.Clear(instance.NextObservedBuffTypes, 0, instance.NextObservedBuffTypes.Length);
+        System.Array.Clear(instance.NextObservedBuffTimes, 0, instance.NextObservedBuffTimes.Length);
+        for (int i = 0; i < Player.MaxBuffs; i++)
+        {
+            int type = hunter.buffType[i];
+            int time = hunter.buffTime[i];
+            if (type <= 0 || time <= 0)
+                continue;
+
+            int previousTime = 0;
+            for (int previousIndex = 0; previousIndex < Player.MaxBuffs; previousIndex++)
+            {
+                if (instance.ObservedBuffTypes[previousIndex] == type)
+                {
+                    previousTime = instance.ObservedBuffTimes[previousIndex];
+                    break;
+                }
+            }
+            bool newlyApplied = previousTime <= 0 || time > previousTime + 1;
+            if (newlyApplied && Main.expertMode && BuffID.Sets.LongerExpertDebuff[type])
+            {
+                float multiplier = Main.GameModeInfo.DebuffTimeMultiplier;
+                if (Main.GameModeInfo.IsJourneyMode)
+                {
+                    multiplier = Main.masterMode
+                        ? Main.RegisteredGameModes[2].DebuffTimeMultiplier
+                        : Main.RegisteredGameModes[1].DebuffTimeMultiplier;
+                }
+                time = System.Math.Max(time, (int)(time * multiplier));
+            }
+
+            if (!BuffID.Sets.TimeLeftDoesNotDecrease[type])
+                time--;
+
+            hunter.buffTime[i] = System.Math.Max(0, time);
+            instance.NextObservedBuffTypes[i] = type;
+            instance.NextObservedBuffTimes[i] = hunter.buffTime[i];
+        }
+
+        System.Array.Copy(instance.NextObservedBuffTypes, instance.ObservedBuffTypes, Player.MaxBuffs);
+        System.Array.Copy(instance.NextObservedBuffTimes, instance.ObservedBuffTimes, Player.MaxBuffs);
     }
 
     private static void HaltHunterInput(Player player)

@@ -35,6 +35,11 @@ public sealed class MoreAIPlayerClientConfig : ModConfig
     [DefaultValue(false)]
     public bool ShowCompanionHealthBars;
 
+    // Off preserves the existing countdown above the owner. When enabled, death and revival are
+    // announced once in chat instead, avoiding both a permanent overlay and per-second spam.
+    [DefaultValue(false)]
+    public bool UseChatForCompanionReviveTimer;
+
     // Off by default: right-clicking a companion in the world does nothing, and the backpack
     // is opened only through the top-of-screen matrix panel. Enable to restore right-click open.
     [DefaultValue(false)]

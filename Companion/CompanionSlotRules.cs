@@ -15,6 +15,17 @@ public static class CompanionSlotRules
         return item.damage > 0 || tool;
     }
 
+    /// <summary>One of the three priority attack slots: active weapons, but not persistent
+    /// minion/sentry staffs or construction tools. Whips remain valid because they are active
+    /// attacks even though they use summon damage.</summary>
+    public static bool IsRegularWeapon(Item item)
+    {
+        if (item.IsAir)
+            return true;
+        bool tool = item.pick > 0 || item.axe > 0 || item.hammer > 0;
+        return item.damage > 0 && !tool && !CompanionWeaponBehaviors.IsSummonStaff(item);
+    }
+
     /// <summary>
     /// The guard slot accepts any weapon at all — a shotgun, a greatsword and a suicide-tome
     /// spellbook are all equally valid answers to being swarmed, and picking between them is
@@ -31,12 +42,16 @@ public static class CompanionSlotRules
     }
 
     /// <summary>
-    /// The summon slot takes minion and sentry staffs and nothing else. Whips are rejected on
+    /// The summon slot takes minion staffs and nothing else. Whips are rejected on
     /// purpose: they carry the summon damage class but are swung at enemies like any other
     /// weapon, so they belong in the ordinary rotation, not in slot upkeep.
     /// </summary>
     public static bool IsSummonWeapon(Item item) =>
-        item.IsAir || CompanionWeaponBehaviors.IsSummonStaff(item);
+        item.IsAir || CompanionWeaponBehaviors.IsMinionStaff(item);
+
+    /// <summary>The sentry slot accepts only stationary-summon staffs.</summary>
+    public static bool IsSentryWeapon(Item item) =>
+        item.IsAir || CompanionWeaponBehaviors.IsSentryStaff(item);
 
     /// <summary>Bug nets only — the vanilla set covers the Bug Net, Lavaproof Bug Net and Golden
     /// Bug Net, plus any modded catching tool that registers itself the same way.</summary>
@@ -57,8 +72,17 @@ public static class CompanionSlotRules
     /// companion was told to break, and a hammer or axe in this slot would widen that to walls
     /// and trees, which is exactly the "it digs wherever it likes" failure being avoided.
     /// </summary>
-    public static bool IsPickaxe(Item item) =>
-        item.IsAir || (item.pick > 0 && item.axe <= 0 && item.hammer <= 0);
+    public static bool IsPickaxe(Item item) => item.IsAir || item.pick > 0;
+
+    public static bool IsAxe(Item item) => item.IsAir || item.axe > 0;
+
+    public static bool IsHammer(Item item) => item.IsAir || item.hammer > 0;
+
+    public static bool IsHealingPotion(Item item) =>
+        item.IsAir || item.potion && item.healLife > 0;
+
+    public static bool IsManaPotion(Item item) =>
+        item.IsAir || item.potion && item.healMana > 0;
 
     /// <summary>
     /// How many of the profile's accessory slots the current world actually grants. Companions

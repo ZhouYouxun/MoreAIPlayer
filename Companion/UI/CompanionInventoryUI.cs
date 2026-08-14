@@ -24,7 +24,11 @@ public sealed class CompanionInventoryUI : UIState, ICompanionPanelState
     private readonly int companionSlot;
     private readonly Vector2? initialPanelPosition;
     private DraggableUIPanel panel = null!;
-    private UIText statsText = null!;
+    private UIText lifeText = null!;
+    private UIText manaText = null!;
+    private UIText defenseText = null!;
+    private UIText accessoryPageText = null!;
+    private int accessoryPage;
     private UIText titleText = null!;
     private UIPanel renameOverlay;
     private UIPanel renameDialog;
@@ -54,7 +58,7 @@ public sealed class CompanionInventoryUI : UIState, ICompanionPanelState
         Append(panel);
 
         string companionName = string.IsNullOrWhiteSpace(data.Name) ? T("DefaultName") : data.Name;
-        titleText = new UIText(T("InventoryTitle", companionName), 1.05f, true);
+        titleText = new UIText(companionName, 1.05f, true);
         titleText.Left.Set(18f, 0f);
         titleText.Top.Set(12f, 0f);
         panel.Append(titleText);
@@ -79,14 +83,12 @@ public sealed class CompanionInventoryUI : UIState, ICompanionPanelState
         const float equipLabelY = 50f;
         const float equipTopY = equipLabelY + LabelGap;
 
-        AddLabel(panel, T("Armor"), Margin, equipLabelY);
         AddVerticalSlots(panel, data.Armor, Margin, equipTopY,
             ItemSlot.Context.EquipArmor,
             (CompanionSlotRules.IsHeadArmor, T("HeadArmorOnly")),
             (CompanionSlotRules.IsBodyArmor, T("BodyArmorOnly")),
             (CompanionSlotRules.IsLegArmor, T("LegArmorOnly")));
 
-        AddLabel(panel, T("Vanity"), Margin + SlotStep, equipLabelY);
         for (int i = 0; i < data.Vanity.Length; i++)
         {
             System.Func<Item, bool> rule;
@@ -110,7 +112,6 @@ public sealed class CompanionInventoryUI : UIState, ICompanionPanelState
                 drawContext: ItemSlot.Context.EquipArmorVanity, emptySilhouetteIndex: 3 + i * 6));
         }
 
-        AddLabel(panel, T("Dye"), Margin + SlotStep * 2f, equipLabelY);
         for (int i = 0; i < data.Dyes.Length; i++)
         {
             panel.Append(CreateSlot(data.Dyes, i, CompanionSlotRules.IsDye, T("DyeOnly"),
@@ -127,59 +128,91 @@ public sealed class CompanionInventoryUI : UIState, ICompanionPanelState
                 ColumnTwo + i * SlotStep, equipTopY,
                 isLocked: () => capturedIndex >= CompanionSlotRules.UnlockedAccessorySlots(),
                 lockedText: AccessoryLockReason(capturedIndex),
-                drawContext: ItemSlot.Context.EquipAccessory));
+                drawContext: ItemSlot.Context.EquipAccessory,
+                isVisible: () => accessoryPage == 0));
         }
 
-        const float extraAccessoryTopY = equipTopY + SlotStep + 24f;
-        const float extraAccessoryBottomY = extraAccessoryTopY + CompanionItemSlot.SlotSize;
-        AddLabel(panel, T("ExtraAccessories"), ColumnTwo, equipTopY + SlotStep + 6f);
         for (int i = 0; i < data.ExtraAccessories.Length; i++)
         {
             int capturedIndex = i;
             panel.Append(CreateSlot(
                 data.ExtraAccessories, i, CompanionSlotRules.IsAccessory, T("AccessoryOnly"),
-                ColumnTwo + i * SlotStep, extraAccessoryTopY,
+                ColumnTwo + i * SlotStep, equipTopY,
                 isLocked: () => capturedIndex >= MoreAIPlayerClientConfig.ExtraCompanionAccessorySlots,
                 lockedText: T("ExtraAccessoryLocked"),
-                drawContext: ItemSlot.Context.EquipAccessory));
+                drawContext: ItemSlot.Context.EquipAccessory,
+                isVisible: () => accessoryPage == 1));
         }
 
-        // Tucked under the accessory row, filling the space beside the three equip columns.
-        // Non-Chinese status labels are naturally wider; this scale keeps the six live rows
-        // inside the accessory-side column without changing the panel's low-resolution fit.
-        statsText = new UIText(string.Empty, 0.76f);
-        statsText.Left.Set(ColumnTwo, 0f);
-        statsText.Top.Set(extraAccessoryBottomY + 12f, 0f);
-        panel.Append(statsText);
+        const float pageButtonY = equipTopY + CompanionItemSlot.SlotSize + 5f;
+        UITextPanel<string> previousAccessoryPage = new("<", 0.75f, false);
+        previousAccessoryPage.Width.Set(30f, 0f);
+        previousAccessoryPage.Height.Set(24f, 0f);
+        previousAccessoryPage.Left.Set(ColumnTwo, 0f);
+        previousAccessoryPage.Top.Set(pageButtonY, 0f);
+        previousAccessoryPage.OnLeftClick += (_, _) => SetAccessoryPage(0);
+        panel.Append(previousAccessoryPage);
+
+        accessoryPageText = new UIText(string.Empty, 0.7f);
+        accessoryPageText.Left.Set(ColumnTwo + 38f, 0f);
+        accessoryPageText.Top.Set(pageButtonY + 3f, 0f);
+        panel.Append(accessoryPageText);
+
+        UITextPanel<string> nextAccessoryPage = new(">", 0.75f, false);
+        nextAccessoryPage.Width.Set(30f, 0f);
+        nextAccessoryPage.Height.Set(24f, 0f);
+        nextAccessoryPage.Left.Set(ColumnTwo + 82f, 0f);
+        nextAccessoryPage.Top.Set(pageButtonY, 0f);
+        nextAccessoryPage.OnLeftClick += (_, _) => SetAccessoryPage(1);
+        panel.Append(nextAccessoryPage);
+
+        // Only the three values a loadout screen needs, tucked below the armor column.
+        lifeText = AddStat(panel, Margin, equipTopY + SlotStep * 3f + 8f, new Color(245, 90, 90));
+        manaText = AddStat(panel, Margin, equipTopY + SlotStep * 3f + 28f, new Color(95, 135, 255));
+        defenseText = AddStat(panel, Margin, equipTopY + SlotStep * 3f + 48f, new Color(190, 200, 220));
 
         // ── Group 2: weapon bar ──────────────────────────────────────────────────────────
-        // The status readout occupies the right column below the optional accessory row.
-        // Reserve its height before starting the weapon and backpack groups underneath.
-        const float equipBottomY = extraAccessoryBottomY + 100f;
-        const float weaponLabelY = equipBottomY + GroupGap;
-        const float weaponTopY = weaponLabelY + LabelGap + 18f; // two label lines
-
-        AddLabel(panel, T("WeaponBar"), Margin, weaponLabelY);
-        AddLabel(panel, T("WeaponPriority"), Margin, weaponLabelY + 18f);
+        const float weaponTopY = 304f;
         for (int i = 0; i < CompanionPlayer.HotbarSize; i++)
         {
             int capturedIndex = i;
-            bool isGuardSlot = i == CompanionProfile.GuardSlot;
             bool isSummonSlot = i == CompanionProfile.SummonSlot;
+            bool isSentrySlot = i == CompanionProfile.SentrySlot;
             bool isPickSlot = i == CompanionProfile.PickSlot;
+            bool isAxeSlot = i == CompanionProfile.AxeSlot;
+            bool isHammerSlot = i == CompanionProfile.HammerSlot;
+            bool isHealingSlot = i == CompanionProfile.HealingPotionSlot;
+            bool isManaSlot = i == CompanionProfile.ManaPotionSlot;
 
-            System.Func<Item, bool> rule = isGuardSlot ? CompanionSlotRules.IsGuardWeapon
-                : isPickSlot ? CompanionSlotRules.IsPickaxe
+            System.Func<Item, bool> rule = isPickSlot ? CompanionSlotRules.IsPickaxe
+                : isAxeSlot ? CompanionSlotRules.IsAxe
+                : isHammerSlot ? CompanionSlotRules.IsHammer
+                : isHealingSlot ? CompanionSlotRules.IsHealingPotion
+                : isManaSlot ? CompanionSlotRules.IsManaPotion
                 : isSummonSlot ? CompanionSlotRules.IsSummonWeapon
-                : CompanionSlotRules.IsAllowedWeapon;
-            string rejection = isGuardSlot ? T("GuardWeaponOnly")
-                : isPickSlot ? T("PickaxeOnly")
+                : isSentrySlot ? CompanionSlotRules.IsSentryWeapon
+                : CompanionSlotRules.IsRegularWeapon;
+            string rejection = isPickSlot ? T("PickaxeOnly")
+                : isAxeSlot ? T("AxeOnly")
+                : isHammerSlot ? T("HammerOnly")
+                : isHealingSlot ? T("HealingPotionOnly")
+                : isManaSlot ? T("ManaPotionOnly")
                 : isSummonSlot ? T("SummonWeaponOnly")
+                : isSentrySlot ? T("SentryWeaponOnly")
                 : T("WeaponOnly");
-            Color? accent = isGuardSlot ? CompanionItemSlot.GuardAccent
-                : isPickSlot ? CompanionItemSlot.PickAccent
+            Color? accent = isPickSlot || isAxeSlot || isHammerSlot ? CompanionItemSlot.PickAccent
                 : isSummonSlot ? CompanionItemSlot.SummonAccent
+                : isSentrySlot ? CompanionItemSlot.SentryAccent
                 : null;
+            int ghostType = i < CompanionProfile.EndCombatSlot ? ItemID.IronBroadsword
+                : isSummonSlot ? ItemID.SlimeStaff
+                : isSentrySlot ? ItemID.QueenSpiderStaff
+                : isPickSlot ? ItemID.IronPickaxe
+                : isAxeSlot ? ItemID.IronAxe
+                : isHammerSlot ? ItemID.IronHammer
+                : isHealingSlot ? ItemID.HealingPotion
+                : isManaSlot ? ItemID.ManaPotion
+                : ItemID.None;
 
             CompanionItemSlot slot = CreateSlot(
                 data.Hotbar,
@@ -189,13 +222,15 @@ public sealed class CompanionInventoryUI : UIState, ICompanionPanelState
                 Margin + i * SlotStep,
                 weaponTopY,
                 () => data.ActiveWeaponSlot == capturedIndex,
-                accent);
+                accent,
+                emptyItemGhostType: ghostType);
             panel.Append(slot);
 
             // 左/右 preference toggle, shown only while this slot holds a weapon that has
             // both a left and a right click and is not covered by a scripted special case.
             CompanionToggleButton altToggle = new(
-                isVisible: () => CompanionWeaponOverrides.HasConfigurableAltUse(data.Hotbar[capturedIndex]),
+                isVisible: () => capturedIndex < CompanionProfile.EndCombatSlot &&
+                    CompanionWeaponOverrides.HasConfigurableAltUse(data.Hotbar[capturedIndex]),
                 getLabel: () => data.PrefersAltUse(data.Hotbar[capturedIndex]) ? T("RightClick") : T("LeftClick"),
                 onToggle: () => data.TogglePrefersAltUse(data.Hotbar[capturedIndex]),
                 width: CompanionItemSlot.SlotSize,
@@ -207,23 +242,6 @@ public sealed class CompanionInventoryUI : UIState, ICompanionPanelState
         }
 
         // 潜伏/普攻 switch, visible while the companion wears Calamity rogue armor.
-        CompanionToggleButton stealthToggle = new(
-            isVisible: () =>
-            {
-                CompanionInstance companion = CompanionEntitySystem.GetBySlot(companionSlot);
-                return companion is not null &&
-                       CompanionModBridge.TryGetRogueStealth(companion.Entity, out _, out float max) && max > 0f;
-            },
-            getLabel: () => data.RogueStealthWait ? T("DecisionStealth") : T("DecisionNormal"),
-            onToggle: () => data.RogueStealthWait = !data.RogueStealthWait,
-            width: 132f,
-            height: 30f,
-            textScale: 0.78f);
-        // Sits immediately left of the close button on the title row.
-        stealthToggle.Left.Set(-300f, 1f);
-        stealthToggle.Top.Set(8f, 0f);
-        panel.Append(stealthToggle);
-
         // ── Group 3: ammo and the dedicated tool slots ───────────────────────────────────
         const float weaponBottomY = weaponTopY + CompanionItemSlot.SlotSize + 4f + 22f;
         const float ammoLabelY = weaponBottomY + GroupGap;
@@ -239,7 +257,6 @@ public sealed class CompanionInventoryUI : UIState, ICompanionPanelState
         // A half-slot seam separates tools from ammo while leaving room for all four dedicated
         // mobility/utility slots inside the panel.
         float toolColumn = Margin + (data.Ammo.Length + 0.5f) * SlotStep;
-        AddLabel(panel, T("Tools"), toolColumn, ammoLabelY);
         panel.Append(CreateSlot(data.Net, 0, CompanionSlotRules.IsCatchingTool,
             T("NetOnly"), toolColumn, ammoTopY, emptyItemGhostType: ItemID.BugNet));
         panel.Append(CreateSlot(data.Rod, 0, CompanionSlotRules.IsFishingPole,
@@ -317,59 +334,20 @@ public sealed class CompanionInventoryUI : UIState, ICompanionPanelState
 
         base.Update(gameTime);
 
-        Item activeWeapon = data.ActiveWeapon;
-        string weaponName = activeWeapon.IsAir
-            ? T("WaitingForTarget")
-            : data.ActiveWeaponSlot switch
-            {
-                CompanionProfile.GuardSlot => T("GuardSlotWeapon", activeWeapon.Name),
-                CompanionProfile.SummonSlot => T("SummonSlotWeapon", activeWeapon.Name),
-                _ => T("NumberedSlotWeapon", data.ActiveWeaponSlot + 1, activeWeapon.Name)
-            };
-
-        // Surfaces the failure this panel used to hide: with every weapon parked in a reserved
-        // slot the companion still fights (SelectWeapon falls back), but at the wrong priority.
-        // Silence here is what let that state go unnoticed for so long.
-        string warning = HasRotationWeapon() ? string.Empty : "\n" + T("NoRotationWeapon");
-
-        // The companion is a real player entity, so its stats come straight from the
-        // vanilla equipment pipeline instead of a hand-rolled approximation.
+        accessoryPageText.SetText(accessoryPage == 0 ? "1 / 2" : "2 / 2");
         CompanionInstance companion = CompanionEntitySystem.GetBySlot(companionSlot);
         if (companion is not null)
         {
             Player entity = companion.Entity;
-            // Live decision readout. "The companion is not attacking" has had several different
-            // causes that all look identical in game, so the brain reports which one applies
-            // instead of leaving it to be guessed at from the outside.
-            string state = AI.CompanionAttackStateText.Describe(companion.Brain.AttackState);
-
-            // The active mode belongs here for the same reason. Modes changed behaviour
-            // drastically and were switched by a wheel that left no lasting trace on screen, so
-            // a mode picked by accident looked exactly like the companion being broken.
-            CompanionMode effective = CompanionModeRules.Effective(data);
-            string modeLine = effective == data.Mode
-                ? CompanionModeRules.Name(effective)
-                : T("ModeFallback",
-                    CompanionModeRules.Name(effective),
-                    CompanionModeRules.Name(data.Mode),
-                    CompanionModeRules.RequirementText(data.Mode));
-
-            statsText.SetText(
-                T("StatsMode", modeLine) + "\n" +
-                T("StatsWeapon", weaponName) + "\n" +
-                T("StatsState", state) + "\n" +
-                T("StatsAvoidance", companion.Brain.AvoidanceStateText,
-                    companion.Brain.VisibleThreats, companion.Brain.AvoidanceRisk) + "\n" +
-                T("StatsLife", entity.statLife, entity.statLifeMax2, (int)entity.statDefense) + "\n" +
-                T("StatsDamage",
-                    entity.GetTotalDamage(DamageClass.Melee).ApplyTo(1f),
-                    entity.GetTotalDamage(DamageClass.Ranged).ApplyTo(1f),
-                    entity.GetTotalDamage(DamageClass.Magic).ApplyTo(1f)) +
-                warning);
+            lifeText.SetText(T("LifeValue", entity.statLife, entity.statLifeMax2));
+            manaText.SetText(T("ManaValue", entity.statMana, entity.statManaMax2));
+            defenseText.SetText(T("DefenseValue", (int)entity.statDefense));
         }
         else
         {
-            statsText.SetText(T("StatsWeapon", weaponName) + warning);
+            lifeText.SetText(T("LifeValue", "—", "—"));
+            manaText.SetText(T("ManaValue", "—", "—"));
+            defenseText.SetText(T("DefenseValue", "—"));
         }
     }
 
@@ -448,7 +426,7 @@ public sealed class CompanionInventoryUI : UIState, ICompanionPanelState
         CompanionInstance companion = CompanionEntitySystem.GetBySlot(companionSlot);
         if (companion is not null)
             companion.Entity.name = data.Name;
-        titleText?.SetText(T("InventoryTitle", DisplayName()));
+        titleText?.SetText(DisplayName());
         SoundEngine.PlaySound(SoundID.MenuTick with { Volume = 0.6f, Pitch = 0.16f });
         CloseRenameDialog();
     }
@@ -467,6 +445,15 @@ public sealed class CompanionInventoryUI : UIState, ICompanionPanelState
     }
 
     private string DisplayName() => string.IsNullOrWhiteSpace(data.Name) ? T("DefaultName") : data.Name;
+
+    private void SetAccessoryPage(int page)
+    {
+        int target = System.Math.Clamp(page, 0, 1);
+        if (accessoryPage == target)
+            return;
+        accessoryPage = target;
+        SoundEngine.PlaySound(SoundID.MenuTick with { Volume = 0.45f });
+    }
 
     /// <summary>True when at least one ordinary rotation slot holds something usable as a weapon.</summary>
     private bool HasRotationWeapon()
@@ -493,10 +480,11 @@ public sealed class CompanionInventoryUI : UIState, ICompanionPanelState
 
     private static CompanionItemSlot CreateSlot(Item[] items, int index, System.Func<Item, bool> rule, string rejectionText, float left, float top,
         System.Func<bool> isHighlighted = null, Color? accentColor = null, System.Func<bool> isLocked = null, string lockedText = null,
-        int drawContext = ItemSlot.Context.BankItem, int emptyItemGhostType = ItemID.None, int emptySilhouetteIndex = -1)
+        int drawContext = ItemSlot.Context.BankItem, int emptyItemGhostType = ItemID.None, int emptySilhouetteIndex = -1,
+        System.Func<bool> isVisible = null)
     {
         CompanionItemSlot slot = new(items, index, rule, rejectionText, isHighlighted, accentColor, isLocked, lockedText,
-            drawContext, emptyItemGhostType, emptySilhouetteIndex);
+            drawContext, emptyItemGhostType, emptySilhouetteIndex, isVisible);
         slot.Left.Set(left, 0f);
         slot.Top.Set(top, 0f);
         return slot;
@@ -516,5 +504,15 @@ public sealed class CompanionInventoryUI : UIState, ICompanionPanelState
         label.Left.Set(left, 0f);
         label.Top.Set(top, 0f);
         panel.Append(label);
+    }
+
+    private static UIText AddStat(UIElement panel, float left, float top, Color color)
+    {
+        UIText text = new(string.Empty, 0.78f);
+        text.TextColor = color;
+        text.Left.Set(left, 0f);
+        text.Top.Set(top, 0f);
+        panel.Append(text);
+        return text;
     }
 }

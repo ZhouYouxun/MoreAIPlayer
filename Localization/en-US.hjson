@@ -5,6 +5,11 @@
 
 Mods: {
 	MoreAIPlayer: {
+		Keybinds: {
+			CompanionWheel.DisplayName: Command Wheel
+			CompanionRescue.DisplayName: Companion Emergency Recall
+		}
+
 		Fault: {
 			SubsystemError: "[Phantom Companion] Subsystem {0} hit an internal error and was skipped for now. The game keeps running normally."
 			CompanionDisabled: "[Phantom Companion] A companion kept faulting and was safely removed to protect the game."
@@ -12,6 +17,8 @@ Mods: {
 			CircuitOpened: "[Phantom Companion] {0} hit an error and has been paused for this world session. Other companion systems remain active."
 			CircuitStillOpen: "[Phantom Companion] A risky companion operation remains paused after an error. Reload the world before trying it again."
 			BackpackDropBlocked: "[Phantom Companion] Companion backpack Drop All is disabled by default to protect your save. Enable it in Config only after checking compatibility."
+			BackpackRecovered: "[Phantom Companion] A companion data error was found at {0}. The affected state was cleaned and refreshed automatically."
+			BackpackRecoveryFailed: "[Phantom Companion] A companion error at {0} could not be refreshed safely, so the affected panel was closed. Details were written to the log."
 		}
 
 		Configs: {
@@ -42,6 +49,11 @@ Mods: {
 				ShowCompanionHealthBars: {
 					Label: "[i:LifeCrystal] Show companion health bars"
 					Tooltip: Disabled by default. Companions occupy real player slots, so the game already draws a health bar over them. Enable to also show the mod's own bar below each companion.
+				}
+
+				UseChatForCompanionReviveTimer: {
+					Label: "[i:RecallPotion] Put companion revival notices in chat"
+					Tooltip: Disabled by default: the current countdown remains above you. Enable to replace it with one chat notice on death and one on revival.
 				}
 
 				AllowRightClickOpenBackpack: {
@@ -81,9 +93,18 @@ Mods: {
 			}
 		}
 
-		Keybinds.CompanionRescue.DisplayName: Companion Emergency Recall
-
 		Items: {
+			PhantomStaff: {
+				DisplayName: Phantom Staff
+				Tooltip:
+					'''
+					Left click: summon or recall this staff's bound companion near you
+					Right click: open the bound companion's backpack while summoned
+					With this staff in your inventory, press the Command Wheel key to command the first summoned staff
+					Each staff remembers one companion. The original books remain fully usable.
+					'''
+			}
+
 			DamageTestDummy: {
 				DisplayName: Little Bunny
 				Tooltip:
@@ -101,6 +122,8 @@ Mods: {
 				Updates: I will keep updating it, improving companions, and fixing problems reported by players.
 				Compatibility: Popular weapons from large mods will receive one-to-one compatibility work over time.
 				Complexity: Similar-looking weapons can use very different code internally; some therefore need much more time to support safely. Thank you for your patience.
+				BetaControlsFirstLine: This beta currently has two control methods: six books, or a Phantom Staff with its command wheel.
+				BetaControlsSecondLine: Choose whichever suits you; the controls will be simplified and reorganized later.
 				ConfigSuggestion: Consider checking the configuration options.
 				Tooltip: Development status and configuration options.
 			}
@@ -264,7 +287,7 @@ Mods: {
 			Armor: Armor
 			Vanity: Vanity
 			Dye: Dye
-			Accessories: Accessories (progress-based; no Demon Heart needed)
+			Accessories: Accessories
 			ExtraAccessories: Extra accessories (enabled by the config slider)
 			ExtraAccessoryLocked: Raise the Extra Companion Accessory Slots slider in client config to use this slot
 			HeadArmorOnly: Head armor only
@@ -276,16 +299,24 @@ Mods: {
 			DyeOnly: Dyes only
 			AccessoryOnly: Accessories only
 			WeaponBar: Weapon bar   Blue=guard  Gray=pickaxe  Yellow=summon
-			WeaponPriority: The middle 7 slots are regular weapons; priority is left → right
+			WeaponPriority: The middle 6 slots are regular weapons; priority is left → right
 			GuardWeaponOnly: Guard slot: any weapon except pickaxes, axes, and hammers
-			PickaxeOnly: Pickaxe slot: pure pickaxes only; multi-tools are not accepted
-			SummonWeaponOnly: Summon slot: summon or sentry staffs only; whips do not count
-			WeaponOnly: Weapons (including summon weapons), pickaxes, axes, or hammers only
+			PickaxeOnly: Pickaxes only
+			AxeOnly: Axes only
+			HammerOnly: Hammers only
+			HealingPotionOnly: Life-restoring potions only
+			ManaPotionOnly: Mana-restoring potions only
+			SummonWeaponOnly: Minion slot: minion staffs only; sentries and whips do not count
+			SentryWeaponOnly: Sentry slot: sentry staffs only
+			WeaponOnly: Active attack weapons only
 			RightClick: Right
 			LeftClick: Left
 			DecisionStealth: Decision: Stealth
 			DecisionNormal: Decision: Normal
-			Ammo: Ammo (first 4 slots take priority; last 2 are extensions)
+			Ammo: Ammo
+			LifeValue: Life {0}/{1}
+			ManaValue: Mana {0}/{1}
+			DefenseValue: Defense {0}
 			AmmoOnly: Arrows, bullets, and other ammunition only
 			Tools: Net / Rod / Hook / Mount
 			NetOnly: Bug Net, Lavaproof Bug Net, or Golden Bug Net only
@@ -296,8 +327,9 @@ Mods: {
 			WaitingForTarget: Waiting for target
 			GuardSlotWeapon: Guard · {0}
 			SummonSlotWeapon: Summon · {0}
+			SentrySlotWeapon: Sentry · {0}
 			NumberedSlotWeapon: Slot {0} · {1}
-			NoRotationWeapon: Warning: slots 3–9 have no regular weapon; using a reserved slot as fallback
+			NoRotationWeapon: Warning: slots 3–8 have no regular weapon; using a reserved slot as fallback
 			ModeFallback: "{0} (fell back from {1}: {2})"
 			StatsMode: Mode: {0}
 			StatsWeapon: Auto-selected: {0}
@@ -336,7 +368,7 @@ Mods: {
 			ModeMiningDescription: Dig with the owner, mine ore, and provide light
 			ModeCatchRequirement: Requires a net in the net slot
 			ModeFishingRequirement: Requires a fishing rod in the rod slot and bait in the hotbar or backpack
-			ModeMiningRequirement: Requires a pickaxe in slot 2
+			ModeMiningRequirement: Requires a pickaxe in slot 6
 			AvoidNoThreat: No threat detected
 			AvoidReacting: Reacting
 			AvoidHolding: Holding position
@@ -381,6 +413,56 @@ Mods: {
 		}
 
 		CompanionCommand: {
+			StaffUnbound: This Phantom Staff has not chosen a companion yet. Left click once to bind it.
+			StaffNotSummoned: Summon this staff's companion before opening its backpack.
+			StaffUnboundTooltip: Unbound - left click to choose or create a companion
+			StaffBoundTooltip: Bound to {0} - {1}
+			StaffStored: stored
+			StaffActive: summoned
+			WheelNoActiveStaff: No summoned Phantom Staff was found in your inventory.
+			WheelRecall: Hold to recall
+			WheelBackpack: Open backpack
+			WheelSwitchWork: Work: {0}
+			WheelChooseWork: Choose work mode
+			WheelChooseWorkHint: Click a sector; the wheel will return to commands
+			WheelCurrentWork: Current: {0}
+			WheelHoldRecall: Keep holding - release to cancel
+			WheelWorkChanged: "{0} switched to {1}."
+			WheelCommandChanged: "{0}: {1}"
+			WheelOn: On
+			WheelOff: Off
+			WheelWorkIdle: Idle
+			WheelWorkCombat: Combat
+			WheelWorkExploration: Exploration
+			WheelWorkBuilding: Building
+			WheelWorkFarming: Farming
+			WheelWorkFishing: Fishing
+			WheelWorkCapturing: Capturing
+			WheelCommandIdleStay: Stay
+			WheelCommandIdleFollow: Follow
+			WheelCommandIdleFree: Free activity
+			WheelCommandCombatSelf: Self-defense
+			WheelCommandCombatProtect: Protect player
+			WheelCommandCombatShared: Attack same target
+			WheelCommandCombatPatrol: Patrol
+			WheelCommandCombatGarrison: Garrison
+			WheelCommandExploreFollow: Follow
+			WheelCommandExploreFree: Free exploration
+			WheelCommandExploreLight: Lighting
+			WheelCommandExploreSafety: Hazard removal
+			WheelCommandExploreGather: Gathering
+			WheelCommandBuildPlatform: Platform building
+			WheelCommandBuildDefensive: Defensive building
+			WheelCommandBuildDestroy: Destruction
+			WheelCommandFarmTree: Tree farm
+			WheelCommandFarmHerb: Herb garden
+			WheelCommandFarmPumpkin: Pumpkin farm
+			WheelCommandFarmCombined: Combined farm
+			WheelCommandFishingFish: Fishing
+			WheelCommandFishingWater: Fill water
+			WheelCommandCaptureFixed: Fixed capture
+			WheelCommandCaptureFree: Free capture
+			WheelCommandCaptureBreak: Clear debris
 			AutomationSingleplayerOnly: The Automation Tome is single-player only for now.
 			AutomationAlreadyActive: This automation companion is already busy; clicking again will not refresh it.
 			AutomationNoFreeSlot: No free slot is available for the automation companion right now.
@@ -398,6 +480,8 @@ Mods: {
 			NoCompanion: You have no companions summoned.
 			SingleplayerOnly: Phantom companions are single-player only for now.
 			Reviving: "{0} reviving {1}s"
+			ReviveChatStarted: "{0} was defeated and will revive in {1}s."
+			ReviveChatFinished: "{0} has revived."
 			QuickAccess: "{0} · Click to open equipment and backpack"
 			LootBrag: Look what I found!
 			DumpAll: Drop All

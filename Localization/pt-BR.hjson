@@ -5,6 +5,11 @@
 
 Mods: {
 	MoreAIPlayer: {
+		Keybinds: {
+			// CompanionWheel.DisplayName: Command Wheel
+			CompanionRescue.DisplayName: Chamada de emergência dos companheiros
+		}
+
 		Fault: {
 			SubsystemError: "[Companheiro Fantasma] O subsistema {0} encontrou um erro interno e foi ignorado por enquanto. O jogo continua normalmente."
 			CompanionDisabled: "[Companheiro Fantasma] Um companheiro continuou falhando e foi removido com segurança para proteger o jogo."
@@ -12,6 +17,8 @@ Mods: {
 			CircuitOpened: "[Companheiro Fantasma] {0} encontrou um erro e foi pausado nesta sessão do mundo. Os demais sistemas permanecem ativos."
 			CircuitStillOpen: "[Companheiro Fantasma] Uma operação arriscada permanece pausada após um erro. Recarregue o mundo antes de tentar de novo."
 			BackpackDropBlocked: "[Companheiro Fantasma] Esvaziar mochila vem desativado por padrão para proteger seu mundo. Ative nas configurações somente após verificar a compatibilidade."
+			// BackpackRecovered: "[Phantom Companion] A companion data error was found at {0}. The affected state was cleaned and refreshed automatically."
+			// BackpackRecoveryFailed: "[Phantom Companion] A companion error at {0} could not be refreshed safely, so the affected panel was closed. Details were written to the log."
 		}
 
 		Configs: {
@@ -42,6 +49,11 @@ Mods: {
 				ShowCompanionHealthBars: {
 					// Label: "[i:LifeCrystal] Show companion health bars"
 					// Tooltip: Disabled by default. Companions occupy real player slots, so the game already draws a health bar over them. Enable to also show the mod's own bar below each companion.
+				}
+
+				UseChatForCompanionReviveTimer: {
+					Label: "[i:RecallPotion] Avisar renascimento no chat"
+					Tooltip: Desativado por padrão. Substitui a contagem acima do jogador por um aviso ao morrer e outro ao renascer.
 				}
 
 				AllowRightClickOpenBackpack: {
@@ -81,9 +93,18 @@ Mods: {
 			}
 		}
 
-		Keybinds.CompanionRescue.DisplayName: Chamada de emergência dos companheiros
-
 		Items: {
+			PhantomStaff: {
+				// DisplayName: Phantom Staff
+				/* Tooltip:
+					'''
+					Left click: summon or recall this staff's bound companion near you
+					Right click: open the bound companion's backpack while summoned
+					With this staff in your inventory, press the Command Wheel key to command the first summoned staff
+					Each staff remembers one companion. The original books remain fully usable.
+					''' */
+			}
+
 			DamageTestDummy: {
 				DisplayName: Coelhinho
 				Tooltip:
@@ -101,6 +122,8 @@ Mods: {
 				Updates: Continuarei a atualizá-lo, melhorar os companheiros e corrigir os problemas relatados pelos jogadores.
 				Compatibility: Armas populares de grandes mods receberão suporte de compatibilidade individual ao longo do tempo.
 				Complexity: Armas de aparência semelhante podem usar mecanismos internos muito diferentes; por isso algumas precisam de muito mais tempo para receber suporte seguro. Agradeço a sua paciência.
+				BetaControlsFirstLine: Esta versão beta tem atualmente dois métodos de controle: seis livros ou o Cajado Fantasma com sua roda de comandos.
+				BetaControlsSecondLine: Escolha o que preferir; os controles serão simplificados e reorganizados mais tarde.
 				ConfigSuggestion: Considere verificar as opções de configuração.
 				Tooltip: Informações sobre o desenvolvimento e as opções de configuração.
 			}
@@ -258,7 +281,7 @@ Mods: {
 			Armor: Armadura
 			Vanity: Visual
 			Dye: Corante
-			Accessories: Acessórios (progresso; sem Coração Demoníaco)
+			Accessories: Acessórios
 			ExtraAccessories: Acessórios extras (ativados pelo controle de configuração)
 			ExtraAccessoryLocked: Aumente o controle de espaços extras de acessórios do companheiro na configuração do cliente
 			HeadArmorOnly: Apenas armadura de cabeça
@@ -270,16 +293,24 @@ Mods: {
 			DyeOnly: Apenas corantes
 			AccessoryOnly: Apenas acessórios
 			WeaponBar: Armas   Azul=defesa  Cinza=picareta  Amarelo=invocação
-			WeaponPriority: Os 7 espaços centrais são armas normais; prioridade esquerda → direita
+			WeaponPriority: Os 6 espaços centrais são armas normais; prioridade esquerda → direita
 			GuardWeaponOnly: Defesa: qualquer arma, exceto picaretas, machados e martelos
 			PickaxeOnly: Picareta: apenas picaretas puras; sem ferramentas múltiplas
-			SummonWeaponOnly: Invocação: apenas cajados de invocação ou sentinela; sem chicotes
-			WeaponOnly: Apenas armas, picaretas, machados ou martelos
+			AxeOnly: Apenas machados
+			HammerOnly: Apenas martelos
+			HealingPotionOnly: Apenas poções de vida
+			ManaPotionOnly: Apenas poções de mana
+			SummonWeaponOnly: Lacaio: apenas cajados de lacaio; sem sentinelas ou chicotes
+			SentryWeaponOnly: Sentinela: apenas cajados de sentinela
+			WeaponOnly: Apenas armas de ataque ativas
 			RightClick: Direito
 			LeftClick: Esquerdo
 			DecisionStealth: Decisão: furtividade
 			DecisionNormal: Decisão: normal
-			Ammo: Munição (4 primeiros espaços prioritários; 2 últimos extras)
+			Ammo: Munição
+			LifeValue: Vida {0}/{1}
+			ManaValue: Mana {0}/{1}
+			DefenseValue: Defesa {0}
 			AmmoOnly: Apenas flechas, balas e outras munições
 			Tools: Rede / Vara / Gancho / Montaria
 			NetOnly: Apenas rede normal, à prova de lava ou dourada
@@ -290,8 +321,9 @@ Mods: {
 			WaitingForTarget: Aguardando alvo
 			GuardSlotWeapon: Defesa · {0}
 			SummonSlotWeapon: Invocação · {0}
+			SentrySlotWeapon: Sentinela · {0}
 			NumberedSlotWeapon: Espaço {0} · {1}
-			NoRotationWeapon: Aviso: espaços 3–9 sem arma normal; usando um espaço reservado
+			NoRotationWeapon: Aviso: espaços 3–8 sem arma normal; usando um espaço reservado
 			ModeFallback: "{0} (retorno de {1}: {2})"
 			StatsMode: Modo: {0}
 			StatsWeapon: Seleção automática: {0}
@@ -330,7 +362,7 @@ Mods: {
 			ModeMiningDescription: Escava com você, minera e ilumina
 			ModeCatchRequirement: Requer uma rede no espaço de rede
 			ModeFishingRequirement: Requer uma vara no espaço de vara e isca na barra rápida ou mochila
-			ModeMiningRequirement: Requer uma picareta no espaço 2
+			ModeMiningRequirement: Requer uma picareta no espaço 6
 			AvoidNoThreat: Nenhuma ameaça detectada
 			AvoidReacting: Reagindo
 			AvoidHolding: Mantendo posição
@@ -375,6 +407,56 @@ Mods: {
 		}
 
 		CompanionCommand: {
+			// StaffUnbound: This Phantom Staff has not chosen a companion yet. Left click once to bind it.
+			// StaffNotSummoned: Summon this staff's companion before opening its backpack.
+			// StaffUnboundTooltip: Unbound - left click to choose or create a companion
+			// StaffBoundTooltip: Bound to {0} - {1}
+			// StaffStored: stored
+			// StaffActive: summoned
+			// WheelNoActiveStaff: No summoned Phantom Staff was found in your inventory.
+			// WheelRecall: Hold to recall
+			// WheelBackpack: Open backpack
+			// WheelSwitchWork: Work: {0}
+			// WheelChooseWork: Choose work mode
+			// WheelChooseWorkHint: Click a sector; the wheel will return to commands
+			// WheelCurrentWork: Current: {0}
+			// WheelHoldRecall: Keep holding - release to cancel
+			// WheelWorkChanged: "{0} switched to {1}."
+			// WheelCommandChanged: "{0}: {1}"
+			// WheelOn: On
+			// WheelOff: Off
+			// WheelWorkIdle: Idle
+			// WheelWorkCombat: Combat
+			// WheelWorkExploration: Exploration
+			// WheelWorkBuilding: Building
+			// WheelWorkFarming: Farming
+			// WheelWorkFishing: Fishing
+			// WheelWorkCapturing: Capturing
+			// WheelCommandIdleStay: Stay
+			// WheelCommandIdleFollow: Follow
+			// WheelCommandIdleFree: Free activity
+			// WheelCommandCombatSelf: Self-defense
+			// WheelCommandCombatProtect: Protect player
+			// WheelCommandCombatShared: Attack same target
+			// WheelCommandCombatPatrol: Patrol
+			// WheelCommandCombatGarrison: Garrison
+			// WheelCommandExploreFollow: Follow
+			// WheelCommandExploreFree: Free exploration
+			// WheelCommandExploreLight: Lighting
+			// WheelCommandExploreSafety: Hazard removal
+			// WheelCommandExploreGather: Gathering
+			// WheelCommandBuildPlatform: Platform building
+			// WheelCommandBuildDefensive: Defensive building
+			// WheelCommandBuildDestroy: Destruction
+			// WheelCommandFarmTree: Tree farm
+			// WheelCommandFarmHerb: Herb garden
+			// WheelCommandFarmPumpkin: Pumpkin farm
+			// WheelCommandFarmCombined: Combined farm
+			// WheelCommandFishingFish: Fishing
+			// WheelCommandFishingWater: Fill water
+			// WheelCommandCaptureFixed: Fixed capture
+			// WheelCommandCaptureFree: Free capture
+			// WheelCommandCaptureBreak: Clear debris
 			AutomationSingleplayerOnly: O Tomo Automático é somente para um jogador por enquanto.
 			AutomationAlreadyActive: Este companheiro automático já está ocupado; clicar de novo não o reinicia.
 			AutomationNoFreeSlot: No momento não há espaço livre para o companheiro automático.
@@ -392,6 +474,8 @@ Mods: {
 			NoCompanion: Você não tem companheiros fantasmas invocados.
 			SingleplayerOnly: Companheiros fantasmas por enquanto só estão disponíveis no modo solo.
 			Reviving: "{0} volta em {1}s"
+			ReviveChatStarted: "{0} foi derrotado e voltará em {1}s."
+			ReviveChatFinished: "{0} voltou."
 			QuickAccess: "{0} · Clique para abrir equipamentos e mochila"
 			LootBrag: Olha só o que eu encontrei!
 			DumpAll: Largar tudo

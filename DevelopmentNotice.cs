@@ -52,6 +52,14 @@ public sealed class DevelopmentNotice : ModItem
         {
             OverrideColor = new Color(205, 180, 255)
         });
+        tooltips.Add(new TooltipLine(Mod, "BetaControlsFirstLine", GetText("BetaControlsFirstLine"))
+        {
+            OverrideColor = new Color(255, 125, 205)
+        });
+        tooltips.Add(new TooltipLine(Mod, "BetaControlsSecondLine", GetText("BetaControlsSecondLine"))
+        {
+            OverrideColor = new Color(255, 125, 205)
+        });
         tooltips.Add(new TooltipLine(Mod, "ConfigSuggestion", GetText("ConfigSuggestion"))
         {
             OverrideColor = new Color(145, 225, 255)

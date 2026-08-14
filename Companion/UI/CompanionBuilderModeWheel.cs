@@ -118,6 +118,11 @@ public static class CompanionBuilderModeWheel
 
         CompanionBuildMode chosen = ModeOrder[hovered];
         CompanionPlayer data = owner.GetModPlayer<CompanionPlayer>();
+        foreach (CompanionInstance companion in CompanionCommandBook.OwnedActiveCompanions(owner.whoAmI))
+        {
+            if (companion.TryGetContext(out _, out CompanionProfile profile))
+                profile.WheelCommandsActive = false;
+        }
         data.BuildMode = chosen;
         CompanionBuildingSystem.ResetSmartObservation(owner);
         string state = Language.GetTextValue(data.BuildTacticActive

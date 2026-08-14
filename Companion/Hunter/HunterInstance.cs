@@ -24,6 +24,13 @@ public sealed class HunterInstance
     public long AimCorrections;
     public long SlotRepairs;
 
+    // Vanilla advances buff timers only for Main.myPlayer. Hunters are synthetic players, so
+    // their timers are mirrored here and advanced explicitly by HunterSystem.
+    public int[] ObservedBuffTypes { get; } = new int[Player.MaxBuffs];
+    public int[] ObservedBuffTimes { get; } = new int[Player.MaxBuffs];
+    public int[] NextObservedBuffTypes { get; } = new int[Player.MaxBuffs];
+    public int[] NextObservedBuffTimes { get; } = new int[Player.MaxBuffs];
+
     /// <summary>Consecutive ticks this hunter's own per-tick update threw. A clean tick resets it;
     /// reaching <see cref="MaxFaultStreak"/> retires the hunter rather than letting it fault
     /// forever (the minimal-damage fallback).</summary>
@@ -73,6 +80,10 @@ public sealed class HunterInstance
         ItemCheckPreparedFrame = ulong.MaxValue;
         ItemCheckDetourFrame = ulong.MaxValue;
         ConsecutiveItemCheckMisses = 0;
+        System.Array.Clear(ObservedBuffTypes, 0, ObservedBuffTypes.Length);
+        System.Array.Clear(ObservedBuffTimes, 0, ObservedBuffTimes.Length);
+        System.Array.Clear(NextObservedBuffTypes, 0, NextObservedBuffTypes.Length);
+        System.Array.Clear(NextObservedBuffTimes, 0, NextObservedBuffTimes.Length);
         Brain.ResetForNewLife(me);
     }
 }

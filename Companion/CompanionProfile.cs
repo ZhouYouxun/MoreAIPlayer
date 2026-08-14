@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using Microsoft.Xna.Framework;
 using MoreAIPlayer.Companion.Automation;
+using MoreAIPlayer.Companion.Commands;
 using Terraria;
 using Terraria.ID;
 using Terraria.Localization;
@@ -11,6 +12,8 @@ namespace MoreAIPlayer.Companion;
 
 public sealed class CompanionProfile
 {
+    private const int CurrentHotbarLayoutVersion = 2;
+
     public enum AppearanceColor
     {
         Hair,
@@ -36,32 +39,23 @@ public sealed class CompanionProfile
     public Color PantsColor { get; private set; }
     public Color ShoeColor { get; private set; }
 
-    /// <summary>
-    /// Hotbar index reserved for the guard weapon. It is excluded from the normal weapon
-    /// rotation and from summon-staff upkeep, and is used only when the companion is swarmed
-    /// (see CompanionBrain's guard response). The UI marks it with a blue border.
-    /// </summary>
-    public const int GuardSlot = 0;
+    /// <summary>Three ordinary attack weapons, checked from left to right.</summary>
+    public const int FirstCombatSlot = 0;
 
-    /// <summary>
-    /// Hotbar index reserved for the summon staff. Excluded from the normal rotation the same
-    /// way <see cref="GuardSlot"/> is, and it is the only slot summon upkeep looks at. The UI
-    /// marks it with a yellow border.
-    /// </summary>
-    public const int SummonSlot = CompanionPlayer.HotbarSize - 1;
+    /// <summary>Dedicated minion and sentry staff slots.</summary>
+    public const int SummonSlot = 3;
 
-    /// <summary>
-    /// Hotbar index reserved for the pickaxe that Mining mode uses. Like the guard and summon
-    /// slots it is outside the normal rotation, so the companion never swings its pick at an
-    /// enemy. The UI marks it with a grey border.
-    /// </summary>
-    public const int PickSlot = GuardSlot + 1;
+    public const int SentrySlot = 4;
 
-    /// <summary>First hotbar index the normal weapon rotation may draw from.</summary>
-    public const int FirstCombatSlot = PickSlot + 1;
+    /// <summary>Dedicated tool and quick-potion slots.</summary>
+    public const int PickSlot = 5;
+    public const int AxeSlot = 6;
+    public const int HammerSlot = 7;
+    public const int HealingPotionSlot = 8;
+    public const int ManaPotionSlot = 9;
 
     /// <summary>One past the last hotbar index the normal weapon rotation may draw from.</summary>
-    public const int EndCombatSlot = SummonSlot;
+    public const int EndCombatSlot = 3;
 
     public Item[] Hotbar { get; private set; }
     public Item[] Ammo { get; private set; }
@@ -95,6 +89,22 @@ public sealed class CompanionProfile
 
     /// <summary>Behaviour mode cycled by the command book. Persists with the profile.</summary>
     public CompanionMode Mode = CompanionMode.Attack;
+
+    // New wheel shell. The original Mode above deliberately remains persisted and usable by the
+    // books; these fields remember the richer command vocabulary without replacing it.
+    public CompanionWorkMode WorkMode = CompanionWorkMode.Combat;
+    public IdleCommand IdleCommand = IdleCommand.Follow;
+    public CombatCommand CombatCommand = CombatCommand.SelfDefense;
+    public ExplorationCommand ExplorationCommand = ExplorationCommand.Follow;
+    public BuildingCommand BuildingCommand = BuildingCommand.Platform;
+    public FarmingCommand FarmingCommand = FarmingCommand.TreeFarm;
+    public FishingCommand FishingCommand = FishingCommand.Fish;
+    public CapturingCommand CapturingCommand = CapturingCommand.FixedArea;
+    public bool ExplorationLighting = true;
+    public bool ExplorationHazardRemoval;
+    public bool ExplorationGathering;
+    public bool CapturingBreakDebris;
+    public bool WheelCommandsActive;
 
     /// <summary>Persistent source identity. This is intentionally not derived from whether the
     /// automation brain happens to be running right now.</summary>
@@ -139,7 +149,7 @@ public sealed class CompanionProfile
 
         Item axe = new();
         axe.SetDefaults(ItemID.CopperAxe);
-        Hotbar[FirstCombatSlot] = axe;
+        Hotbar[AxeSlot] = axe;
     }
 
     /// <summary>潜伏 mode: with a rogue weapon, wait for full Calamity stealth before every attack.</summary>
@@ -228,11 +238,11 @@ public sealed class CompanionProfile
     public Item ActiveWeapon =>
         ActiveWeaponSlot >= 0 && ActiveWeaponSlot < Hotbar.Length ? Hotbar[ActiveWeaponSlot] : new Item();
 
-    /// <summary>Whatever the player parked in <see cref="GuardSlot"/>; air when they left it empty.</summary>
-    public Item GuardWeapon => Hotbar[GuardSlot];
-
     /// <summary>Whatever the player parked in <see cref="SummonSlot"/>; air when they left it empty.</summary>
     public Item SummonWeapon => Hotbar[SummonSlot];
+
+    /// <summary>Whatever the player parked in <see cref="SentrySlot"/>; air when they left it empty.</summary>
+    public Item SentryWeapon => Hotbar[SentrySlot];
 
     /// <summary>The equipped bug net, or air when the net slot is empty.</summary>
     public Item NetTool => Net[0];
@@ -248,6 +258,11 @@ public sealed class CompanionProfile
 
     /// <summary>The equipped pickaxe, or air when the pick slot is empty.</summary>
     public Item PickTool => Hotbar[PickSlot];
+
+    public Item AxeTool => Hotbar[AxeSlot];
+    public Item HammerTool => Hotbar[HammerSlot];
+    public Item PreferredHealingPotion => Hotbar[HealingPotionSlot];
+    public Item PreferredManaPotion => Hotbar[ManaPotionSlot];
 
     /// <summary>
     /// The accessory to hand the entity for a given slot: the real item while the world has
@@ -274,30 +289,51 @@ public sealed class CompanionProfile
     /// misplaced. Displaced items go to a free rotation slot, or the backpack, and are left
     /// where they are if there is no room anywhere — never destroyed.
     /// </summary>
-    private void MigrateReservedSlots()
+    private void MigrateLegacyHotbarLayout()
     {
-        Relocate(PickSlot, CompanionSlotRules.IsPickaxe);
-        Relocate(SummonSlot, CompanionSlotRules.IsSummonWeapon);
-
-        void Relocate(int slot, System.Func<Item, bool> belongsHere)
+        Item[] legacy = Hotbar;
+        Hotbar = CreateEmptyItems(CompanionPlayer.HotbarSize);
+        foreach (Item item in legacy)
         {
-            Item occupant = Hotbar[slot];
-            if (occupant.IsAir || belongsHere(occupant))
-                return;
+            if (item is null || item.IsAir)
+                continue;
 
-            for (int free = FirstCombatSlot; free < EndCombatSlot; free++)
+            int preferred = CompanionWeaponBehaviors.IsMinionStaff(item) ? SummonSlot
+                : CompanionWeaponBehaviors.IsSentryStaff(item) ? SentrySlot
+                : CompanionSlotRules.IsHealingPotion(item) ? HealingPotionSlot
+                : CompanionSlotRules.IsManaPotion(item) ? ManaPotionSlot
+                : item.pick > 0 ? PickSlot
+                : item.axe > 0 ? AxeSlot
+                : item.hammer > 0 ? HammerSlot
+                : CompanionSlotRules.IsRegularWeapon(item) ? FirstFreeCombatSlot()
+                : -1;
+
+            if (preferred >= 0 && Hotbar[preferred].IsAir)
             {
-                if (!Hotbar[free].IsAir)
-                    continue;
-
-                Hotbar[free] = occupant;
-                Hotbar[slot] = new Item();
-                return;
+                Hotbar[preferred] = item;
+                continue;
             }
 
-            Item moving = occupant.Clone();
+            Item moving = item.Clone();
             if (TryAddToBackpack(moving))
-                Hotbar[slot] = new Item();
+                continue;
+
+            // A full backpack must never turn a layout migration into item loss.
+            for (int fallback = 0; fallback < Hotbar.Length; fallback++)
+            {
+                if (!Hotbar[fallback].IsAir)
+                    continue;
+                Hotbar[fallback] = item;
+                break;
+            }
+        }
+
+        int FirstFreeCombatSlot()
+        {
+            for (int slot = FirstCombatSlot; slot < EndCombatSlot; slot++)
+                if (Hotbar[slot].IsAir)
+                    return slot;
+            return -1;
         }
     }
 
@@ -430,7 +466,21 @@ public sealed class CompanionProfile
             [nameof(ShoeColor)] = SaveColor(ShoeColor),
             [nameof(RogueStealthWait)] = RogueStealthWait,
             [nameof(Mode)] = (int)Mode,
+            [nameof(WorkMode)] = (int)WorkMode,
+            [nameof(IdleCommand)] = (int)IdleCommand,
+            [nameof(CombatCommand)] = (int)CombatCommand,
+            [nameof(ExplorationCommand)] = (int)ExplorationCommand,
+            [nameof(BuildingCommand)] = (int)BuildingCommand,
+            [nameof(FarmingCommand)] = (int)FarmingCommand,
+            [nameof(FishingCommand)] = (int)FishingCommand,
+            [nameof(CapturingCommand)] = (int)CapturingCommand,
+            [nameof(ExplorationLighting)] = ExplorationLighting,
+            [nameof(ExplorationHazardRemoval)] = ExplorationHazardRemoval,
+            [nameof(ExplorationGathering)] = ExplorationGathering,
+            [nameof(CapturingBreakDebris)] = CapturingBreakDebris,
+            [nameof(WheelCommandsActive)] = WheelCommandsActive,
             [nameof(Origin)] = (int)Origin,
+            ["HotbarLayoutVersion"] = CurrentHotbarLayoutVersion,
             ["PreferAltUseWeapons"] = new List<string>(preferAltUseWeapons),
             [nameof(Hotbar)] = SaveItems(Hotbar),
             [nameof(Ammo)] = SaveItems(Ammo),
@@ -452,7 +502,8 @@ public sealed class CompanionProfile
 
     public static CompanionProfile Load(TagCompound tag)
     {
-        CompanionProfile profile = new(tag.GetInt(nameof(Id)))
+        int id = tag.GetInt(nameof(Id));
+        CompanionProfile profile = new(id)
         {
             Name = tag.ContainsKey(nameof(Name)) && !string.IsNullOrWhiteSpace(tag.GetString(nameof(Name)))
                 ? tag.GetString(nameof(Name))
@@ -468,22 +519,35 @@ public sealed class CompanionProfile
             UnderShirtColor = LoadColor(tag, nameof(UnderShirtColor)),
             PantsColor = LoadColor(tag, nameof(PantsColor)),
             ShoeColor = LoadColor(tag, nameof(ShoeColor)),
-            Hotbar = LoadItems(tag, nameof(Hotbar), CompanionPlayer.HotbarSize),
-            Ammo = LoadItems(tag, nameof(Ammo), CompanionPlayer.AmmoSize),
-            Armor = LoadItems(tag, nameof(Armor), CompanionPlayer.ArmorSize),
-            Accessories = LoadItems(tag, nameof(Accessories), CompanionPlayer.AccessorySize),
-            ExtraAccessories = LoadItems(tag, nameof(ExtraAccessories), CompanionPlayer.ExtraAccessorySize),
-            Vanity = LoadItems(tag, nameof(Vanity), CompanionPlayer.VanitySize),
-            Dyes = LoadItems(tag, nameof(Dyes), CompanionPlayer.DyeSize),
-            Backpack = LoadItems(tag, nameof(Backpack), CompanionPlayer.BackpackSize),
-            Net = LoadItems(tag, nameof(Net), CompanionPlayer.NetSize),
-            Rod = LoadItems(tag, nameof(Rod), CompanionPlayer.RodSize),
-            Hook = LoadItems(tag, nameof(Hook), CompanionPlayer.HookSize),
-            Mount = LoadItems(tag, nameof(Mount), CompanionPlayer.MountSize)
+            Hotbar = LoadItems(tag, nameof(Hotbar), CompanionPlayer.HotbarSize, id),
+            Ammo = LoadItems(tag, nameof(Ammo), CompanionPlayer.AmmoSize, id),
+            Armor = LoadItems(tag, nameof(Armor), CompanionPlayer.ArmorSize, id),
+            Accessories = LoadItems(tag, nameof(Accessories), CompanionPlayer.AccessorySize, id),
+            ExtraAccessories = LoadItems(tag, nameof(ExtraAccessories), CompanionPlayer.ExtraAccessorySize, id),
+            Vanity = LoadItems(tag, nameof(Vanity), CompanionPlayer.VanitySize, id),
+            Dyes = LoadItems(tag, nameof(Dyes), CompanionPlayer.DyeSize, id),
+            Backpack = LoadItems(tag, nameof(Backpack), CompanionPlayer.BackpackSize, id),
+            Net = LoadItems(tag, nameof(Net), CompanionPlayer.NetSize, id),
+            Rod = LoadItems(tag, nameof(Rod), CompanionPlayer.RodSize, id),
+            Hook = LoadItems(tag, nameof(Hook), CompanionPlayer.HookSize, id),
+            Mount = LoadItems(tag, nameof(Mount), CompanionPlayer.MountSize, id)
         };
         profile.RogueStealthWait = !tag.ContainsKey(nameof(RogueStealthWait)) || tag.GetBool(nameof(RogueStealthWait));
         if (tag.ContainsKey(nameof(Mode)))
             profile.Mode = (CompanionMode)tag.GetInt(nameof(Mode));
+        if (tag.ContainsKey(nameof(WorkMode))) profile.WorkMode = (CompanionWorkMode)tag.GetInt(nameof(WorkMode));
+        if (tag.ContainsKey(nameof(IdleCommand))) profile.IdleCommand = (IdleCommand)tag.GetInt(nameof(IdleCommand));
+        if (tag.ContainsKey(nameof(CombatCommand))) profile.CombatCommand = (CombatCommand)tag.GetInt(nameof(CombatCommand));
+        if (tag.ContainsKey(nameof(ExplorationCommand))) profile.ExplorationCommand = (ExplorationCommand)tag.GetInt(nameof(ExplorationCommand));
+        if (tag.ContainsKey(nameof(BuildingCommand))) profile.BuildingCommand = (BuildingCommand)tag.GetInt(nameof(BuildingCommand));
+        if (tag.ContainsKey(nameof(FarmingCommand))) profile.FarmingCommand = (FarmingCommand)tag.GetInt(nameof(FarmingCommand));
+        if (tag.ContainsKey(nameof(FishingCommand))) profile.FishingCommand = (FishingCommand)tag.GetInt(nameof(FishingCommand));
+        if (tag.ContainsKey(nameof(CapturingCommand))) profile.CapturingCommand = (CapturingCommand)tag.GetInt(nameof(CapturingCommand));
+        profile.ExplorationLighting = !tag.ContainsKey(nameof(ExplorationLighting)) || tag.GetBool(nameof(ExplorationLighting));
+        profile.ExplorationHazardRemoval = tag.ContainsKey(nameof(ExplorationHazardRemoval)) && tag.GetBool(nameof(ExplorationHazardRemoval));
+        profile.ExplorationGathering = tag.ContainsKey(nameof(ExplorationGathering)) && tag.GetBool(nameof(ExplorationGathering));
+        profile.CapturingBreakDebris = tag.ContainsKey(nameof(CapturingBreakDebris)) && tag.GetBool(nameof(CapturingBreakDebris));
+        profile.WheelCommandsActive = tag.ContainsKey(nameof(WheelCommandsActive)) && tag.GetBool(nameof(WheelCommandsActive));
         if (tag.ContainsKey("PreferAltUseWeapons"))
         {
             foreach (string key in tag.GetList<string>("PreferAltUseWeapons"))
@@ -505,26 +569,60 @@ public sealed class CompanionProfile
                 ? CompanionOrigin.OrdinaryDebug
                 : CompanionOrigin.Automation;
         }
-        profile.MigrateReservedSlots();
+        if (!tag.ContainsKey("HotbarLayoutVersion") || tag.GetInt("HotbarLayoutVersion") < CurrentHotbarLayoutVersion)
+            profile.MigrateLegacyHotbarLayout();
         return profile;
     }
 
     public static CompanionProfile LoadLegacy(int id, Player owner, TagCompound tag)
     {
         CompanionProfile profile = Create(id, owner, true);
-        profile.Hotbar = LoadItems(tag, nameof(Hotbar), CompanionPlayer.HotbarSize);
-        profile.Ammo = LoadItems(tag, nameof(Ammo), CompanionPlayer.AmmoSize);
-        profile.Armor = LoadItems(tag, nameof(Armor), CompanionPlayer.ArmorSize);
-        profile.Accessories = LoadItems(tag, nameof(Accessories), CompanionPlayer.AccessorySize);
-        profile.ExtraAccessories = LoadItems(tag, nameof(ExtraAccessories), CompanionPlayer.ExtraAccessorySize);
-        profile.Vanity = LoadItems(tag, nameof(Vanity), CompanionPlayer.VanitySize);
-        profile.Dyes = LoadItems(tag, nameof(Dyes), CompanionPlayer.DyeSize);
-        profile.Backpack = LoadItems(tag, nameof(Backpack), CompanionPlayer.BackpackSize);
-        profile.Net = LoadItems(tag, nameof(Net), CompanionPlayer.NetSize);
-        profile.Rod = LoadItems(tag, nameof(Rod), CompanionPlayer.RodSize);
-        profile.Hook = LoadItems(tag, nameof(Hook), CompanionPlayer.HookSize);
-        profile.Mount = LoadItems(tag, nameof(Mount), CompanionPlayer.MountSize);
-        profile.MigrateReservedSlots();
+        profile.Hotbar = LoadItems(tag, nameof(Hotbar), CompanionPlayer.HotbarSize, id);
+        profile.Ammo = LoadItems(tag, nameof(Ammo), CompanionPlayer.AmmoSize, id);
+        profile.Armor = LoadItems(tag, nameof(Armor), CompanionPlayer.ArmorSize, id);
+        profile.Accessories = LoadItems(tag, nameof(Accessories), CompanionPlayer.AccessorySize, id);
+        profile.ExtraAccessories = LoadItems(tag, nameof(ExtraAccessories), CompanionPlayer.ExtraAccessorySize, id);
+        profile.Vanity = LoadItems(tag, nameof(Vanity), CompanionPlayer.VanitySize, id);
+        profile.Dyes = LoadItems(tag, nameof(Dyes), CompanionPlayer.DyeSize, id);
+        profile.Backpack = LoadItems(tag, nameof(Backpack), CompanionPlayer.BackpackSize, id);
+        profile.Net = LoadItems(tag, nameof(Net), CompanionPlayer.NetSize, id);
+        profile.Rod = LoadItems(tag, nameof(Rod), CompanionPlayer.RodSize, id);
+        profile.Hook = LoadItems(tag, nameof(Hook), CompanionPlayer.HookSize, id);
+        profile.Mount = LoadItems(tag, nameof(Mount), CompanionPlayer.MountSize, id);
+        profile.MigrateLegacyHotbarLayout();
+        return profile;
+    }
+
+    /// <summary>
+    /// Last-resort loader for a profile whose metadata is malformed. Appearance and behaviour
+    /// return to safe defaults, while every independently readable inventory section is retained.
+    /// </summary>
+    public static CompanionProfile RecoverInventory(int id, Player owner, TagCompound tag)
+    {
+        CompanionProfile profile = Create(id, owner, true);
+        profile.Hotbar = LoadItems(tag, nameof(Hotbar), CompanionPlayer.HotbarSize, id);
+        profile.Ammo = LoadItems(tag, nameof(Ammo), CompanionPlayer.AmmoSize, id);
+        profile.Armor = LoadItems(tag, nameof(Armor), CompanionPlayer.ArmorSize, id);
+        profile.Accessories = LoadItems(tag, nameof(Accessories), CompanionPlayer.AccessorySize, id);
+        profile.ExtraAccessories = LoadItems(tag, nameof(ExtraAccessories), CompanionPlayer.ExtraAccessorySize, id);
+        profile.Vanity = LoadItems(tag, nameof(Vanity), CompanionPlayer.VanitySize, id);
+        profile.Dyes = LoadItems(tag, nameof(Dyes), CompanionPlayer.DyeSize, id);
+        profile.Backpack = LoadItems(tag, nameof(Backpack), CompanionPlayer.BackpackSize, id);
+        profile.Net = LoadItems(tag, nameof(Net), CompanionPlayer.NetSize, id);
+        profile.Rod = LoadItems(tag, nameof(Rod), CompanionPlayer.RodSize, id);
+        profile.Hook = LoadItems(tag, nameof(Hook), CompanionPlayer.HookSize, id);
+        profile.Mount = LoadItems(tag, nameof(Mount), CompanionPlayer.MountSize, id);
+
+        try
+        {
+            if (!tag.ContainsKey("HotbarLayoutVersion") || tag.GetInt("HotbarLayoutVersion") < CurrentHotbarLayoutVersion)
+                profile.MigrateLegacyHotbarLayout();
+        }
+        catch (System.Exception exception)
+        {
+            CompanionFaultGuard.ReportRecovered($"profile {id}, hotbar migration", exception, true);
+        }
+        profile.RepairRuntimeState();
         return profile;
     }
 
@@ -576,17 +674,99 @@ public sealed class CompanionProfile
         return saved;
     }
 
-    private static Item[] LoadItems(TagCompound tag, string key, int expectedSize)
+    private static Item[] LoadItems(TagCompound tag, string key, int expectedSize, int profileId)
     {
         Item[] result = CreateEmptyItems(expectedSize);
         if (!tag.ContainsKey(key))
             return result;
 
-        IList<TagCompound> saved = tag.GetList<TagCompound>(key);
+        IList<TagCompound> saved;
+        try
+        {
+            saved = tag.GetList<TagCompound>(key);
+        }
+        catch (System.Exception exception)
+        {
+            CompanionFaultGuard.ReportRecovered($"profile {profileId}, {key} list", exception, true);
+            return result;
+        }
+
         for (int i = 0; i < System.Math.Min(expectedSize, saved.Count); i++)
-            result[i] = ItemIO.Load(saved[i]);
+        {
+            try
+            {
+                Item loaded = ItemIO.Load(saved[i]);
+                if (!IsRuntimeItemValid(loaded))
+                    throw new System.IO.InvalidDataException($"Invalid item state (type={loaded?.type}, stack={loaded?.stack}).");
+                result[i] = loaded;
+            }
+            catch (System.Exception exception)
+            {
+                // One unreadable modded item must not discard the rest of this companion or stop
+                // the player file from loading. Its exact profile/list/index remains in the log.
+                result[i] = new Item();
+                CompanionFaultGuard.ReportRecovered($"profile {profileId}, {key}[{i}]", exception, true);
+            }
+        }
         return result;
     }
+
+    /// <summary>
+    /// Repairs only structural runtime damage (wrong array sizes, null/invalid item references).
+    /// Valid unloaded-mod placeholders are ordinary tModLoader items and are deliberately kept.
+    /// Returns the number of references replaced so callers can decide whether a rebind is needed.
+    /// </summary>
+    public int RepairRuntimeState()
+    {
+        int repairs = 0;
+        Hotbar = RepairItems(Hotbar, CompanionPlayer.HotbarSize, ref repairs);
+        Ammo = RepairItems(Ammo, CompanionPlayer.AmmoSize, ref repairs);
+        Armor = RepairItems(Armor, CompanionPlayer.ArmorSize, ref repairs);
+        Accessories = RepairItems(Accessories, CompanionPlayer.AccessorySize, ref repairs);
+        ExtraAccessories = RepairItems(ExtraAccessories, CompanionPlayer.ExtraAccessorySize, ref repairs);
+        Vanity = RepairItems(Vanity, CompanionPlayer.VanitySize, ref repairs);
+        Dyes = RepairItems(Dyes, CompanionPlayer.DyeSize, ref repairs);
+        Backpack = RepairItems(Backpack, CompanionPlayer.BackpackSize, ref repairs);
+        Net = RepairItems(Net, CompanionPlayer.NetSize, ref repairs);
+        Rod = RepairItems(Rod, CompanionPlayer.RodSize, ref repairs);
+        Hook = RepairItems(Hook, CompanionPlayer.HookSize, ref repairs);
+        Mount = RepairItems(Mount, CompanionPlayer.MountSize, ref repairs);
+        lockedAccessoryFiller = RepairItems(lockedAccessoryFiller, CompanionPlayer.AccessorySize, ref repairs);
+        if (ActiveWeaponSlot < -1 || ActiveWeaponSlot >= CompanionPlayer.HotbarSize)
+        {
+            ActiveWeaponSlot = -1;
+            repairs++;
+        }
+        return repairs;
+    }
+
+    private static Item[] RepairItems(Item[] source, int expectedSize, ref int repairs)
+    {
+        if (source is null || source.Length != expectedSize)
+        {
+            Item[] resized = CreateEmptyItems(expectedSize);
+            if (source is not null)
+            {
+                int copyCount = System.Math.Min(source.Length, expectedSize);
+                for (int i = 0; i < copyCount; i++)
+                    resized[i] = source[i];
+            }
+            source = resized;
+            repairs++;
+        }
+
+        for (int i = 0; i < source.Length; i++)
+        {
+            if (IsRuntimeItemValid(source[i]))
+                continue;
+            source[i] = new Item();
+            repairs++;
+        }
+        return source;
+    }
+
+    private static bool IsRuntimeItemValid(Item item) =>
+        item is not null && item.type >= ItemID.None && item.type < ItemLoader.ItemCount && item.stack >= 0;
 
     private static TagCompound SaveColor(Color color) => new()
     {

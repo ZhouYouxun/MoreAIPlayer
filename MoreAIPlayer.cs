@@ -16,6 +16,7 @@ namespace MoreAIPlayer
 		/// logger from any context without a ModContent lookup.</summary>
 		public static MoreAIPlayer Instance { get; private set; }
 		public static ModKeybind CompanionRescueKeybind { get; private set; }
+		public static ModKeybind CompanionWheelKeybind { get; private set; }
 
 		public MoreAIPlayer() => Instance = this;
 
@@ -24,6 +25,7 @@ namespace MoreAIPlayer
 			// Mouse2 is Terraria's right mouse button. Clearing this binding deliberately falls
 			// back to the historical double-right-click rescue gesture.
 			CompanionRescueKeybind = KeybindLoader.RegisterKeybind(this, "CompanionRescue", "Mouse2");
+			CompanionWheelKeybind = KeybindLoader.RegisterKeybind(this, "CompanionWheel", "V");
 		}
 
 		public static bool HasCompanionRescueKeybind =>
@@ -50,6 +52,7 @@ namespace MoreAIPlayer
 		public override void Unload()
 		{
 			CompanionRescueKeybind = null;
+			CompanionWheelKeybind = null;
 			Instance = null;
 		}
 	}

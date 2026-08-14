@@ -23,6 +23,7 @@ public sealed class CompanionItemSlot : UIElement
     private readonly int drawContext;
     private readonly int emptyItemGhostType;
     private readonly int emptySilhouetteIndex;
+    private readonly Func<bool> isVisible;
 
     /// <summary>Border colour of a slot that plays a special role, drawn permanently so the slot
     /// reads as different at a glance. The in-use highlight still wins while it is showing.</summary>
@@ -30,11 +31,14 @@ public sealed class CompanionItemSlot : UIElement
 
     public static readonly Color SummonAccent = new(240, 200, 60, 225);
 
+    public static readonly Color SentryAccent = new(235, 125, 65, 225);
+
     public static readonly Color PickAccent = new(165, 170, 180, 225);
 
     public CompanionItemSlot(Item[] items, int index, Func<Item, bool> canAccept, string rejectionText,
         Func<bool> isHighlighted = null, Color? accentColor = null, Func<bool> isLocked = null, string lockedText = null,
-        int drawContext = ItemSlot.Context.BankItem, int emptyItemGhostType = ItemID.None, int emptySilhouetteIndex = -1)
+        int drawContext = ItemSlot.Context.BankItem, int emptyItemGhostType = ItemID.None, int emptySilhouetteIndex = -1,
+        Func<bool> isVisible = null)
     {
         this.items = items;
         this.index = index;
@@ -47,6 +51,7 @@ public sealed class CompanionItemSlot : UIElement
         this.drawContext = drawContext;
         this.emptyItemGhostType = emptyItemGhostType;
         this.emptySilhouetteIndex = emptySilhouetteIndex;
+        this.isVisible = isVisible;
         Width.Set(SlotSize, 0f);
         Height.Set(SlotSize, 0f);
     }
@@ -54,13 +59,15 @@ public sealed class CompanionItemSlot : UIElement
     public override void Update(GameTime gameTime)
     {
         base.Update(gameTime);
-        if (ContainsPoint(Main.MouseScreen))
+        if (isVisible?.Invoke() != false && ContainsPoint(Main.MouseScreen))
             Main.LocalPlayer.mouseInterface = true;
     }
 
     protected override void DrawSelf(SpriteBatch spriteBatch)
     {
         base.DrawSelf(spriteBatch);
+        if (isVisible?.Invoke() == false)
+            return;
         CalculatedStyle dimensions = GetDimensions();
         Vector2 position = dimensions.Position();
 

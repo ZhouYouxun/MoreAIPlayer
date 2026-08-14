@@ -120,6 +120,7 @@ internal static class VirtualPlayerExecutionContext
     private static bool rootStateValid;
     private static SavedState lastRealState;
     private static bool lastRealStateValid;
+    private static int fallbackLocalPlayerSlot = -1;
     private static MouseCacheEntry[] mouseCache;
     private static ModMouseFeedEntry[] modMouseFeedCache;
 
@@ -158,7 +159,20 @@ internal static class VirtualPlayerExecutionContext
         {
             lastRealState = SavedState.Capture();
             lastRealStateValid = true;
+            if (IsUsableRealSlot(Main.myPlayer))
+                fallbackLocalPlayerSlot = Main.myPlayer;
         }
+    }
+
+    /// <summary>Seeds recovery from the verified owner before a synthetic slot is created.</summary>
+    internal static void RegisterRealPlayer(Player player)
+    {
+        if (player is null || depth != 0 || player.whoAmI != Main.myPlayer || !IsUsableRealSlot(player.whoAmI))
+            return;
+
+        fallbackLocalPlayerSlot = player.whoAmI;
+        lastRealState = SavedState.Capture();
+        lastRealStateValid = true;
     }
 
     /// <summary>
@@ -174,8 +188,13 @@ internal static class VirtualPlayerExecutionContext
 
         if (leakedScope && rootStateValid)
             rootState.Restore();
-        else if (lastRealStateValid)
+
+        // A root scope can itself have been entered after foreign code already leaked a virtual
+        // identity. Never accept that virtual snapshot as the final restoration target.
+        if (IsVirtualSlot(Main.myPlayer) && lastRealStateValid)
             lastRealState.Restore();
+        if (IsVirtualSlot(Main.myPlayer) && IsUsableRealSlot(fallbackLocalPlayerSlot))
+            Main.myPlayer = fallbackLocalPlayerSlot;
 
         depth = 0;
         rootStateValid = false;
@@ -316,6 +335,7 @@ internal static class VirtualPlayerExecutionContext
         rootStateValid = false;
         lastRealState = default;
         lastRealStateValid = false;
+        fallbackLocalPlayerSlot = IsUsableRealSlot(Main.myPlayer) ? Main.myPlayer : -1;
         mouseCache = null;
         modMouseFeedCache = null;
     }
@@ -323,4 +343,8 @@ internal static class VirtualPlayerExecutionContext
     private static bool IsVirtualSlot(int slot) =>
         slot >= 0 &&
         (CompanionEntitySystem.IsCompanionSlot(slot) || Hunter.HunterSystem.IsHunterSlot(slot));
+
+    private static bool IsUsableRealSlot(int slot) =>
+        slot >= 0 && slot < Main.maxPlayers && Main.player is not null && slot < Main.player.Length &&
+        Main.player[slot] is not null && Main.player[slot].active && !IsVirtualSlot(slot);
 }

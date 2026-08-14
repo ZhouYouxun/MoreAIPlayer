@@ -28,6 +28,7 @@ internal static class CompanionFaultGuard
     internal const string HealingPotionLane = "healing-potion consumption";
     internal const string BackpackDropLane = "backpack world drop";
     internal const string BackpackTransferLane = "backpack transfer";
+    internal const string BackpackRecoveryLane = "companion backpack recovery";
     internal const string VirtualItemCheckLane = "virtual item use";
     internal const string VirtualProjectileLane = "virtual projectile update";
     internal const string AutomationLane = "automation companion";
@@ -162,6 +163,34 @@ internal static class CompanionFaultGuard
 
         if (!Main.dedServ && ShouldFire(lastMessageFrame, lane, now, MessageThrottleTicks))
             SafeNewText(FaultText("SubsystemError", lane), 255, 150, 90);
+    }
+
+    /// <summary>
+    /// Records a fault for which the owning subsystem has already discarded only the damaged
+    /// state and rebuilt itself. Unlike <see cref="Trip"/>, a successful recovery does not disable
+    /// the lane for the rest of the session. The player sees this only after a real exception;
+    /// healthy sessions remain completely silent.
+    /// </summary>
+    public static void ReportRecovered(string source, Exception exception, bool recoverySucceeded)
+    {
+        string lane = $"{BackpackRecoveryLane}: {source}";
+        ulong now = Main.GameUpdateCount;
+
+        if (ShouldFire(lastLogFrame, lane, now, LogThrottleTicks))
+        {
+            string outcome = recoverySucceeded ? "recovered" : "could not be rebuilt";
+            SafeLog($"[MoreAIPlayer] {lane} faulted and {outcome}. Only the affected companion state was isolated.", exception);
+        }
+
+        string messageLane = recoverySucceeded
+            ? $"{BackpackRecoveryLane}: recovered"
+            : $"{BackpackRecoveryLane}: failed";
+        if (!Main.dedServ && ShouldFire(lastMessageFrame, messageLane, now, MessageThrottleTicks))
+        {
+            string key = recoverySucceeded ? "BackpackRecovered" : "BackpackRecoveryFailed";
+            SafeNewText(FaultText(key, source), 255,
+                recoverySucceeded ? (byte)190 : (byte)120, recoverySucceeded ? (byte)100 : (byte)90);
+        }
     }
 
     /// <summary>
