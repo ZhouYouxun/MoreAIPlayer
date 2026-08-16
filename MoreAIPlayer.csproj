@@ -10,7 +10,7 @@
 
 	<!-- References -->
 	<ItemGroup>
-		
+	  <Folder Include="Repor\" />
 	</ItemGroup>
 
 </Project>
