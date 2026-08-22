@@ -38,6 +38,8 @@ public sealed class CompanionPlayer : ModPlayer
     private const int RescueSignalWindow = 10;
 
     public List<CompanionProfile> Profiles { get; private set; } = [];
+    public string PhantomOwnerIdentity { get; private set; } = string.Empty;
+    private int nextPhantomStaffNumber = 1;
 
     /// <summary>Per-world automation-companion bindings, keyed by the world's unique id. See
     /// <see cref="AutoWorldBinding"/>. Persists with the character, not the world.</summary>
@@ -104,6 +106,8 @@ public sealed class CompanionPlayer : ModPlayer
     public override void Initialize()
     {
         Profiles = [];
+        PhantomOwnerIdentity = System.Guid.NewGuid().ToString("N");
+        nextPhantomStaffNumber = 1;
         autoBindings.Clear();
         BuildMode = CompanionBuildMode.SmartBuild;
         BuildTacticActive = false;
@@ -128,6 +132,80 @@ public sealed class CompanionPlayer : ModPlayer
                 return profile;
         }
         return null;
+    }
+
+    public CompanionProfile GetProfileByPhantomStaff(string identity)
+    {
+        if (string.IsNullOrWhiteSpace(identity))
+            return null;
+        foreach (CompanionProfile profile in Profiles)
+        {
+            if (string.Equals(profile.PhantomStaffIdentity, identity, System.StringComparison.Ordinal))
+                return profile;
+        }
+        return null;
+    }
+
+    public int AllocatePhantomStaffNumber(int minimum = 1)
+    {
+        nextPhantomStaffNumber = System.Math.Max(nextPhantomStaffNumber, System.Math.Max(1, minimum));
+        return nextPhantomStaffNumber++;
+    }
+
+    public void ObservePhantomStaffNumber(int number)
+    {
+        if (number > 0)
+            nextPhantomStaffNumber = System.Math.Max(nextPhantomStaffNumber, number + 1);
+    }
+
+    /// <summary>
+    /// Imports the profile carried by a transferred staff. Returning a staff to a previous owner
+    /// replaces that staff's older local copy, so the companion comes back with every change made
+    /// while another player owned it instead of creating a stale duplicate.
+    /// </summary>
+    public CompanionProfile ImportPhantomStaffProfile(TagCompound snapshot, string identity)
+    {
+        CompanionProfile previous = GetProfileByPhantomStaff(identity);
+        int id;
+        if (previous is not null)
+        {
+            id = previous.Id;
+            CompanionInstance active = CompanionEntitySystem.FindByProfile(Player.whoAmI, id);
+            if (active is not null)
+                CompanionEntitySystem.Dismiss(active.Slot);
+        }
+        else
+        {
+            id = 0;
+            foreach (CompanionProfile profile in Profiles)
+                id = System.Math.Max(id, profile.Id + 1);
+        }
+
+        TagCompound copy = new();
+        foreach ((string key, object value) in snapshot)
+            copy[key] = value;
+        copy[nameof(CompanionProfile.Id)] = id;
+        copy[nameof(CompanionProfile.PhantomStaffIdentity)] = identity;
+
+        CompanionProfile imported;
+        try
+        {
+            imported = CompanionProfile.Load(copy);
+        }
+        catch (System.Exception exception)
+        {
+            imported = CompanionProfile.RecoverInventory(id, Player, copy);
+            imported.BindToPhantomStaff(identity);
+            CompanionFaultGuard.ReportRecovered($"transferred Phantom Staff profile {id}", exception, true);
+        }
+        imported.RepairRuntimeState();
+
+        int previousIndex = previous is null ? -1 : Profiles.IndexOf(previous);
+        if (previousIndex >= 0)
+            Profiles[previousIndex] = imported;
+        else
+            Profiles.Add(imported);
+        return imported;
     }
 
     // ---- Automation companion, one per (character, world), keyed by world unique id (§4.1) ----
@@ -181,6 +259,8 @@ public sealed class CompanionPlayer : ModPlayer
         tag[nameof(Profiles)] = savedProfiles;
         tag[nameof(BuildMode)] = (int)BuildMode;
         tag[nameof(BuildTacticActive)] = BuildTacticActive;
+        tag[nameof(PhantomOwnerIdentity)] = PhantomOwnerIdentity;
+        tag[nameof(nextPhantomStaffNumber)] = nextPhantomStaffNumber;
 
         List<TagCompound> savedBindings = new(autoBindings.Count);
         foreach ((string world, AutoWorldBinding binding) in autoBindings)
@@ -195,6 +275,13 @@ public sealed class CompanionPlayer : ModPlayer
     public override void LoadData(TagCompound tag)
     {
         Profiles = [];
+        PhantomOwnerIdentity = tag.ContainsKey(nameof(PhantomOwnerIdentity)) &&
+            !string.IsNullOrWhiteSpace(tag.GetString(nameof(PhantomOwnerIdentity)))
+                ? tag.GetString(nameof(PhantomOwnerIdentity))
+                : System.Guid.NewGuid().ToString("N");
+        nextPhantomStaffNumber = tag.ContainsKey(nameof(nextPhantomStaffNumber))
+            ? System.Math.Max(1, tag.GetInt(nameof(nextPhantomStaffNumber)))
+            : 1;
         int savedMode = tag.ContainsKey(nameof(BuildMode)) ? tag.GetInt(nameof(BuildMode)) : 0;
         BuildMode = System.Enum.IsDefined(typeof(CompanionBuildMode), savedMode)
             ? (CompanionBuildMode)savedMode
@@ -308,6 +395,14 @@ public sealed class CompanionPlayer : ModPlayer
             if (Main.netMode == NetmodeID.SinglePlayer)
                 Player.slotsMinions += CompanionEntitySystem.CountActiveOwnedBy(Player.whoAmI);
         }
+    }
+
+    public override bool CanHitNPC(NPC target)
+    {
+        if (target is null || target.catchItem <= 0)
+            return true;
+        CompanionInstance instance = CompanionEntitySystem.GetBySlot(Player.whoAmI);
+        return instance is null || !ReferenceEquals(instance.Entity, Player) || !instance.Brain.ProtectCritters;
     }
 
     public override void PostUpdateRunSpeeds()

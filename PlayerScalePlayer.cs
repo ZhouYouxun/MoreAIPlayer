@@ -19,6 +19,7 @@ public sealed class PlayerScalePlayer : ModPlayer
 
     private const int VanillaWidth = 20;
     private const int VanillaHeight = 42;
+    private bool physicalScaleApplied;
 
     /// <summary>The value currently armed in the matrix. It is retained between sessions.</summary>
     public float SelectedScale { get; private set; } = 1f;
@@ -28,10 +29,20 @@ public sealed class PlayerScalePlayer : ModPlayer
 
     public bool IsScaled => ActiveScale != 1f;
 
+    /// <summary>
+    /// The scale gameplay hooks are allowed to observe. The saved single-player choice remains
+    /// intact while visiting a multiplayer world, but it must have no collision, movement,
+    /// damage, projectile or rendering effect until the player returns to single-player.
+    /// </summary>
+    public float RuntimeScale => Main.netMode == NetmodeID.SinglePlayer ? ActiveScale : 1f;
+
+    public bool IsRuntimeScaled => RuntimeScale != 1f;
+
     public override void Initialize()
     {
         SelectedScale = 1f;
         ActiveScale = 1f;
+        physicalScaleApplied = false;
     }
 
     public override void SaveData(TagCompound tag)
@@ -51,6 +62,9 @@ public sealed class PlayerScalePlayer : ModPlayer
     /// <summary>Applies the armed scale, or cancels the active transformation on the next use.</summary>
     public void ToggleScale()
     {
+        if (Main.netMode != NetmodeID.SinglePlayer)
+            return;
+
         float previous = ActiveScale;
         ActiveScale = IsScaled ? 1f : SelectedScale;
         if (!TryApplyPhysicalSize(checkForSpace: true))
@@ -69,16 +83,22 @@ public sealed class PlayerScalePlayer : ModPlayer
         // The feature is intentionally single-player only. A remote player needs a packet and
         // server-authoritative collision reconciliation; silently changing only one client
         // would desync hitboxes and projectile damage.
-        if (Main.netMode == NetmodeID.SinglePlayer && !TryApplyPhysicalSize(checkForSpace: true))
+        if (Main.netMode != NetmodeID.SinglePlayer)
+        {
+            RemoveOwnedPhysicalScale();
+            return;
+        }
+
+        if (!TryApplyPhysicalSize(checkForSpace: true))
             ActiveScale = 1f;
     }
 
     public override void PostUpdateMiscEffects()
     {
-        if (!IsScaled)
+        float movementFactor = RuntimeScale;
+        if (movementFactor == 1f)
             return;
 
-        float movementFactor = ActiveScale;
         // moveSpeed affects walking before the final run-speed values are calculated, while
         // wingTimeMax is rebuilt by equipment every tick. Applying both here makes size matter
         // for ordinary movement and the total time a winged player can remain airborne.
@@ -91,13 +111,13 @@ public sealed class PlayerScalePlayer : ModPlayer
 
     public override void PostUpdateRunSpeeds()
     {
-        if (!IsScaled)
+        float movementFactor = RuntimeScale;
+        if (movementFactor == 1f)
             return;
 
         // Movement is part of the same transformation: a 3× body gets 3× running cap and
         // acceleration, while a 0.5× body gets half. This is intentionally not a realism
         // penalty; the book is an explicit proportional "everything grows" effect.
-        float movementFactor = ActiveScale;
         Player.maxRunSpeed *= movementFactor;
         Player.accRunSpeed *= movementFactor;
         Player.runAcceleration *= movementFactor;
@@ -122,14 +142,16 @@ public sealed class PlayerScalePlayer : ModPlayer
 
     public override void ModifyWeaponDamage(Item item, ref StatModifier damage)
     {
-        if (IsScaled && item.damage > 0)
-            damage *= ActiveScale;
+        float runtimeScale = RuntimeScale;
+        if (runtimeScale != 1f && item.damage > 0)
+            damage *= runtimeScale;
     }
 
     public override void ModifyItemScale(Item item, ref float scale)
     {
-        if (IsScaled && !item.IsAir)
-            scale *= ActiveScale;
+        float runtimeScale = RuntimeScale;
+        if (runtimeScale != 1f && !item.IsAir)
+            scale *= runtimeScale;
     }
 
     /// <summary>
@@ -139,22 +161,23 @@ public sealed class PlayerScalePlayer : ModPlayer
     /// </summary>
     public override void TransformDrawData(ref PlayerDrawSet drawInfo)
     {
-        if (!IsScaled)
+        float runtimeScale = RuntimeScale;
+        if (runtimeScale == 1f)
             return;
 
         Vector2 pivot = Player.Center - Main.screenPosition;
         for (int i = 0; i < drawInfo.DrawDataCache.Count; i++)
         {
             DrawData data = drawInfo.DrawDataCache[i];
-            data.position = pivot + (data.position - pivot) * ActiveScale;
-            data.scale *= ActiveScale;
+            data.position = pivot + (data.position - pivot) * runtimeScale;
+            data.scale *= runtimeScale;
             drawInfo.DrawDataCache[i] = data;
         }
     }
 
     private void EnsurePhysicalSizeAfterVanillaReset()
     {
-        if (Main.netMode != NetmodeID.SinglePlayer || !IsScaled)
+        if (!IsRuntimeScaled)
             return;
 
         if (!TryApplyPhysicalSize(checkForSpace: false))
@@ -166,7 +189,10 @@ public sealed class PlayerScalePlayer : ModPlayer
         int targetWidth = (int)System.MathF.Round(VanillaWidth * ActiveScale);
         int targetHeight = (int)System.MathF.Round(VanillaHeight * ActiveScale);
         if (Player.width == targetWidth && Player.height == targetHeight)
+        {
+            physicalScaleApplied = ActiveScale != 1f;
             return true;
+        }
 
         // Keep the feet anchored. Without this, every switch appears as a small teleport and
         // large forms can fall through the floor for one update.
@@ -180,7 +206,28 @@ public sealed class PlayerScalePlayer : ModPlayer
         Player.width = targetWidth;
         Player.height = targetHeight;
         Player.Bottom = feet;
+        physicalScaleApplied = ActiveScale != 1f;
         return true;
+    }
+
+    private void RemoveOwnedPhysicalScale()
+    {
+        if (!physicalScaleApplied)
+            return;
+
+        int ownedWidth = (int)System.MathF.Round(VanillaWidth * ActiveScale);
+        int ownedHeight = (int)System.MathF.Round(VanillaHeight * ActiveScale);
+        if (Player.width == ownedWidth && Player.height == ownedHeight)
+        {
+            Vector2 feet = Player.Bottom;
+            Player.width = VanillaWidth;
+            Player.height = VanillaHeight;
+            Player.Bottom = feet;
+        }
+
+        // If a mount or another mod already replaced the rectangle, it owns the new dimensions;
+        // do not overwrite them. Either way this mod relinquishes its physical-size claim here.
+        physicalScaleApplied = false;
     }
 
     private void SpawnTransitionDust()

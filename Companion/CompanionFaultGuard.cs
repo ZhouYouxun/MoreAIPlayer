@@ -72,6 +72,28 @@ internal static class CompanionFaultGuard
     }
 
     /// <summary>
+    /// Same rendering isolation as <see cref="RunDraw"/>, but for optional visual polish where
+    /// repeatedly surfacing a chat warning is worse than temporarily omitting that one layer.
+    /// The full exception is still throttled and written to the mod log for diagnosis.
+    /// </summary>
+    public static bool RunDrawQuiet(string lane, Action body)
+    {
+        if (body is null)
+            return true;
+        try
+        {
+            body();
+        }
+        catch (Exception exception)
+        {
+            ulong now = Main.GameUpdateCount;
+            if (ShouldFire(lastLogFrame, lane, now, LogThrottleTicks))
+                SafeLog($"[MoreAIPlayer] optional visual subsystem '{lane}' faulted and was hidden for this frame.", exception);
+        }
+        return true;
+    }
+
+    /// <summary>
     /// Runs a subsystem body, reporting and isolating any fault. Returns true when it completed
     /// cleanly. Callers that track a per-entity fault streak use the result to decide when to
     /// retire a persistently faulting entity.

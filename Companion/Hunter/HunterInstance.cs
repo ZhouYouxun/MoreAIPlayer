@@ -23,6 +23,26 @@ public sealed class HunterInstance
     public int ConsecutiveItemCheckMisses;
     public long AimCorrections;
     public long SlotRepairs;
+    public int ItemUseFaultStreak { get; private set; }
+    public int ItemUseBackoffTicks { get; private set; }
+
+    public void TickItemUseBackoff()
+    {
+        if (ItemUseBackoffTicks > 0)
+            ItemUseBackoffTicks--;
+    }
+
+    public void RegisterItemUseFailure()
+    {
+        ItemUseFaultStreak = System.Math.Min(ItemUseFaultStreak + 1, 6);
+        ItemUseBackoffTicks = System.Math.Min(1800, 60 << (ItemUseFaultStreak - 1));
+    }
+
+    public void RegisterItemUseSuccess()
+    {
+        ItemUseFaultStreak = 0;
+        ItemUseBackoffTicks = 0;
+    }
 
     // Vanilla advances buff timers only for Main.myPlayer. Hunters are synthetic players, so
     // their timers are mirrored here and advanced explicitly by HunterSystem.
@@ -80,6 +100,8 @@ public sealed class HunterInstance
         ItemCheckPreparedFrame = ulong.MaxValue;
         ItemCheckDetourFrame = ulong.MaxValue;
         ConsecutiveItemCheckMisses = 0;
+        ItemUseFaultStreak = 0;
+        ItemUseBackoffTicks = 0;
         System.Array.Clear(ObservedBuffTypes, 0, ObservedBuffTypes.Length);
         System.Array.Clear(ObservedBuffTimes, 0, ObservedBuffTimes.Length);
         System.Array.Clear(NextObservedBuffTypes, 0, NextObservedBuffTypes.Length);

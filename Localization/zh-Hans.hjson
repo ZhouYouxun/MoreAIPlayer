@@ -98,10 +98,12 @@ Mods: {
 				DisplayName: 幻影法杖
 				Tooltip:
 					'''
-					左键：在身边放出或收回此法杖绑定的伙伴
+					挥动法杖：在身边放出或收回此法杖绑定的伙伴
 					右键：伙伴已放出时，直接打开其背包
+					第一次进入你的背包时，会自动获得独立编号并绑定给你
+					别人绑定的法杖暂时禁用；在背包中右键可转绑，伙伴数据不会重置
 					法杖位于物品栏时，按“轮盘”键指挥最靠前且已放出伙伴
-					每根法杖记住一名伙伴；原有书本与界面全部保留可用
+					每根法杖始终只对应一名伙伴；原有书本与界面全部保留可用
 					'''
 			}
 
@@ -416,6 +418,14 @@ Mods: {
 			StaffUnbound: 这根幻影法杖尚未绑定伙伴；左键使用一次即可绑定。
 			StaffNotSummoned: 请先放出这根法杖绑定的伙伴，再打开背包。
 			StaffUnboundTooltip: 未绑定——左键选择或创建伙伴
+			StaffNumberedName: "{0} {1}号"
+			StaffOwnerTooltip: 绑定玩家：{0}
+			StaffCompanionTooltip: 对应伙伴：{0}——{1}
+			StaffForeignTooltip: 当前武器已经绑定到 {0}，您目前无法使用
+			StaffRebindHint: 如需解除，请在背包中对该物品点击右键
+			StaffForeignUseBlocked: 当前武器已经绑定到 {0}，您目前无法使用。如需解除，请在背包中对该物品点击右键。
+			StaffRebound: 已完成转绑：现在是你的 {0}号幻影法杖，对应伙伴仍为 {1}。
+			StaffTransferDataMissing: 法杖内没有可安全转移的伙伴档案，因此没有执行转绑。
 			StaffBoundTooltip: 已绑定 {0}——{1}
 			StaffStored: 已收回
 			StaffActive: 已放出
@@ -560,5 +570,6 @@ Mods: {
 		}
 
 		NPCs.DamageTestDummyNPC.DisplayName: 伤害测试傀儡
+		// Projectiles.DevelopmentNoticeSwing.DisplayName: Development Notice Swing
 	}
 }

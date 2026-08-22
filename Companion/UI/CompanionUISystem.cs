@@ -23,6 +23,7 @@ public sealed class CompanionUISystem : ModSystem
     private bool recoverAppearancePage;
     private string pendingRecoverySource;
     private Exception pendingRecoveryException;
+    private bool inactiveRuntimeUICleared;
 
     public static bool IsOpen => instance?.inventoryUI is not null;
     public static int TargetSlot => instance?.targetSlot ?? -1;
@@ -37,14 +38,7 @@ public sealed class CompanionUISystem : ModSystem
 
     public override void Unload()
     {
-        userInterface?.SetState(null);
-        inventoryUI?.Deactivate();
-        CompanionModeWheel.Close();
-        CompanionBuilderModeWheel.Close();
-        PhantomCommandWheel.Close();
-        CompanionManagerPanel.CloseInstant();
-        HunterConfigPanel.CloseInstant();
-        PlayerScaleMatrixPanel.CloseInstant();
+        CloseAllTransientUI();
         instance = null;
         userInterface = null;
         inventoryUI = null;
@@ -57,18 +51,12 @@ public sealed class CompanionUISystem : ModSystem
 
     public override void OnWorldUnload()
     {
-        Close();
-        CompanionModeWheel.Close();
-        CompanionBuilderModeWheel.Close();
-        PhantomCommandWheel.Close();
-        CompanionManagerPanel.CloseInstant();
-        HunterConfigPanel.CloseInstant();
-        PlayerScaleMatrixPanel.CloseInstant();
+        CloseAllTransientUI();
     }
 
     public static void Open(int companionSlot)
     {
-        if (instance?.userInterface is null || Main.gameMenu)
+        if (instance?.userInterface is null || Main.gameMenu || !CompanionRuntimePolicy.CanRunCompanionUI)
             return;
 
         CompanionInstance companion = CompanionEntitySystem.GetBySlot(companionSlot);
@@ -99,10 +87,21 @@ public sealed class CompanionUISystem : ModSystem
         instance.pendingRecoveryException = null;
     }
 
+    private static void CloseAllTransientUI()
+    {
+        Close();
+        CompanionModeWheel.Close();
+        CompanionBuilderModeWheel.Close();
+        PhantomCommandWheel.Close();
+        CompanionManagerPanel.CloseInstant();
+        HunterConfigPanel.CloseInstant();
+        PlayerScaleMatrixPanel.CloseInstant();
+    }
+
     /// <summary>Replaces the equipment/backpack page with the companion's dresser page.</summary>
     internal static void OpenAppearance(int companionSlot, Vector2? panelPosition)
     {
-        if (instance?.userInterface is null || Main.gameMenu)
+        if (instance?.userInterface is null || Main.gameMenu || !CompanionRuntimePolicy.CanRunCompanionUI)
             return;
 
         CompanionInstance companion = CompanionEntitySystem.GetBySlot(companionSlot);
@@ -116,6 +115,19 @@ public sealed class CompanionUISystem : ModSystem
 
     public override void UpdateUI(GameTime gameTime)
     {
+        if (!CompanionRuntimePolicy.CanRunCompanionUI)
+        {
+            // Clear anything carried over from a single-player world before returning early.
+            // CloseInstant variants avoid sounds and input side effects during a world switch.
+            if (!inactiveRuntimeUICleared)
+            {
+                CloseAllTransientUI();
+                inactiveRuntimeUICleared = true;
+            }
+            return;
+        }
+        inactiveRuntimeUICleared = false;
+
         CompanionModeWheel.UpdateInput();
         CompanionBuilderModeWheel.UpdateInput();
         PhantomCommandWheel.UpdateInput();
@@ -156,7 +168,7 @@ public sealed class CompanionUISystem : ModSystem
     /// "nothing I changed had any effect" can be told apart from "the change did not help" —
     /// three rounds of fixes were evaluated without that distinction being available.
     /// </summary>
-    public const string BuildStamp = "2026-08-13 #39 command-wheel-line-render-hotfix";
+    public const string BuildStamp = "2026-08-22 #40 multiplayer-safety-hardening";
 
     /// <summary>Draws a live decision readout over each companion only when the player has
     /// explicitly enabled the client-side diagnostic configuration.</summary>
@@ -165,7 +177,7 @@ public sealed class CompanionUISystem : ModSystem
     public override void OnWorldLoad()
     {
         CompanionManagerPanel.CloseInstant();
-        if (!Main.dedServ)
+        if (CompanionRuntimePolicy.CanRunCompanionUI)
             Main.NewText(T("BuildLoaded", BuildStamp), 130, 220, 160);
     }
 
@@ -443,6 +455,9 @@ public sealed class CompanionUISystem : ModSystem
 
     public override void ModifyInterfaceLayers(List<GameInterfaceLayer> layers)
     {
+        if (!CompanionRuntimePolicy.CanRunCompanionUI)
+            return;
+
         int mouseTextIndex = layers.FindIndex(layer => layer.Name.Equals("Vanilla: Mouse Text", StringComparison.Ordinal));
         if (mouseTextIndex < 0)
             return;

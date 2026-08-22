@@ -24,7 +24,7 @@ public sealed class PlayerScaleGlobalProjectile : GlobalProjectile
         if (source is EntitySource_Parent { Entity: Projectile parent })
             SizeSnapshot = parent.GetGlobalProjectile<PlayerScaleGlobalProjectile>().SizeSnapshot;
         else if (projectile.owner >= 0 && projectile.owner < Main.maxPlayers && Main.player[projectile.owner].active)
-            SizeSnapshot = Main.player[projectile.owner].GetModPlayer<PlayerScalePlayer>().ActiveScale;
+            SizeSnapshot = Main.player[projectile.owner].GetModPlayer<PlayerScalePlayer>().RuntimeScale;
 
         if (SizeSnapshot != 1f)
             projectile.scale *= SizeSnapshot;

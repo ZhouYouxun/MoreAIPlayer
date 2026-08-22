@@ -98,10 +98,12 @@ Mods: {
 				// DisplayName: Phantom Staff
 				/* Tooltip:
 					'''
-					Left click: summon or recall this staff's bound companion near you
+					Swing the staff: summon or recall its bound companion near you
 					Right click: open the bound companion's backpack while summoned
+					The first time it enters your inventory, it receives your next number and binds to you
+					A staff owned by someone else is disabled; right-click it in the inventory to transfer it without resetting the companion
 					With this staff in your inventory, press the Command Wheel key to command the first summoned staff
-					Each staff remembers one companion. The original books remain fully usable.
+					Each staff always corresponds to one companion. The original books remain fully usable.
 					''' */
 			}
 
@@ -410,6 +412,14 @@ Mods: {
 			// StaffUnbound: This Phantom Staff has not chosen a companion yet. Left click once to bind it.
 			// StaffNotSummoned: Summon this staff's companion before opening its backpack.
 			// StaffUnboundTooltip: Unbound - left click to choose or create a companion
+			// StaffNumberedName: "{0} #{1}"
+			// StaffOwnerTooltip: Bound player: {0}
+			// StaffCompanionTooltip: Companion: {0} - {1}
+			// StaffForeignTooltip: This weapon is bound to {0}; you cannot use it
+			// StaffRebindHint: Right-click this item in the inventory to transfer its binding
+			// StaffForeignUseBlocked: This weapon is bound to {0}; you cannot use it. Right-click it in the inventory to transfer its binding.
+			// StaffRebound: Transfer complete: this is now your Phantom Staff #{0}; its companion is still {1}.
+			// StaffTransferDataMissing: The staff has no safe companion snapshot to transfer, so its binding was not changed.
 			// StaffBoundTooltip: Bound to {0} - {1}
 			// StaffStored: stored
 			// StaffActive: summoned
@@ -554,5 +564,6 @@ Mods: {
 		}
 
 		NPCs.DamageTestDummyNPC.DisplayName: Manekin testowy obrażeń
+		// Projectiles.DevelopmentNoticeSwing.DisplayName: Development Notice Swing
 	}
 }

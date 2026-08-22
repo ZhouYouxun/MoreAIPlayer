@@ -31,6 +31,11 @@ public static class CompanionRuntimePolicy
     /// dedicated server; callers still add the per-owner "this is my companion" check.</summary>
     public static bool CanRunLocalUI => !Main.dedServ;
 
+    /// <summary>Whether companion-specific panels, wheels, overlays and hover input may run.
+    /// These controls have no useful multiplayer target while synthetic players are disabled,
+    /// so do not register or update them merely because this machine happens to be a client.</summary>
+    public static bool CanRunCompanionUI => CanRunSyntheticPlayers && CanRunLocalUI;
+
     /// <summary>Whether it is safe to run this mod's own state cleanup (registries, leaked-context
     /// recovery, releasing synthetic slots). Safe on every side because it only ever touches this
     /// mod's own bookkeeping — it must never kill a real connected player's projectiles or overwrite

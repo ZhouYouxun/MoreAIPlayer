@@ -1,18 +1,17 @@
 <#
 .SYNOPSIS
-    Static multiplayer-safety audit for MoreAIPlayer (design doc "8月11日更改" §3.3).
+    Static multiplayer-safety audit for MoreAIPlayer.
 
 .DESCRIPTION
-    Companions are singleplayer-only. This script scans every source file for the operations that
-    would be unsafe on a multiplayer client or dedicated server, and confirms each one sits inside
-    an approved guard (the CompanionRuntimePolicy properties, a netMode / dedServ branch, or a
-    ValidOwner check). It is a reviewer aid, not a proof: it reports every authoritative operation
-    and flags any that has no recognised guard in its enclosing method.
+    Companions and player scaling are intentionally single-player-only. This reviewer aid checks
+    authoritative operations against a guard in their enclosing member and enforces several
+    project-specific invariants that previously regressed silently.
 
-    Run from anywhere:  pwsh -File Tools/mp_safety_audit.ps1
-    Exit code 0 = no unguarded authoritative operations found; 1 = review required.
+    This is not live multiplayer proof. Run from anywhere:
+      pwsh -File Tools/mp_safety_audit.ps1
 
-    This folder is excluded from the packaged mod via build.txt (buildIgnore = Tools/*).
+    Exit code 0 = no recognised regression; 1 = review required.
+    Tools are excluded from the packaged mod by build.txt (buildIgnore = Tools/*).
 #>
 
 param(
@@ -21,62 +20,80 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
-# Tokens that count as an approved guard when they appear in the enclosing method (or, for
-# whole-file client contexts, anywhere above the match in the file).
-$guardTokens = @(
-    'CanRunSyntheticPlayers', 'CanMutateWorld', 'IsAuthoritativeDamageSide', 'CanRunLocalUI',
-    'CanRunNetworkCleanup', 'IsDedicatedServer', 'ValidOwner', 'IsCompanion', 'IsHunter',
-    'netMode ==', 'netMode !=', 'NetmodeID', 'dedServ', 'Main.dedServ', 'SinglePlayer'
-)
-
-# Authoritative operations: unsafe if performed on a non-authoritative side. An unguarded hit here
-# fails the audit.
 $authoritativePatterns = [ordered]@{
-    'world-mutation'   = 'WorldGen\.(PlaceTile|PlaceWall|OpenDoor|CloseDoor|KillTile|ReplaceTile|SlopeTile|PoundTile|Place1x2|PlaceObject)\b'
-    'myPlayer-write'   = 'Main\.myPlayer\s*='
-    'mouse-write'      = 'Main\.(mouseX|mouseY|mouseLeft|mouseRight)\s*='
-    'player-slot-write'= 'Main\.player\[[^\]]+\]\s*='
-    'net-send'         = 'NetMessage\.SendData'
+    'world-mutation'    = 'WorldGen\.(PlaceTile|PlaceWall|OpenDoor|CloseDoor|KillTile|ReplaceTile|SlopeTile|PoundTile|Place1x2|PlaceObject)\b'
+    'myPlayer-write'    = 'Main\.myPlayer\s*='
+    'mouse-write'       = 'Main\.(mouseX|mouseY|mouseLeft|mouseRight)\s*='
+    'player-slot-write' = 'Main\.player\[[^\]]+\]\s*='
+    'net-send'          = 'NetMessage\.SendData'
 }
 
-# Informational: client-side reads that are safe on a client but would be wrong on a dedicated
-# server. UI / book code never runs on a dedicated server, so these are listed, not failed.
-$informationalPatterns = [ordered]@{
-    'localplayer-read' = 'Main\.LocalPlayer'
+# Guards are category-specific. In particular, client-only UI and cleanup permissions no longer
+# excuse world mutation or synthetic player-slot writes.
+$guardPatterns = @{
+    'world-mutation'    = 'CanMutateWorld|Main\.netMode\s*!=\s*NetmodeID\.MultiplayerClient|Main\.netMode\s*==\s*NetmodeID\.MultiplayerClient|Main\.netMode\s*==\s*NetmodeID\.SinglePlayer'
+    'myPlayer-write'    = 'CanRunSyntheticPlayers|Main\.netMode\s*(==|!=)\s*NetmodeID\.SinglePlayer|ValidOwner|IsVirtualSlot'
+    'mouse-write'       = 'CanRunSyntheticPlayers|Main\.netMode\s*(==|!=)\s*NetmodeID\.SinglePlayer|ValidOwner'
+    'player-slot-write' = 'CanRunSyntheticPlayers|Main\.netMode\s*(==|!=)\s*NetmodeID\.SinglePlayer|ReferenceEquals\(Main\.player|Main\.player\[[^\]]+\]\s*==\s*instance\.Entity'
+    # Sending can legitimately be client- or server-authoritative, but the side must be explicit.
+    'net-send'          = 'Main\.netMode|NetmodeID\.(MultiplayerClient|Server)|IsAuthoritativeDamageSide'
 }
 
-function Get-EnclosingGuardContext {
+function Get-EnclosingMemberContext {
     param([string[]]$Lines, [int]$Index)
-    # Walk upward to the nearest method/property declaration (4-space indent in this codebase),
-    # collecting text so guard tokens inside the method body above the hit are visible.
-    $collected = New-Object System.Text.StringBuilder
+
+    $start = 0
     for ($i = $Index; $i -ge 0; $i--) {
-        [void]$collected.AppendLine($Lines[$i])
-        if ($Lines[$i] -match '^\s{4}(public|private|internal|protected)[^;]*\($') { break }
-        if ($Lines[$i] -match '^\s{4}(public|private|internal|protected)[^;=]*\(.*\)\s*$') { break }
-        if ($Lines[$i] -match '^\s{4}(public|private|internal|protected).*=>') { break }
+        if ($Lines[$i] -match '^\s{4}(public|private|internal|protected)\b.*(\(|=>)') {
+            $start = $i
+            break
+        }
     }
-    return $collected.ToString()
+    return ($Lines[$start..$Index] -join "`n") -replace '(?m)//.*$', ''
 }
 
-function Test-Guarded {
-    param([string]$Context, [string]$FileText, [int]$LineIndex, [string[]]$Lines)
-    foreach ($token in $guardTokens) {
-        if ($Context -like "*$token*") { return $true }
+function Get-MethodText {
+    param([string]$Path, [string]$MethodName)
+
+    $lines = Get-Content -LiteralPath $Path
+    $start = -1
+    for ($i = 0; $i -lt $lines.Count; $i++) {
+        if ($lines[$i] -match "\b$([regex]::Escape($MethodName))\s*\(") {
+            $start = $i
+            break
+        }
     }
-    # Whole-file client context: a book (ModItem) or UIState that itself early-returns on netMode.
-    $above = ($Lines[0..([Math]::Max(0, $LineIndex))] -join "`n")
-    foreach ($token in $guardTokens) {
-        if ($above -like "*$token*") { return $true }
+    if ($start -lt 0) { return $null }
+
+    $depth = 0
+    $bodyStarted = $false
+    $collected = New-Object System.Collections.Generic.List[string]
+    for ($i = $start; $i -lt $lines.Count; $i++) {
+        $line = $lines[$i]
+        $collected.Add($line)
+        $depth += ([regex]::Matches($line, '\{')).Count
+        if ($depth -gt 0) { $bodyStarted = $true }
+        $depth -= ([regex]::Matches($line, '\}')).Count
+        if ($bodyStarted -and $depth -eq 0) { break }
     }
-    return $false
+    return $collected -join "`n"
+}
+
+function Add-InvariantFailure {
+    param([string]$Name, [string]$File, [string]$Message)
+    $script:failures += [pscustomobject]@{
+        Category = "invariant:$Name"
+        File = $File
+        Line = '-'
+        Text = $Message
+    }
 }
 
 $files = Get-ChildItem -Path $Root -Recurse -Filter *.cs |
     Where-Object { $_.FullName -notmatch '\\(obj|bin)\\' }
 
 $failures = @()
-$informational = @()
+$informationalCount = 0
 $authoritativeCount = 0
 
 foreach ($file in $files) {
@@ -85,45 +102,84 @@ foreach ($file in $files) {
 
     for ($n = 0; $n -lt $lines.Count; $n++) {
         $line = $lines[$n]
-        if ($line -match '^\s*//') { continue }  # skip comment lines
+        if ($line -match '^\s*//') { continue }
+        if ($line -match 'Main\.LocalPlayer') { $informationalCount++ }
 
         foreach ($category in $authoritativePatterns.Keys) {
-            if ($line -match $authoritativePatterns[$category]) {
-                $authoritativeCount++
-                $context = Get-EnclosingGuardContext -Lines $lines -Index $n
-                if (-not (Test-Guarded -Context $context -LineIndex $n -Lines $lines)) {
-                    $failures += [pscustomobject]@{
-                        Category = $category
-                        File     = $rel
-                        Line     = $n + 1
-                        Text     = $line.Trim()
-                    }
-                }
-            }
-        }
-        foreach ($category in $informationalPatterns.Keys) {
-            if ($line -match $informationalPatterns[$category]) {
-                $informational += [pscustomobject]@{
+            if ($line -notmatch $authoritativePatterns[$category]) { continue }
+            $authoritativeCount++
+            $context = Get-EnclosingMemberContext -Lines $lines -Index $n
+            if ($context -notmatch $guardPatterns[$category]) {
+                $failures += [pscustomobject]@{
                     Category = $category
-                    File     = $rel
-                    Line     = $n + 1
+                    File = $rel
+                    Line = $n + 1
+                    Text = $line.Trim()
                 }
             }
         }
     }
 }
 
-Write-Host "=== MoreAIPlayer multiplayer-safety audit ==="
+# Regression invariant 1: ModItem.NetSend runs on clients and servers. It may serialize the item's
+# cached data, but must not guess an owner through Main.LocalPlayer.
+$staffRel = 'Companion\Content\PhantomStaff.cs'
+$staffPath = Join-Path $Root $staffRel
+$staffNetSend = (Get-MethodText -Path $staffPath -MethodName 'NetSend') -replace '(?m)//.*$', ''
+if ([string]::IsNullOrWhiteSpace($staffNetSend)) {
+    Add-InvariantFailure -Name 'staff-net-context' -File $staffRel -Message 'NetSend method was not found.'
+} elseif ($staffNetSend -match 'Main\.LocalPlayer') {
+    Add-InvariantFailure -Name 'staff-net-context' -File $staffRel -Message 'NetSend reads Main.LocalPlayer.'
+}
+
+$staffText = Get-Content -LiteralPath $staffPath -Raw
+if ($staffText -notmatch 'MaximumNetworkSnapshotBytes\s*=\s*48\s*\*\s*1024') {
+    Add-InvariantFailure -Name 'staff-packet-budget' -File $staffRel -Message 'Expected a 48 KiB compressed snapshot budget.'
+}
+if ($staffText -notmatch 'MaximumDecompressedSnapshotBytes' -or $staffText -notmatch 'CopyWithLimit') {
+    Add-InvariantFailure -Name 'staff-decompression-limit' -File $staffRel -Message 'Bounded snapshot decompression is missing.'
+}
+
+# Regression invariant 2: persisted scale intent may remain non-1 in multiplayer, so every runtime
+# gameplay/draw consumer must use the fail-closed RuntimeScale facade.
+$scaleRel = 'PlayerScalePlayer.cs'
+$scalePath = Join-Path $Root $scaleRel
+foreach ($method in @('PostUpdateMiscEffects', 'PostUpdateRunSpeeds', 'ModifyWeaponDamage', 'ModifyItemScale', 'TransformDrawData')) {
+    $methodText = Get-MethodText -Path $scalePath -MethodName $method
+    if ([string]::IsNullOrWhiteSpace($methodText) -or $methodText -notmatch 'RuntimeScale') {
+        Add-InvariantFailure -Name 'runtime-scale' -File $scaleRel -Message "$method does not use RuntimeScale."
+    }
+}
+
+foreach ($scaleConsumer in @('PlayerScaleGlobalItem.cs', 'PlayerScaleGlobalProjectile.cs')) {
+    $consumerText = Get-Content -LiteralPath (Join-Path $Root $scaleConsumer) -Raw
+    if ($consumerText -notmatch 'RuntimeScale') {
+        Add-InvariantFailure -Name 'runtime-scale' -File $scaleConsumer -Message 'Multiplayer-safe RuntimeScale is not used.'
+    }
+}
+
+# Regression invariant 3: client UI hooks execute for multiplayer clients too; companion-only UI
+# must not update or register interface layers when synthetic companions are disabled.
+$uiRel = 'Companion\UI\CompanionUISystem.cs'
+$uiPath = Join-Path $Root $uiRel
+foreach ($method in @('UpdateUI', 'ModifyInterfaceLayers')) {
+    $methodText = Get-MethodText -Path $uiPath -MethodName $method
+    if ([string]::IsNullOrWhiteSpace($methodText) -or $methodText -notmatch 'CanRunCompanionUI') {
+        Add-InvariantFailure -Name 'multiplayer-ui-gate' -File $uiRel -Message "$method is not gated by CanRunCompanionUI."
+    }
+}
+
+Write-Host '=== MoreAIPlayer multiplayer-safety audit ==='
 Write-Host ("Scanned {0} source files." -f $files.Count)
-Write-Host ("Authoritative operations found: {0} (world mutation / myPlayer / mouse / slot / net-send)." -f $authoritativeCount)
-Write-Host ("Client-side Main.LocalPlayer reads (informational): {0}." -f $informational.Count)
-Write-Host ""
+Write-Host ("Authoritative operations reviewed: {0}." -f $authoritativeCount)
+Write-Host ("Main.LocalPlayer reads listed for manual client-context review: {0}." -f $informationalCount)
+Write-Host ''
 
 if ($failures.Count -eq 0) {
-    Write-Host "PASS: every authoritative operation sits inside an approved guard." -ForegroundColor Green
+    Write-Host 'PASS: authoritative operations are locally guarded and multiplayer invariants hold.' -ForegroundColor Green
     exit 0
 }
 
-Write-Host ("FAIL: {0} authoritative operation(s) without a recognised guard:" -f $failures.Count) -ForegroundColor Red
+Write-Host ("FAIL: {0} multiplayer-safety issue(s) require review:" -f $failures.Count) -ForegroundColor Red
 $failures | Sort-Object File, Line | Format-Table -AutoSize Category, File, Line, Text
 exit 1

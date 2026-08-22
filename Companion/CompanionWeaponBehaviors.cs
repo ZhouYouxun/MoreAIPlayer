@@ -42,14 +42,15 @@ public static class CompanionWeaponBehaviors
     /// now structural rather than a per-slot fix: the rotation is preferred, and the reserved
     /// slots are a last resort instead of a black hole.
     /// </summary>
-    public static CompanionWeaponPlan SelectWeapon(Player companion, NPC target, CompanionProfile inventory)
+    public static CompanionWeaponPlan SelectWeapon(Player companion, NPC target, CompanionProfile inventory,
+        int excludedInventorySlot = -1)
     {
         CompanionWeaponPlan immediate = null;
         CompanionWeaponPlan fallback = null;
 
         // Tier 1: the ordinary rotation, in hotbar order.
         for (int slot = CompanionProfile.FirstCombatSlot; slot < CompanionProfile.EndCombatSlot; slot++)
-            ConsiderSlot(companion, target, inventory, slot, ref immediate, ref fallback);
+            ConsiderSlot(companion, target, inventory, slot, excludedInventorySlot, ref immediate, ref fallback);
 
         if (immediate is not null)
             return immediate;
@@ -70,9 +71,13 @@ public static class CompanionWeaponBehaviors
     /// priority.
     /// </summary>
     private static void ConsiderSlot(Player companion, NPC target, CompanionProfile inventory, int slot,
+        int excludedInventorySlot,
         ref CompanionWeaponPlan immediate, ref CompanionWeaponPlan fallback)
     {
         if (immediate is not null)
+            return;
+
+        if (slot == excludedInventorySlot)
             return;
 
         Item weapon = inventory.Hotbar[slot];
@@ -137,10 +142,12 @@ public static class CompanionWeaponBehaviors
     /// here is what gets swung, and the standoff/approach logic in CompanionBrain then treats
     /// it like any other weapon of its shape.
     /// </summary>
-    public static CompanionWeaponPlan GuardPlan(CompanionProfile inventory)
+    public static CompanionWeaponPlan GuardPlan(CompanionProfile inventory, int excludedInventorySlot = -1)
     {
         for (int slot = CompanionProfile.FirstCombatSlot; slot < CompanionProfile.EndCombatSlot; slot++)
         {
+            if (slot == excludedInventorySlot)
+                continue;
             Item candidate = inventory.Hotbar[slot];
             if (candidate.IsAir || !CompanionSlotRules.IsRegularWeapon(candidate))
                 continue;

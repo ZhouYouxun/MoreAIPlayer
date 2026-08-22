@@ -512,6 +512,9 @@ public sealed class CompanionBuildingSystem : ModSystem
 
     private static PlacementResult TryPlaceJob(CompanionInstance instance, Player owner, BuildJob job)
     {
+        if (!CompanionRuntimePolicy.CanMutateWorld)
+            return PlacementResult.Retry;
+
         if (!WorldGen.InWorld(job.X, job.Y, 5))
             return PlacementResult.Obstructed;
 

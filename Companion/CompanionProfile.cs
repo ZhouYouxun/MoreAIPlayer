@@ -26,6 +26,10 @@ public sealed class CompanionProfile
     }
 
     public int Id { get; private set; }
+    /// <summary>Stable identity of the Phantom Staff carrying this profile. The staff number is
+    /// deliberately not stored here because numbering belongs to the current owner and changes
+    /// when the staff is transferred.</summary>
+    public string PhantomStaffIdentity { get; private set; } = string.Empty;
     public string Name { get; private set; } = string.Empty;
     public bool MirrorsOwnerAppearance { get; private set; }
     public bool Male { get; private set; }
@@ -77,6 +81,23 @@ public sealed class CompanionProfile
 
     /// <summary>The dedicated mount slot. It is bound to Player.miscEquips[3].</summary>
     public Item[] Mount { get; private set; }
+
+    /// <summary>
+    /// Keeping a Guide to Critter Companionship in this profile's backpack permanently prevents
+    /// this companion from harming catchable critters, regardless of its selected work mode.
+    /// </summary>
+    public bool HasCritterCompanionshipGuide
+    {
+        get
+        {
+            foreach (Item item in Backpack)
+            {
+                if (item is not null && !item.IsAir && item.type == ItemID.DontHurtCrittersBook)
+                    return true;
+            }
+            return false;
+        }
+    }
 
     /// <summary>
     /// Air items handed to the entity in place of accessories the world has not unlocked yet.
@@ -179,6 +200,12 @@ public sealed class CompanionProfile
     {
         if (!string.IsNullOrWhiteSpace(name))
             Name = name.Trim();
+    }
+
+    public void BindToPhantomStaff(string identity)
+    {
+        if (!string.IsNullOrWhiteSpace(identity))
+            PhantomStaffIdentity = identity;
     }
 
     private CompanionProfile(int id)
@@ -469,6 +496,7 @@ public sealed class CompanionProfile
             [nameof(WorkMode)] = (int)WorkMode,
             [nameof(IdleCommand)] = (int)IdleCommand,
             [nameof(CombatCommand)] = (int)CombatCommand,
+            [nameof(PhantomStaffIdentity)] = PhantomStaffIdentity,
             [nameof(ExplorationCommand)] = (int)ExplorationCommand,
             [nameof(BuildingCommand)] = (int)BuildingCommand,
             [nameof(FarmingCommand)] = (int)FarmingCommand,
@@ -505,6 +533,9 @@ public sealed class CompanionProfile
         int id = tag.GetInt(nameof(Id));
         CompanionProfile profile = new(id)
         {
+            PhantomStaffIdentity = tag.ContainsKey(nameof(PhantomStaffIdentity))
+                ? tag.GetString(nameof(PhantomStaffIdentity))
+                : string.Empty,
             Name = tag.ContainsKey(nameof(Name)) && !string.IsNullOrWhiteSpace(tag.GetString(nameof(Name)))
                 ? tag.GetString(nameof(Name))
                 : GenerateName(),

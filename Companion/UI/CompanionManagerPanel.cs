@@ -37,6 +37,7 @@ public static class CompanionManagerPanel
     private static bool positionInitialized;
     private static int lastHoveredSlot = -1;
     private static int lastQuickHoveredSlot = -1;
+    private static bool quickPreviewRenderingDisabled;
 
     public static bool IsOpen => open;
 
@@ -83,7 +84,7 @@ public static class CompanionManagerPanel
     /// so opening a loadout never depends on catching a moving character in the world.
     /// </summary>
     public static void DrawQuickAccessBar() =>
-        CompanionFaultGuard.RunDraw("companion quick access bar", DrawQuickAccessBarCore);
+        CompanionFaultGuard.RunDrawQuiet("companion quick access bar", DrawQuickAccessBarCore);
 
     private static void DrawQuickAccessBarCore()
     {
@@ -127,6 +128,8 @@ public static class CompanionManagerPanel
                 cellSize);
 
             CompanionInstance companion = entries[i];
+            if (companion?.Entity is null || !companion.Entity.active)
+                continue;
             bool hovered = cell.Intersects(mouseRect);
             bool selected = CompanionUISystem.IsOpen && CompanionUISystem.TargetSlot == companion.Slot;
             Color back = hovered ? new Color(56, 72, 90, 235) : new Color(24, 31, 42, 220);
@@ -165,7 +168,7 @@ public static class CompanionManagerPanel
         if (hoveredSlot >= 0)
         {
             CompanionInstance hovered = CompanionEntitySystem.GetBySlot(hoveredSlot);
-            if (hovered is not null)
+            if (hovered?.Entity is not null && hovered.Entity.active)
             {
                 string text = Language.GetTextValue(
                     "Mods.MoreAIPlayer.CompanionCommand.QuickAccess", hovered.Entity.name);
@@ -325,7 +328,8 @@ public static class CompanionManagerPanel
         {
             // The automation companion is managed only through the automation book, never the
             // normal manager panel (no dismiss button, no backpack card here).
-            if (instance.OwnerWhoAmI == Main.myPlayer && instance.Entity.active && !instance.IsAutoIdentity)
+            if (instance is not null && instance.OwnerWhoAmI == Main.myPlayer &&
+                instance.Entity is not null && instance.Entity.active && !instance.IsAutoIdentity)
                 entries.Add(instance);
         }
         entries.Sort((a, b) => a.ProfileId.CompareTo(b.ProfileId));
@@ -422,33 +426,54 @@ public static class CompanionManagerPanel
 
     private static void DrawQuickPreviews(List<(Rectangle Area, CompanionInstance Instance)> previewDraws)
     {
-        if (previewDraws.Count == 0)
+        if (quickPreviewRenderingDisabled || previewDraws.Count == 0)
             return;
 
         SpriteBatch spriteBatch = Main.spriteBatch;
-        spriteBatch.End();
-        spriteBatch.Begin(SpriteSortMode.Immediate, BlendState.AlphaBlend, SamplerState.PointClamp,
-            DepthStencilState.None, RasterizerState.CullCounterClockwise, null, Main.UIScaleMatrix);
-
-        foreach ((Rectangle cell, CompanionInstance companion) in previewDraws)
+        try
         {
-            if (!companion.TryGetContext(out Player owner, out CompanionProfile profile))
-                continue;
+            spriteBatch.End();
+            spriteBatch.Begin(SpriteSortMode.Immediate, BlendState.AlphaBlend, SamplerState.PointClamp,
+                DepthStencilState.None, RasterizerState.CullCounterClockwise, null, Main.UIScaleMatrix);
 
-            Player preview = GetOrPreparePreview(companion, owner, profile);
-            Vector2 drawTopLeft = new(
-                cell.Center.X - preview.width * 0.5f,
-                cell.Center.Y - preview.height * 0.5f - 1f);
-
-            using (new Main.CurrentPlayerOverride(preview))
+            foreach ((Rectangle cell, CompanionInstance companion) in previewDraws)
             {
-                Main.PlayerRenderer.DrawPlayer(Main.Camera, preview,
-                    drawTopLeft + Main.screenPosition, 0f, Vector2.Zero, 0f, 0.85f);
+                if (companion?.Entity is null || !companion.Entity.active ||
+                    !companion.TryGetContext(out Player owner, out CompanionProfile profile))
+                    continue;
+
+                Player preview = GetOrPreparePreview(companion, owner, profile);
+                Vector2 drawTopLeft = new(
+                    cell.Center.X - preview.width * 0.5f,
+                    cell.Center.Y - preview.height * 0.5f - 1f);
+
+                using (new Main.CurrentPlayerOverride(preview))
+                {
+                    Main.PlayerRenderer.DrawPlayer(Main.Camera, preview,
+                        drawTopLeft + Main.screenPosition, 0f, Vector2.Zero, 0f, 0.85f);
+                }
             }
         }
-
-        spriteBatch.End();
-        spriteBatch.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend, null, null, null, null, Main.UIScaleMatrix);
+        catch (System.Exception exception)
+        {
+            // Modded armour/dyes can throw from PlayerRenderer. Keep the usable quick-access
+            // buttons alive and stop retrying the optional portrait path every frame.
+            quickPreviewRenderingDisabled = true;
+            MoreAIPlayer.Instance?.Logger?.Error("[MoreAIPlayer] companion quick-access portrait rendering was disabled for this session.", exception);
+        }
+        finally
+        {
+            try
+            {
+                spriteBatch.End();
+                spriteBatch.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend, null, null, null, null, Main.UIScaleMatrix);
+            }
+            catch (System.Exception exception)
+            {
+                quickPreviewRenderingDisabled = true;
+                MoreAIPlayer.Instance?.Logger?.Error("[MoreAIPlayer] failed to restore the UI sprite batch after a quick-access portrait.", exception);
+            }
+        }
     }
 
     private static Player GetOrPreparePreview(CompanionInstance instance, Player owner, CompanionProfile profile)

@@ -614,8 +614,7 @@ public sealed class CompanionEntitySystem : ModSystem
         previousMouseRight = Main.mouseRight;
 
         HoveredSlot = -1;
-        if (Main.gameMenu || !CompanionRuntimePolicy.CanRunLocalUI ||
-            !CompanionRuntimePolicy.CanRunSyntheticPlayers || BySlot.Count == 0)
+        if (Main.gameMenu || !CompanionRuntimePolicy.CanRunCompanionUI || BySlot.Count == 0)
             return;
         if (Main.LocalPlayer.mouseInterface)
             return;
@@ -736,7 +735,7 @@ public sealed class CompanionEntitySystem : ModSystem
         if (wantsAltUse)
             self.altFunctionUse = 1;
 
-        if (!CompanionFaultGuard.IsAvailable(CompanionFaultGuard.VirtualItemCheckLane))
+        if (IsVirtualItemUseBackedOff(self))
         {
             HaltSyntheticInput(self);
             return;
@@ -747,11 +746,12 @@ public sealed class CompanionEntitySystem : ModSystem
             using VirtualPlayerExecutionContext.Scope scope = VirtualPlayerExecutionContext.Enter(
                 self, aimWorld, wantsUseItem, wantsAltUse, instance?.WorkTile);
             orig(self);
+            RegisterVirtualItemUseSuccess(self);
         }
         catch (Exception exception)
         {
             HaltSyntheticInput(self);
-            CompanionFaultGuard.Trip(CompanionFaultGuard.VirtualItemCheckLane, exception);
+            RegisterVirtualItemUseFailure(self, exception);
         }
         finally
         {
@@ -820,6 +820,50 @@ public sealed class CompanionEntitySystem : ModSystem
     // Last line of defense: if any code path still manages to leave Main.myPlayer pointing
     // at a companion slot, snap it back before the frame is drawn. A leaked myPlayer makes
     // the camera follow the companion and routes real input into it.
+    /// <summary>
+    /// A foreign item hook must never disable virtual item use for the entire world. The
+    /// companion (or hunter) that hit the fault rests briefly, then retries; everyone else keeps
+    /// using their own weapons normally.
+    /// </summary>
+    private static bool IsVirtualItemUseBackedOff(Player player)
+    {
+        if (BySlot.TryGetValue(player.whoAmI, out CompanionInstance companion) &&
+            ReferenceEquals(companion.Entity, player))
+            return companion.ItemUseBackoffTicks > 0;
+        if (Hunter.HunterSystem.GetBySlot(player.whoAmI) is Hunter.HunterInstance hunter &&
+            ReferenceEquals(hunter.Entity, player))
+        {
+            hunter.TickItemUseBackoff();
+            return hunter.ItemUseBackoffTicks > 0;
+        }
+        return false;
+    }
+
+    private static void RegisterVirtualItemUseFailure(Player player, Exception exception)
+    {
+        if (BySlot.TryGetValue(player.whoAmI, out CompanionInstance companion) &&
+            ReferenceEquals(companion.Entity, player))
+        {
+            companion.RegisterItemUseFailure(player.selectedItem);
+        }
+        else if (Hunter.HunterSystem.GetBySlot(player.whoAmI) is Hunter.HunterInstance hunter &&
+                 ReferenceEquals(hunter.Entity, player))
+        {
+            hunter.RegisterItemUseFailure();
+        }
+        CompanionFaultGuard.Report(CompanionFaultGuard.VirtualItemCheckLane, exception);
+    }
+
+    private static void RegisterVirtualItemUseSuccess(Player player)
+    {
+        if (BySlot.TryGetValue(player.whoAmI, out CompanionInstance companion) &&
+            ReferenceEquals(companion.Entity, player))
+            companion.RegisterItemUseSuccess();
+        else if (Hunter.HunterSystem.GetBySlot(player.whoAmI) is Hunter.HunterInstance hunter &&
+                 ReferenceEquals(hunter.Entity, player))
+            hunter.RegisterItemUseSuccess();
+    }
+
     private static void RestoreHijackedLocalPlayer()
     {
         if (VirtualPlayerExecutionContext.ForceRestoreIfLeaked())
@@ -1764,7 +1808,7 @@ public sealed class CompanionEntitySystem : ModSystem
     private void RunRecoveredItemCheck(Player player, Vector2 aimWorld, bool wantsUseItem,
         bool wantsAltUse, Point? workTile)
     {
-        if (!CompanionFaultGuard.IsAvailable(CompanionFaultGuard.VirtualItemCheckLane))
+        if (IsVirtualItemUseBackedOff(player))
         {
             HaltSyntheticInput(player);
             return;
@@ -1785,7 +1829,7 @@ public sealed class CompanionEntitySystem : ModSystem
         catch (Exception exception)
         {
             HaltSyntheticInput(player);
-            CompanionFaultGuard.Trip(CompanionFaultGuard.VirtualItemCheckLane, exception);
+            RegisterVirtualItemUseFailure(player, exception);
         }
         finally
         {

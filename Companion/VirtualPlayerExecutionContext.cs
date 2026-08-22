@@ -229,6 +229,9 @@ internal static class VirtualPlayerExecutionContext
     /// </summary>
     private static void SetMouseForWorldAim(Player player, Vector2 aimWorld)
     {
+        if (!CompanionRuntimePolicy.CanRunSyntheticPlayers)
+            return;
+
         EnsureCaches();
         ref MouseCacheEntry cache = ref mouseCache[player.whoAmI];
         if (cache.Valid &&

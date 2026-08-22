@@ -1,0 +1,112 @@
+
+[hr][/hr]
+
+[h1]MoreAIPlayer [Phantom Companions][/h1]
+
+What, you are still playing single-player?
+What, you cannot stall during boss fights?
+What, you live alone and your house is pretty big?
+
+No worries—the so↗lu↘tion↗ is↘ here: the “Phantom Companions” mod was made for exactly this.
+In a single-player world, you can summon AI companions that can wear equipment, switch weapons, navigate on their own, and beat up monsters.
+They cannot perfectly recreate multiplayer, but they can at least provide some emotional support—and some firepower.
+
+The core features are now complete. However, balancing and compatibility testing for the complex weapons found in many large mods is still a very long road.
+
+[h1]So what can this thing actually do?[/h1]
+
+[h2]1. They are players, not pets or minions[/h2]
+From a code perspective, many modded “teammates” or “companions” are really pets or NPCs that merely look human.
+Phantom Companions are different: they directly reuse the Player class at their core.
+That means weapon-use animations, armor, equipment and accessory effects, movement, collision, and boss aggro all come included automatically.
+
+[h2]2. Give them anything—they can use every class![/h2]
+All three main vanilla classes are supported, and summon weapons can automatically fill any vacant slots.
+What, you just got a new weapon? Then what about the old one? ()
+Do not rush to sell old gear. Give it to your free companion and let them work for you.
+Auto-aim + automatic movement: 666, this dude has hacks on; command blocks and Deadwater alike must pay their respects to Guixia↘.
+
+[h2]3. They do not die, they follow you, and they have multiple tactics[/h2]
+Normally, a minion simply follows the player and fights. Phantom Companions are different.
+They have several tactics: free attack, follow attack, hold position, general defense, and more tactics to come.
+Whether you need them to defend a location or keep up with you, both are possible.
+Their pathfinding has also been specially tuned: they can jump, fly, drop through platforms, and try to navigate around terrain.
+If they truly cannot find a way out, they will teleport back to your side—ju~st~li~ke~a~Wormhole~Potion~
+Even though the pathfinding is not fully mature yet, it will continue improving over time.
+
+[h2]4. I put a kitty here. Everyone is welcome to pet it.[/h2]
+[code]
+      ╱|、
+    (˚ˎ 。7
+     |、˜〵
+     じしˍ,)ノ
+[/code]
+
+[h1]Dependencies[/h1]
+
+Look, what dependency could there be? This is a small standalone mod. You want something big? So do I.
+
+[h1]Book Guide[/h1]
+
+To make testing easier, every book recipe currently costs only one Dirt Block. 【No rush; this will be adjusted gradually later.】
+
+[h2]1. 【Debugger Book】[/h2]
+· Left-click: directly summon a companion at the cursor. Use it again to summon the next saved companion. All data is saved automatically.
+· Right-click: open the companion-management interface. It displays cards for every companion; left-click a card to open that companion’s backpack and equipment slots, then put in any equipment or weapons you want. Right-click a card to dismiss that companion. There is also a “Dismiss All” button below—very handy when you need to clear the field.
+· You can also right-click a companion directly in the world to open the same backpack and equipment interface.
+
+[h2]2. 【Command Book】[/h2]
+· Hold right-click: open the mode wheel and switch between six modes: “Attack / Defense / Guard / Fishing / Catching / Mining.” When a combat mode changes, text will appear above the companion’s head to show the current mode.
+· Left-click: place a tactical signal marker at the cursor. Companions that receive the signal will immediately head there; the marker lasts for up to 5 seconds, and companions will guard that position after arriving. Left-click near the marker again to cancel it. In short: point where you want them to fight—pure convenience.
+
+[h2]3. 【Hunter Book】[/h2]
+· Left-click: start or end the “Hunter Game.” Hunters first gather at a distance, then begin pursuing you.
+· Right-click: open the hunter-configuration interface, where you can choose 1 to 3 hunters and view the current game status.
+· Hunters only use the preset equipment for the current progression stage. The more hunters there are, the lower each hunter’s individual stats become. A gathering countdown and the distance to the nearest hunter are displayed near your character.
+· This mode is available only during specific stages of progression: after defeating any boss before the Wall of Flesh, or after Hardmode begins but before Plantera is defeated.
+
+[h2]4. 【Builder Book】[/h2]
+· Right-click: cycle through five construction plans: “Smart Follow-Build / Bridge / Safe House / Battle Platform / Rope Shaft.”
+· Left-click: execute the current plan; in Smart Follow-Build mode, this instead toggles continuous assistance. Hold Down and left-click to cancel all construction tasks.
+· Companions prioritize non-favorited materials in their own backpacks, then use materials from your inventory. Construction safely pauses if materials run out.
+· Companions will never mine or replace tiles. Combat, protection, signal markers, and dedicated modes always take priority over construction.
+
+More books will be added in the future, so stay tuned.
+
+[h1]Frequently Asked Questions: Filling the holes first[/h1]
+
+[h2]Q: Does it support multiplayer?[/h2]
+A: For now, it supports 【single-player only】. Multiplayer is far too unstable; the more complex the logic, the more likely it is to break in multiplayer.
+
+[h2]Q: Will companions steal items from my chests?[/h2]
+A: What are you thinking? Absolutely not. They have their own backpacks and equipment slots; unless you manually give them something, they will not touch your chests. They may pick up items from the ground, though—【I picked this up】. These features can all be enabled or disabled.
+
+[h2]Q: Why do they suddenly teleport sometimes?[/h2]
+A: Either they are too far away, such as when you Mirror home or fly too quickly; or they are stuck in terrain and cannot path out. To keep them from falling behind, the system pulls them directly back to your side. The configuration offers “Emergency Companion Recall When Hurt”: when enabled, your companions teleport to safe positions around you to protect you whenever you take damage. It is disabled by default.
+
+[h1]Future Plans and Feedback[/h1]
+
+The reason for making this mod was actually very simple:
+When I played Terraria, I often could not find enough people to start a new world with, so I did it alone. If I cannot recruit players, I might as well make a few myself.
+
+The mod is still being updated. More fun things are planned for the future:
+smarter boss-projectile avoidance, richer personalities, or even voice interactions 【Would you like a voice system?】
+And please look forward to new books as well.
+
+If you encounter a bug while playing, have a silly idea, or simply think something should change, feel free to tell me in the comments.
+
+Have fun, and good luck with your adventures.
+
+[h1]About Crash and Error Reports[/h1]
+
+This mod is made and tested by one person: me.
+
+Therefore, I can only ensure that it does not have major issues in vanilla Terraria or in the vast majority of situations when used alongside most mods.
+
+I cannot test every large mod one by one, nor can I find and fix every possible issue. That is simply not possible in practice.
+
+An issue may originate from this mod, but it may also come from another large mod. Some mods do not make their source code public, and in those cases there may be nothing I can do.
+
+In addition, most reports cannot be reproduced because their descriptions are inaccurate or incomplete. If I cannot reproduce the same situation, it generally means that I cannot fix the issue by myself.
+
+Only when you provide a report that is as detailed and accurate as possible, and I can successfully reproduce it, will I be able to attempt a fix.

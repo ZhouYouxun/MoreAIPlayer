@@ -30,8 +30,8 @@ public sealed class PlayerScaleGlobalItem : GlobalItem
 
     private static float MovementFactor(Player player)
     {
-        if (Main.netMode != Terraria.ID.NetmodeID.SinglePlayer || player is null || !player.active)
+        if (player is null || !player.active)
             return 1f;
-        return player.GetModPlayer<PlayerScalePlayer>().ActiveScale;
+        return player.GetModPlayer<PlayerScalePlayer>().RuntimeScale;
     }
 }

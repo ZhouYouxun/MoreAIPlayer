@@ -1,6 +1,7 @@
 using Microsoft.Xna.Framework;
 using MoreAIPlayer.Companion.AI;
 using Terraria;
+using Terraria.ID;
 using Terraria.Localization;
 
 namespace MoreAIPlayer.Companion;
@@ -89,6 +90,40 @@ public sealed class CompanionInstance
 
     /// <summary>Times another system replaced Main.player[Slot] and the inactive slot was reclaimed.</summary>
     public long SlotRepairs;
+
+    /// <summary>Consecutive failures inside this companion's virtual ItemCheck only.</summary>
+    public int ItemUseFaultStreak { get; private set; }
+
+    /// <summary>Ticks left before this companion may attempt the faulting item use again.</summary>
+    public int ItemUseBackoffTicks { get; private set; }
+
+    /// <summary>Inventory slot that last faulted, retained only while the retry backoff is active.</summary>
+    public int BlockedItemUseInventorySlot { get; private set; } = -1;
+
+    public bool IsItemUseBlocked(int inventorySlot) => ItemUseBackoffTicks > 0 &&
+        BlockedItemUseInventorySlot == inventorySlot;
+
+    public void TickItemUseBackoff()
+    {
+        if (ItemUseBackoffTicks <= 0)
+            return;
+        if (--ItemUseBackoffTicks == 0)
+            BlockedItemUseInventorySlot = -1;
+    }
+
+    public void RegisterItemUseFailure(int inventorySlot)
+    {
+        ItemUseFaultStreak = System.Math.Min(ItemUseFaultStreak + 1, 6);
+        BlockedItemUseInventorySlot = inventorySlot;
+        ItemUseBackoffTicks = System.Math.Min(1800, 60 << (ItemUseFaultStreak - 1));
+    }
+
+    public void RegisterItemUseSuccess()
+    {
+        ItemUseFaultStreak = 0;
+        ItemUseBackoffTicks = 0;
+        BlockedItemUseInventorySlot = -1;
+    }
 
     /// <summary>Consecutive ticks this companion's own per-tick update threw. A clean tick resets
     /// it; reaching <see cref="MaxFaultStreak"/> retires the companion instead of letting it fault
@@ -290,6 +325,8 @@ public sealed class CompanionInstance
         me.immuneAlpha = 0;
         me.outOfRange = false;
 
+        MirrorOwnerBeneficialBuffs(owner, me);
+
         profile.ApplyAppearanceTo(me, owner);
 
         for (int i = 0; i < CompanionPlayer.HotbarSize; i++)
@@ -366,6 +403,25 @@ public sealed class CompanionInstance
     /// <summary>The fishing pole takes the fourth and final coin slot. That exhausts the coin
     /// row — any further dedicated tool slot will have to borrow from the backpack instead.</summary>
     public const int RodInventoryIndex = 53;
+
+    /// <summary>
+    /// Mirrors the main player's active beneficial timed buffs every update. This covers food,
+    /// combat potions and ordinary modded buff potions without copying debuffs, permanent pet/
+    /// mount-style buffs, or potion sickness. The owner's remaining duration is authoritative,
+    /// so the companion cannot extend a buff by existing.
+    /// </summary>
+    private static void MirrorOwnerBeneficialBuffs(Player owner, Player companion)
+    {
+        for (int i = 0; i < Player.MaxBuffs; i++)
+        {
+            int type = owner.buffType[i];
+            int time = owner.buffTime[i];
+            if (type <= 0 || time <= 0 || type >= Main.debuff.Length || Main.debuff[type] ||
+                type >= BuffID.Sets.TimeLeftDoesNotDecrease.Length || BuffID.Sets.TimeLeftDoesNotDecrease[type])
+                continue;
+            companion.AddBuff(type, time, quiet: true);
+        }
+    }
 
     private static void AssignIfChanged(Item[] destination, int index, Item source)
     {

@@ -267,6 +267,7 @@ public sealed class CompanionBrain
         instance.WorkTile = null;
         instance.WantsAltUse = false;
         instance.WantsUseItem = false;
+        instance.TickItemUseBackoff();
         instance.AimWorld = me.Center + new Vector2(me.direction * 160f, 0f);
         AttackState = CompanionAttackState.NoTarget;
         ChosenWeaponName = string.Empty;
@@ -277,6 +278,11 @@ public sealed class CompanionBrain
             return; // still dead this tick — nothing else runs
         }
         me.statMana = me.statManaMax2;
+
+        // Catch mode grants temporary critter protection. A Guide to Critter Companionship in
+        // this companion's backpack makes the same protection permanent in every work mode.
+        CompanionMode mode = owner.dead ? CompanionMode.Attack : CompanionModeRules.Effective(profile);
+        ProtectCritters = mode == CompanionMode.Catch || profile.HasCritterCompanionshipGuide;
 
         // Summon upkeep comes before everything else that uses an item: the companion tops up
         // its summon slots first, and only then falls through to the next non-summon weapon
@@ -295,12 +301,6 @@ public sealed class CompanionBrain
 
         CompanionPlayer ownerData = owner.GetModPlayer<CompanionPlayer>();
         // Falls back to Attack when the mode's tool slot was emptied behind its back.
-        CompanionMode mode = owner.dead ? CompanionMode.Attack : CompanionModeRules.Effective(profile);
-
-        // Critter protection is a property of Catch mode, not of owning a net: outside the mode
-        // the companion fights normally and a net in the slot is just equipment. Set before
-        // SelectTarget, which filters critters out through IsValidTarget.
-        ProtectCritters = mode == CompanionMode.Catch;
         if (ProtectCritters)
             CollectCaughtCritters(me, profile);
 
@@ -324,7 +324,8 @@ public sealed class CompanionBrain
         if (mode == CompanionMode.Escort && target is not null && !IsThreatToOwner(target, owner, me))
             target = null;
 
-        CompanionWeaponPlan plan = target is null ? null : CompanionWeaponBehaviors.SelectWeapon(me, target, profile);
+        CompanionWeaponPlan plan = target is null ? null : CompanionWeaponBehaviors.SelectWeapon(
+            me, target, profile, instance.BlockedItemUseInventorySlot);
 
         // Aiming at a known target is unconditional, decided here rather than inside TryAttack.
         // Every path that declines to attack — out of range, no line of sight, leashed to an
@@ -352,7 +353,7 @@ public sealed class CompanionBrain
         // closest body as well: a "guard" response that keeps firing at the boss across the
         // arena while six slimes eat the companion is not guarding anything.
         if (guarding && target is not null &&
-            CompanionWeaponBehaviors.GuardPlan(profile) is CompanionWeaponPlan guardPlan)
+            CompanionWeaponBehaviors.GuardPlan(profile, instance.BlockedItemUseInventorySlot) is CompanionWeaponPlan guardPlan)
         {
             plan = guardPlan;
             target = nearestThreat ?? target;

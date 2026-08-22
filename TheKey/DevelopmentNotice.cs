@@ -1,13 +1,13 @@
 using Microsoft.Xna.Framework;
 using Terraria;
+using Terraria.DataStructures;
 using Terraria.ID;
 using Terraria.ModLoader;
 
 namespace MoreAIPlayer;
 
 /// <summary>
-/// A one-time welcome item. It is deliberately inert: its only job is to make the mod's
-/// development status and compatibility policy visible to every new player.
+/// A one-time welcome item which also serves as the player's starter melee weapon.
 /// </summary>
 public sealed class DevelopmentNotice : ModItem
 {
@@ -23,12 +23,29 @@ public sealed class DevelopmentNotice : ModItem
         Item.maxStack = 1;
         Item.value = 0;
         Item.rare = ItemRarityID.White;
-        Item.noMelee = true;
-        Item.noUseGraphic = true;
-        Item.useStyle = ItemUseStyleID.None;
+        Item.damage = 25;
+        Item.DamageType = DamageClass.Melee;
+        Item.crit = 30;
+        Item.knockBack = 4f;
+        Item.useTime = Item.useAnimation = 17;
+        Item.useStyle = ItemUseStyleID.Swing;
+        Item.UseSound = SoundID.Item1;
+        Item.autoReuse = true;
+        Item.noMelee = true; // The custom sword-light projectile owns the damage and collision.
+        Item.noUseGraphic = false;
+        Item.shoot = ModContent.ProjectileType<DevelopmentNoticeSwing>();
+        Item.shootSpeed = 1f;
+        Item.shootsEveryUse = true;
     }
 
-    public override bool CanUseItem(Player player) => false;
+    public override bool Shoot(Player player, EntitySource_ItemUse_WithAmmo source, Vector2 position, Vector2 velocity,
+        int type, int damage, float knockback)
+    {
+        float adjustedItemScale = player.GetAdjustedItemScale(Item);
+        Projectile.NewProjectile(source, player.MountedCenter, new Vector2(player.direction, 0f), type, damage,
+            knockback, player.whoAmI, player.direction * player.gravDir, player.itemAnimationMax, adjustedItemScale);
+        return false;
+    }
 
     public override void ModifyTooltips(System.Collections.Generic.List<TooltipLine> tooltips)
     {
