@@ -21,6 +21,8 @@ public sealed class MoreAIPlayerClientConfig : ModConfig
 
     public static int ExtraCompanionAccessorySlots => System.Math.Clamp(Current?.ExtraAccessorySlots ?? 0, 0, 7);
 
+    public static bool AutomationProgressChatEnabled => Current?.ShowAutomationProgress == true;
+
     public override ConfigScope Mode => ConfigScope.ClientSide;
 
     // Values are intentionally read through Current at the point of use. OnChanged needs no
@@ -29,6 +31,11 @@ public sealed class MoreAIPlayerClientConfig : ModConfig
 
     [DefaultValue(false)]
     public bool EnablePhantomPlayerDebugText;
+
+    // Intentionally off by default: a full campaign produces many meaningful transitions. When
+    // enabled, only stage/goal/class changes are announced, never per-frame activity.
+    [DefaultValue(false)]
+    public bool ShowAutomationProgress;
 
     // Companions occupy real Main.player slots, so vanilla already draws a health bar over
     // them. Ours is off by default to avoid the duplicate bar; opt in to show it.

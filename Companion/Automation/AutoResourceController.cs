@@ -268,4 +268,59 @@ public static class AutoResourceController
             total += AutoInventory.Count(profile, type);
         return total;
     }
+
+    /// <summary>Perfect-information campaign mining. The target comes from the frame-sliced world
+    /// index, but travel, pick power, tile hooks and collection remain ordinary gameplay actions.</summary>
+    public static AutoTaskResult MineIndexedResource(AutoContext ctx, int[] tileTypes,
+        int[] itemTypes, int targetAmount)
+    {
+        CollectWanted(ctx, item => Contains(itemTypes, item.type));
+        if (CountAny(ctx.Profile, itemTypes) >= targetAmount)
+            return AutoTaskResult.Succeeded;
+        if (!AutoInventory.HasBackpackSpace(ctx.Profile))
+            return AutoTaskResult.RetryLater;
+
+        bool Valid(Point point) => WorldGen.InWorld(point.X, point.Y, 5) &&
+            Main.tile[point.X, point.Y].HasTile && Contains(tileTypes, Main.tile[point.X, point.Y].TileType) &&
+            WorldGen.CanKillTile(point.X, point.Y);
+
+        Point target;
+        if (!ctx.TaskRuntime.TryGetActiveTarget(AutoGoalId.UpgradeClassLoadout, Valid, out target))
+        {
+            Point? indexed = AutoWorldIndexSystem.FindNearest(ctx.Me.Center, tileTypes,
+                p => !ctx.TaskRuntime.IsTargetRejected(AutoGoalId.UpgradeClassLoadout, p));
+            if (indexed is not Point found)
+                return AutoWorldIndexSystem.ScanComplete
+                    ? AutoTaskResult.AlternativeRequired : AutoExplorationController.Explore(ctx);
+            target = found;
+            ctx.TaskRuntime.SetActiveTarget(AutoGoalId.UpgradeClassLoadout, target);
+        }
+
+        Vector2 targetWorld = new(target.X * 16f + 8f, target.Y * 16f + 8f);
+        if (Vector2.DistanceSquared(ctx.Me.Center, targetWorld) > 7f * 16f * 7f * 16f)
+            return AutoWorldTravelController.TravelTo(ctx, targetWorld, 6f);
+        int pick = AutoInventory.BestToolIndex(ctx.Me, item => item.pick);
+        if (pick < 0 || !ctx.Actuator.MoveAndWorkTile(ctx.Instance, ctx.Me, ctx.Navigator, pick, target))
+        {
+            ctx.TaskRuntime.RejectActiveTarget(4, 3600);
+            return AutoTaskResult.AlternativeRequired;
+        }
+        return AutoTaskResult.Running;
+    }
+
+    public static int CountAny(CompanionProfile profile, int[] itemTypes)
+    {
+        int total = 0;
+        foreach (int type in itemTypes)
+            total += AutoInventory.Count(profile, type);
+        return total;
+    }
+
+    private static bool Contains(int[] values, int value)
+    {
+        foreach (int candidate in values)
+            if (candidate == value)
+                return true;
+        return false;
+    }
 }

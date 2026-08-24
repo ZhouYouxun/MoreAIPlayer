@@ -242,6 +242,8 @@ public sealed class CompanionEntitySystem : ModSystem
             entity.fallStart = (int)(entity.position.Y / 16f);
             entity.statLife = entity.statLifeMax;
             entity.dead = false;
+            if (profile.IsAutoRunning)
+                profile.AutoState.RestoreVitals(entity, instance);
             instance.PersistentLife = entity.statLife;
             instance.PersistentLifeInitialized = true;
             instance.LastSharedLifeMax = entity.statLifeMax;
@@ -618,6 +620,13 @@ public sealed class CompanionEntitySystem : ModSystem
             return;
         if (Main.LocalPlayer.mouseInterface)
             return;
+        // While the Automation Tome is held, right click belongs exclusively to its camera
+        // toggle. Do not also interpret the same press as hover-open or squad rescue.
+        if (Main.LocalPlayer.HeldItem?.ModItem is Content.CompanionAutomationBook)
+        {
+            rescueDoubleClickWindow = 0;
+            return;
+        }
         // The mode wheel is driven by held right click; without this, opening it would also read
         // as the double-right-click recall gesture and yank the whole squad to the owner.
         if (UI.CompanionModeWheel.Active)

@@ -46,6 +46,11 @@ Mods: {
 					Tooltip: Zeigt Entwicklungs-Debugwerte an.
 				}
 
+				ShowAutomationProgress: {
+					Label: "[i:Radar] Fortschritt des automatischen Spielers anzeigen"
+					Tooltip: Zeigt jeden bedeutenden Fortschrittsschritt des automatischen Spielers im Chat an.
+				}
+
 				ShowCompanionHealthBars: {
 					Label: "[i:LifeCrystal] Zusätzliche Begleiter-Lebensleiste anzeigen"
 					Tooltip: Zeichnet die eigene Lebensleiste dieser Mod. Nur aktivieren, wenn die Standard-Lebensleiste nicht funktioniert.
@@ -234,8 +239,8 @@ Mods: {
 				Tooltip:
 					'''
 					[Nur zur Unterhaltung; diese Funktion befindet sich noch im Test]
-					Linksklick: Beschwört deinen einzigen automatischen Begleiter (ein vorhandener wird nie zurückgesetzt oder ersetzt)
-					Rechtsklick: Öffnet seinen Rucksack
+					Linksklick: Beschwört den automatischen Begleiter; ein weiterer Linksklick ruft ihn zurück und speichert Position, Inventar und Fortschrittsgedächtnis
+					Rechtsklick: Bewegt die Kamera zum automatischen Begleiter; erneut rechtsklicken, um zurückzukehren
 					Er versucht selbstständig zu erkunden, zu sammeln, zu bauen, zu kämpfen und die Welt voranzutreiben; danach wird er zu einem normalen Phantomgefährten
 					Er kann noch stecken bleiben, Fehler machen oder andere Bugs verursachen. Erstelle vorher eine Sicherung der Welt. Nur Einzelspieler.
 					'''
@@ -479,8 +484,71 @@ Mods: {
 			AutomationNoFreeSlot: Derzeit ist kein freier Platz für den automatischen Begleiter verfügbar.
 			AutomationNotCreated: In dieser Welt gibt es noch keinen automatischen Begleiter. Beschwöre zuerst einen mit Linksklick.
 			AutomationSummoned: "{0} wurde beschworen und beginnt, die Welt selbstständig voranzutreiben."
+			AutomationRecalled: "{0} wurde vorübergehend zurückgerufen; Gegenstände, Position und Fortschrittsgedächtnis wurden gespeichert."
+			AutomationCameraStarted: Die Kamera folgt jetzt {0}. Du steuerst weiterhin deinen eigenen Spieler.
+			AutomationCameraStopped: Die Kamera ist zu deinem Spieler zurückgekehrt.
 			AutomationBlocked: Der automatische Begleiter hängt bei „{0}“ fest: {1}. Er versucht es von selbst regelmäßig erneut.
 			AutomationCompleted: "{0} hat den Mondherrn besiegt. Der Automatiklauf ist beendet; es ist jetzt ein normaler Phantomgefährte."
+			AutomationProgressStep: "[Automatik · {0}] Phase: {1} · Schritt: {2} · Klasse: {3}"
+			AutomationWeaponSelected: "[Handy-Kampflabor · {0}] {1} gewählt · Kampfwert {2} · theoretische DPS {3}"
+			AutomationDeathRecorded: "[Automatik] {0} wurde besiegt, erscheint an der Himmelsbasis wieder und kehrt zum Fehlerort zurück."
+			AutomationReturnResumed: "[Automatik] {0} hat den vorherigen Fehlerort erreicht und setzt das gespeicherte Ziel fort."
+
+			AutomationStage: {
+				// Foundation: Foundation
+				// EyeOfCthulhu: Eye of Cthulhu
+				// EvilBoss: World evil boss
+				// Skeletron: Skeletron
+				// WallOfFlesh: Wall of Flesh
+				// MechanicalBosses: Mechanical bosses
+				// Plantera: Plantera
+				// Golem: Golem
+				// LunaticCultist: Lunatic Cultist
+				// SolarPillar: Solar Pillar
+				// VortexPillar: Vortex Pillar
+				// NebulaPillar: Nebula Pillar
+				// StardustPillar: Stardust Pillar
+				// MoonLord: Moon Lord
+				// Completed: Complete
+			}
+
+			AutomationClass: {
+				// Flexible: Flexible
+				// Melee: Melee
+				// Ranged: Ranged
+				// Magic: Magic
+				// Summoner: Summoner
+			}
+
+			AutomationGoal: {
+				// Idle: Re-evaluate
+				// GatherWood: Gather wood
+				// GatherStone: Gather stone
+				// GatherGel: Gather gel
+				// MineOre: Mine ore
+				// MineIronTierOre: Mine iron-tier ore
+				// CraftStation: Craft station
+				// CraftGear: Upgrade equipment
+				// CraftConsumable: Craft supplies
+				// BuildShelter: Build sky base
+				// DepositSurplus: Store surplus
+				// Shop: Purchase supplies
+				// LootChest: Loot chest
+				// ExploreWorld: Explore world
+				// EscapeTerrain: Excavate obstruction
+				// FishOpportunity: Bounded fishing
+				// FightBoss: Fight progression target
+				// AcquireVitalUpgrade: Locate permanent health upgrade
+				// ReturnToDeathSite: Return to failed location
+				// PrepareArena: Prepare boss arena
+				// AcquireExplosives: Acquire explosives
+				// SummonBoss: Summon progression target
+				// RiskRecovery: Risk recovery
+				// UpgradeClassLoadout: Mine and craft class loadout
+				// AcquireWeaponUpgrade: Run a weapon-upgrade route
+				// AcquireCombatSupplies: Craft or buy combat ammunition
+			}
+
 			AutomationUnsupportedWorld: Diese besondere Welt hat noch keine Automatikstrategie; der automatische Begleiter hat sicher angehalten.
 			AutomationUnsupportedMod: Der Fortschritt dieser Mod hat keinen Automatik-Anbieter; der Begleiter folgt nur dem Vanilla-Pfad.
 			AutomationBackpackUnavailable: Der Rucksack des automatischen Begleiters ist derzeit nicht verfügbar.

@@ -46,6 +46,11 @@ Mods: {
 					Tooltip: Wyświetla odczyty debugowania deweloperskiego.
 				}
 
+				ShowAutomationProgress: {
+					Label: "[i:Radar] Pokaż postęp automatycznego gracza"
+					Tooltip: Pokazuje na czacie każdy istotny krok wykonany przez automatycznego gracza.
+				}
+
 				ShowCompanionHealthBars: {
 					Label: "[i:LifeCrystal] Pokaż dodatkowy pasek zdrowia towarzysza"
 					Tooltip: Rysuje własny pasek zdrowia tego moda. Włącz tylko, gdy domyślny pasek zdrowia nie działa.
@@ -234,8 +239,8 @@ Mods: {
 				Tooltip:
 					'''
 					[Wyłącznie dla zabawy; ta funkcja jest nadal w fazie testów]
-					Lewy przycisk: przywołuje jedynego automatycznego towarzysza (istniejący nie zostanie zresetowany ani zastąpiony)
-					Prawy przycisk: otwiera jego plecak
+					Lewy przycisk: przywołuje automatycznego towarzysza; ponowny klik odwołuje go i zapisuje pozycję, ekwipunek oraz pamięć postępu
+					Prawy przycisk: przenosi kamerę do automatycznego towarzysza; ponowny klik wraca do ciebie
 					Spróbuje samodzielnie eksplorować, zbierać, budować, walczyć i rozwijać świat; po ukończeniu stanie się zwykłym widmowym towarzyszem
 					Nadal może się zaciąć, pomylić lub napotkać inne błędy. Najpierw wykonaj kopię świata. Tylko tryb jednoosobowy.
 					'''
@@ -479,8 +484,71 @@ Mods: {
 			AutomationNoFreeSlot: Obecnie nie ma wolnego miejsca dla automatycznego towarzysza.
 			AutomationNotCreated: Ten świat nie ma jeszcze automatycznego towarzysza. Kliknij lewym przyciskiem, aby go przywołać.
 			AutomationSummoned: "{0} został przywołany i zacznie samodzielnie rozwijać świat."
+			AutomationRecalled: "{0} został tymczasowo odwołany; zapisano jego przedmioty, pozycję i pamięć postępu."
+			AutomationCameraStarted: Kamera śledzi teraz {0}. Nadal sterujesz własnym graczem.
+			AutomationCameraStopped: Kamera wróciła do twojego gracza.
 			AutomationBlocked: Automatyczny towarzysz utknął na „{0}”: {1}. Będzie sam okresowo ponawiał próby.
 			AutomationCompleted: "{0} pokonał Władcę Księżyca. Bieg automatyczny zakończony; teraz jest zwykłym widmowym towarzyszem."
+			AutomationProgressStep: "[Automatyzacja · {0}] Etap: {1} · Krok: {2} · Klasa: {3}"
+			AutomationWeaponSelected: "[Laboratorium telefonu · {0}] Wybrano {1} · ocena {2} · teoretyczne DPS {3}"
+			AutomationDeathRecorded: "[Automatyzacja] {0} poległ; odrodzi się w podniebnej bazie i wróci do miejsca porażki."
+			AutomationReturnResumed: "[Automatyzacja] {0} dotarł do miejsca poprzedniej porażki i wznowił zapisany cel."
+
+			AutomationStage: {
+				// Foundation: Foundation
+				// EyeOfCthulhu: Eye of Cthulhu
+				// EvilBoss: World evil boss
+				// Skeletron: Skeletron
+				// WallOfFlesh: Wall of Flesh
+				// MechanicalBosses: Mechanical bosses
+				// Plantera: Plantera
+				// Golem: Golem
+				// LunaticCultist: Lunatic Cultist
+				// SolarPillar: Solar Pillar
+				// VortexPillar: Vortex Pillar
+				// NebulaPillar: Nebula Pillar
+				// StardustPillar: Stardust Pillar
+				// MoonLord: Moon Lord
+				// Completed: Complete
+			}
+
+			AutomationClass: {
+				// Flexible: Flexible
+				// Melee: Melee
+				// Ranged: Ranged
+				// Magic: Magic
+				// Summoner: Summoner
+			}
+
+			AutomationGoal: {
+				// Idle: Re-evaluate
+				// GatherWood: Gather wood
+				// GatherStone: Gather stone
+				// GatherGel: Gather gel
+				// MineOre: Mine ore
+				// MineIronTierOre: Mine iron-tier ore
+				// CraftStation: Craft station
+				// CraftGear: Upgrade equipment
+				// CraftConsumable: Craft supplies
+				// BuildShelter: Build sky base
+				// DepositSurplus: Store surplus
+				// Shop: Purchase supplies
+				// LootChest: Loot chest
+				// ExploreWorld: Explore world
+				// EscapeTerrain: Excavate obstruction
+				// FishOpportunity: Bounded fishing
+				// FightBoss: Fight progression target
+				// AcquireVitalUpgrade: Locate permanent health upgrade
+				// ReturnToDeathSite: Return to failed location
+				// PrepareArena: Prepare boss arena
+				// AcquireExplosives: Acquire explosives
+				// SummonBoss: Summon progression target
+				// RiskRecovery: Risk recovery
+				// UpgradeClassLoadout: Mine and craft class loadout
+				// AcquireWeaponUpgrade: Run a weapon-upgrade route
+				// AcquireCombatSupplies: Craft or buy combat ammunition
+			}
+
 			AutomationUnsupportedWorld: Ten specjalny świat nie ma jeszcze strategii automatycznej; automatyczny towarzysz bezpiecznie się zatrzymał.
 			AutomationUnsupportedMod: Postęp tego moda nie ma dostawcy automatyzacji; towarzysz podąża tylko ścieżką podstawową.
 			AutomationBackpackUnavailable: Plecak automatycznego towarzysza jest teraz niedostępny.

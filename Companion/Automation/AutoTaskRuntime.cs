@@ -96,8 +96,10 @@ public sealed class AutoTaskRuntime
 
     private const int RejectedTargetCapacity = 24;
     private const int PlanDeferralCapacity = 16;
+    private const int PlanRecoveryCapacity = 16;
     private readonly List<RejectedTarget> rejectedTargets = [];
     private readonly Dictionary<long, long> deferredPlans = [];
+    private readonly Dictionary<long, int> planRecoveryLevels = [];
 
     public int RejectedTargetCount => rejectedTargets.Count;
     public int DeferredPlanCount => deferredPlans.Count;
@@ -127,6 +129,7 @@ public sealed class AutoTaskRuntime
         LastObservedProgressSerial = 0;
         rejectedTargets.Clear();
         deferredPlans.Clear();
+        planRecoveryLevels.Clear();
     }
 
     public bool TryGetActiveTarget(AutoGoalId goal, System.Func<Point, bool> valid, out Point target)
@@ -226,6 +229,36 @@ public sealed class AutoTaskRuntime
         return false;
     }
 
+    /// <summary>Support detours must not erase how far the blocked parent route had already
+    /// escalated. Otherwise every return from chopping/mining resets it to recovery level zero and
+    /// the level-seven insurance paths are unreachable.</summary>
+    public int RecoveryFor(long planKey) => planKey != 0 &&
+        planRecoveryLevels.TryGetValue(planKey, out int level) ? level : 0;
+
+    public void RememberRecovery(long planKey, int level)
+    {
+        if (planKey == 0)
+            return;
+        if (level <= 0)
+        {
+            planRecoveryLevels.Remove(planKey);
+            return;
+        }
+        if (planRecoveryLevels.Count >= PlanRecoveryCapacity &&
+            !planRecoveryLevels.ContainsKey(planKey))
+        {
+            long evictedKey = 0;
+            using Dictionary<long, int>.Enumerator enumerator = planRecoveryLevels.GetEnumerator();
+            if (enumerator.MoveNext())
+                evictedKey = enumerator.Current.Key;
+            if (evictedKey != 0)
+                planRecoveryLevels.Remove(evictedKey);
+        }
+        planRecoveryLevels[planKey] = level;
+    }
+
+    public void ClearRecovery(long planKey) => planRecoveryLevels.Remove(planKey);
+
     private void PruneExpiredTargets(long now)
     {
         for (int i = rejectedTargets.Count - 1; i >= 0; i--)
@@ -302,9 +335,54 @@ public sealed class AutoTaskRuntime
                 return (ctx.State.ShelterCompleted ? 1_000_000L : 0L) + AutoInventory.Count(profile, ItemID.Wood);
             case AutoGoalId.DepositSurplus:
                 return EmptyBackpackSlots(profile);
+            case AutoGoalId.LootChest:
+                return ctx.State.ReviewedChestCount * 1_000_000L + EmptyBackpackSlots(profile);
+            case AutoGoalId.ExploreWorld:
+                return ctx.State.ExplorationSegments;
+            case AutoGoalId.FishOpportunity:
+                return ctx.State.FishingAttemptsThisSegment * 1_000_000L + ProgressInventoryScore(profile);
+            case AutoGoalId.FightBoss:
+                return AutoBossController.RemainingBossLife();
+            case AutoGoalId.AcquireVitalUpgrade:
+                return ctx.State.LifeCrystals * 1000L + ctx.State.LifeFruits;
+            case AutoGoalId.ReturnToDeathSite:
+                return ctx.State.HasDeathReturnTarget ? 0L : 1L;
+            case AutoGoalId.PrepareArena:
+                return (ctx.State.ArenaCompleted ? 1_000_000L : 0L) +
+                    AutoInventory.Count(profile, ItemID.WoodPlatform) +
+                    AutoExplosiveController.Count(profile) * 1000L;
+            case AutoGoalId.AcquireExplosives:
+                return AutoExplosiveController.Count(profile);
+            case AutoGoalId.SummonBoss:
+                return AutoCampaignController.HasLiveTarget() ? 1L : 0L;
+            case AutoGoalId.RiskRecovery:
+                return ctx.Me.statLife;
+            case AutoGoalId.UpgradeClassLoadout:
+                return ctx.State.AltarsBroken * 1_000_000_000_000L +
+                    AutoInventory.BestPickaxe(profile).pick * 1_000_000L +
+                    AutoWeaponEvaluator.BestScore(profile) * 1000L +
+                    profile.Armor[0].defense + profile.Armor[1].defense + profile.Armor[2].defense;
+            case AutoGoalId.AcquireWeaponUpgrade:
+                return AutoWeaponEvaluator.BestScore(profile) * 1_000_000L +
+                    ctx.State.ReviewedChestCount * 1000L +
+                    ctx.State.ExplorationSegments + (ctx.State.FirstEvilOrbBroken ? 1_000_000_000_000L : 0L);
+            case AutoGoalId.AcquireCombatSupplies:
+                return AutoCombatSupplyController.CountAllUsefulAmmo(profile);
             default:
                 return 0L;
         }
+    }
+
+    private static long ProgressInventoryScore(CompanionProfile profile)
+    {
+        long score = 0;
+        foreach (Item item in profile.Hotbar)
+            if (!item.IsAir)
+                score += item.stack;
+        foreach (Item item in profile.Backpack)
+            if (!item.IsAir)
+                score += item.stack;
+        return score;
     }
 
     private static bool StationExists(AutoContext ctx, int tileType) =>

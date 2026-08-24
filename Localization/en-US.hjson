@@ -46,6 +46,11 @@ Mods: {
 					Tooltip: Displays development debug readings.
 				}
 
+				ShowAutomationProgress: {
+					Label: "[i:Radar] Show automation progress"
+					Tooltip: When enabled, every meaningful step advanced by the automation companion is shown in chat.
+				}
+
 				ShowCompanionHealthBars: {
 					Label: "[i:LifeCrystal] Display extra companion health bar"
 					Tooltip: Draws this mod's own health bar. Enable only if the default health bar does not work.
@@ -234,8 +239,8 @@ Mods: {
 				Tooltip:
 					'''
 					[For entertainment only; this feature is still in testing]
-					Left click: summon your one automation companion (an existing one is never reset or replaced)
-					Right click: open its backpack
+					Left click: summon the automation companion; left-click again to recall it and save its position, inventory, and progression memory
+					Right click: move the camera to the automation companion; right-click again to return to yourself
 					It will try to explore, gather, build, fight, and progress the world independently; after finishing, it becomes a normal phantom companion
 					It may still get stuck, make mistakes, or encounter other bugs. Back up your world first. Single-player only.
 					'''
@@ -485,8 +490,71 @@ Mods: {
 			AutomationNoFreeSlot: No free slot is available for the automation companion right now.
 			AutomationNotCreated: This world has no automation companion yet. Left-click to summon one first.
 			AutomationSummoned: "{0} has been summoned and will start progressing the world on its own."
+			AutomationRecalled: "{0} was recalled temporarily; its items, position, and progression memory were saved."
+			AutomationCameraStarted: The camera is now following {0}. You still control your own player.
+			AutomationCameraStopped: The camera has returned to your player.
 			AutomationBlocked: The automation companion is stuck on "{0}": {1}. It will keep retrying on its own.
 			AutomationCompleted: "{0} has defeated the Moon Lord. The automation run is over; it is now a normal phantom companion."
+			AutomationProgressStep: "[Automation · {0}] Stage: {1} · Step: {2} · Class: {3}"
+			AutomationWeaponSelected: "[Phone combat lab · {0}] Selected {1} · combat score {2} · theoretical DPS {3}"
+			AutomationDeathRecorded: "[Automation] {0} was defeated. It will revive at the sky base and return to the failed location."
+			AutomationReturnResumed: "[Automation] {0} reached the previous failure location and resumed the saved objective."
+
+			AutomationStage: {
+				Foundation: Foundation
+				EyeOfCthulhu: Eye of Cthulhu
+				EvilBoss: World evil boss
+				Skeletron: Skeletron
+				WallOfFlesh: Wall of Flesh
+				MechanicalBosses: Mechanical bosses
+				Plantera: Plantera
+				Golem: Golem
+				LunaticCultist: Lunatic Cultist
+				SolarPillar: Solar Pillar
+				VortexPillar: Vortex Pillar
+				NebulaPillar: Nebula Pillar
+				StardustPillar: Stardust Pillar
+				MoonLord: Moon Lord
+				Completed: Complete
+			}
+
+			AutomationClass: {
+				Flexible: Flexible
+				Melee: Melee
+				Ranged: Ranged
+				Magic: Magic
+				Summoner: Summoner
+			}
+
+			AutomationGoal: {
+				Idle: Re-evaluate
+				GatherWood: Gather wood
+				GatherStone: Gather stone
+				GatherGel: Gather gel
+				MineOre: Mine ore
+				MineIronTierOre: Mine iron-tier ore
+				CraftStation: Craft station
+				CraftGear: Upgrade equipment
+				CraftConsumable: Craft supplies
+				BuildShelter: Build sky base
+				DepositSurplus: Store surplus
+				Shop: Purchase supplies
+				LootChest: Loot chest
+				ExploreWorld: Explore world
+				EscapeTerrain: Excavate obstruction
+				FishOpportunity: Bounded fishing
+				FightBoss: Fight progression target
+				AcquireVitalUpgrade: Locate permanent health upgrade
+				ReturnToDeathSite: Return to failed location
+				PrepareArena: Prepare boss arena
+				AcquireExplosives: Acquire explosives
+				SummonBoss: Summon progression target
+				RiskRecovery: Risk recovery
+				UpgradeClassLoadout: Mine and craft class loadout
+				AcquireWeaponUpgrade: Run a weapon-upgrade route
+				AcquireCombatSupplies: Craft or buy combat ammunition
+			}
+
 			AutomationUnsupportedWorld: This special world has no automation strategy yet; the automation companion stopped safely.
 			AutomationUnsupportedMod: This mod's progression has no automation provider; the automation companion follows only the vanilla path.
 			AutomationBackpackUnavailable: The automation companion's backpack is unavailable right now.

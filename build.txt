@@ -1,6 +1,6 @@
 displayName = MoreAIPlayer [幻影伙伴]
 author = 剃刀刃台风
-version = 1.8.7
+version = 1.8.8
 hideCode = false
 hideResources = false
 includeSource = true

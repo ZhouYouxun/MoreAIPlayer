@@ -33,6 +33,8 @@ internal static class CompanionFaultGuard
     internal const string VirtualProjectileLane = "virtual projectile update";
     internal const string AutomationLane = "automation companion";
     internal const string AutomationCraftingLane = "automation crafting";
+    internal const string AutomationBagOpeningLane = "automation bag opening";
+    internal const string AutomationWeaponEvaluationLane = "automation weapon evaluation";
 
     // Throttle windows, in 60 Hz update ticks. A persistent fault therefore surfaces at most one
     // on-screen line every few seconds and one log line every couple of seconds per lane, rather

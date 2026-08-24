@@ -88,6 +88,11 @@ public readonly struct AutoPlan
         AutoPlanKind kind = AutoPlanKind.HardGate, int failureBudget = 3) =>
         new(goal, 0, 0, 0, AutoTaskResult.Running, kind, failureBudget);
 
+    public static AutoPlan WeaponRoute(AutoWeaponRouteKind route,
+        AutoPlanKind kind = AutoPlanKind.Capability, int failureBudget = 5) =>
+        new(AutoGoalId.AcquireWeaponUpgrade, 0, 0, (int)route,
+            AutoTaskResult.Running, kind, failureBudget);
+
     public static AutoPlan Idle(AutoTaskResult reason) =>
         new(AutoGoalId.Idle, 0, 0, 0, reason, AutoPlanKind.Support, 1);
 }

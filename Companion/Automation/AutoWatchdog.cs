@@ -77,7 +77,7 @@ public sealed class AutoWatchdog
             runtime.GoalStartedTick = now;
             runtime.StepStartedTick = now;
             runtime.AttemptCount = 0;
-            runtime.RecoveryLevel = 0;
+            runtime.RecoveryLevel = runtime.RecoveryFor(plan.StableKey);
             runtime.TicksWithoutProgress = 0;
             runtime.TicksWithoutMetricChange = 0;
             runtime.LastProgressSignature = AutoTaskRuntime.ComputeSignature(ctx, plan);
@@ -136,7 +136,10 @@ public sealed class AutoWatchdog
             runtime.WindowStartPosition = ctx.Me.Center;
             // Real accomplishment relaxes the recovery ladder one rung.
             if (runtime.RecoveryLevel > 0)
+            {
                 runtime.RecoveryLevel--;
+                runtime.RememberRecovery(plan.StableKey, runtime.RecoveryLevel);
+            }
         }
         else
         {
@@ -160,6 +163,7 @@ public sealed class AutoWatchdog
                 runtime.ClearActiveTarget();
                 runtime.AttemptCount = 0;
                 runtime.RecoveryLevel = 0;
+                runtime.ClearRecovery(plan.StableKey);
                 runtime.LastFailureReason = AutoBlockReason.None;
                 return AutoWatchdogAction.Continue;
 
@@ -217,6 +221,7 @@ public sealed class AutoWatchdog
     private AutoWatchdogAction Escalate(AutoContext ctx, AutoPlan plan, long now, AutoBlockReason reason)
     {
         runtime.RecoveryLevel = System.Math.Min(MaxRecoveryLevel, runtime.RecoveryLevel + 1);
+        runtime.RememberRecovery(plan.StableKey, runtime.RecoveryLevel);
         runtime.AttemptCount++;
         runtime.TicksWithoutProgress = 0;
         runtime.WindowStartPosition = ctx.Me.Center;
@@ -272,6 +277,10 @@ public sealed class AutoWatchdog
         {
             AutoGoalId.GatherWood => 16,
             AutoGoalId.GatherStone or AutoGoalId.MineOre or AutoGoalId.MineIronTierOre => 3,
+            AutoGoalId.AcquireVitalUpgrade => 4,
+            AutoGoalId.LootChest => 2,
+            AutoGoalId.AcquireWeaponUpgrade => 5,
+            AutoGoalId.AcquireCombatSupplies => 3,
             _ => 2
         };
         runtime.RejectActiveTarget(radius);
@@ -318,6 +327,16 @@ public sealed class AutoWatchdog
         AutoGoalId.CraftStation or AutoGoalId.CraftGear or AutoGoalId.CraftConsumable => 360,
         AutoGoalId.BuildShelter => 480,                               // ~8s
         AutoGoalId.DepositSurplus => 360,
+        AutoGoalId.LootChest => 480,
+        AutoGoalId.AcquireWeaponUpgrade => 1800,
+        AutoGoalId.AcquireCombatSupplies => 900,
+        AutoGoalId.ExploreWorld => 720,
+        AutoGoalId.FishOpportunity => 1800,
+        AutoGoalId.FightBoss => 900,
+        AutoGoalId.AcquireVitalUpgrade or AutoGoalId.ReturnToDeathSite => 1800,
+        AutoGoalId.PrepareArena => 900,
+        AutoGoalId.AcquireExplosives or AutoGoalId.SummonBoss or AutoGoalId.RiskRecovery => 600,
+        AutoGoalId.UpgradeClassLoadout => 1200,
         _ => 300                                                      // ~5s default (short-range nav/pickup)
     };
 
@@ -326,6 +345,16 @@ public sealed class AutoWatchdog
         AutoGoalId.BuildShelter => 1800,                             // ~30s
         AutoGoalId.GatherWood or AutoGoalId.GatherStone or AutoGoalId.GatherGel or
         AutoGoalId.MineOre or AutoGoalId.MineIronTierOre => 1440,    // ~24s of no metric change at all
+        AutoGoalId.LootChest => 1800,
+        AutoGoalId.AcquireWeaponUpgrade => 7200,
+        AutoGoalId.AcquireCombatSupplies => 3600,
+        AutoGoalId.ExploreWorld => 3600,
+        AutoGoalId.FishOpportunity => 7200,
+        AutoGoalId.FightBoss => 3600,
+        AutoGoalId.AcquireVitalUpgrade or AutoGoalId.ReturnToDeathSite => 18000,
+        AutoGoalId.PrepareArena => 14400,
+        AutoGoalId.AcquireExplosives or AutoGoalId.SummonBoss or AutoGoalId.RiskRecovery => 3600,
+        AutoGoalId.UpgradeClassLoadout => 18000,
         _ => 1200                                                    // ~20s
     };
 }

@@ -5,23 +5,24 @@ using Terraria.ModLoader;
 
 namespace MoreAIPlayer.Companion.Automation;
 
-/// <summary>
-/// Resumable starter-room builder. Every tile and wall is placed with a real inventory item through
-/// <see cref="AutoActuator"/>; after reload it reconstructs progress from the live world and only
-/// marks completion when the complete template is still present.
-/// </summary>
+/// <summary>Real-time aerial town builder. Four individually revalidated rooms sit about twenty
+/// tiles above natural ground on climbable wooden-platform columns. Every material is crafted,
+/// placed and consumed through the companion's own inventory.</summary>
 public static class AutoShelterController
 {
-    public const int WoodReserve = 110;
-    private const int Width = 12;
-    private const int Height = 7;
-    private const int SiteSearchRadius = 36;
+    public const int WoodReserve = 760;
+    private const int RoomWidth = 12;
+    private const int RoomHeight = 7;
+    private const int RoomCount = 4;
+    private const int TotalWidth = (RoomWidth - 1) * RoomCount + 1;
+    private const int Elevation = 20;
+    private const int SiteRadius = 100;
 
     public static AutoTaskResult Build(AutoContext ctx)
     {
-        if (ctx.State.HomeAnchor is not Point anchor || !AnchorStillUsable(anchor))
+        if (ctx.State.HomeAnchor is not Point anchor || !AnchorUsable(anchor))
         {
-            ctx.State.HomeAnchor = FindSite(ctx.Me);
+            ctx.State.HomeAnchor = FindSite();
             ctx.State.ShelterCompleted = false;
             if (ctx.State.HomeAnchor is not Point selected)
                 return AutoTaskResult.AlternativeRequired;
@@ -31,116 +32,225 @@ public static class AutoShelterController
         if (IsShelterComplete(anchor))
         {
             ctx.State.ShelterCompleted = true;
+            CaptureFurnitureAnchors(ctx, anchor);
             return AutoTaskResult.Succeeded;
         }
-
         ctx.State.ShelterCompleted = false;
 
         AutoTaskResult supplies = EnsureSupplies(ctx, anchor);
         if (supplies != AutoTaskResult.Succeeded)
             return supplies;
 
-        if (TryPlaceMissingShell(ctx, anchor) || TryPlaceMissingWalls(ctx, anchor) ||
+        if (TryClearTemplate(ctx, anchor) || TryPlaceSupportColumns(ctx, anchor) ||
+            TryPlaceShell(ctx, anchor) || TryPlaceWalls(ctx, anchor) ||
             TryPlaceFurniture(ctx, anchor))
             return AutoTaskResult.Running;
-
         return AutoTaskResult.RetryLater;
     }
 
-    private static AutoTaskResult EnsureSupplies(AutoContext ctx, Point anchor)
+    public static bool IsShelterComplete(Point a)
     {
-        if (HasMissingInteriorWall(anchor) && !AutoInventory.Has(ctx.Profile, ItemID.WoodWall))
-            return CraftNearBench(ctx, ItemID.WoodWall);
-        if (!HasTileInRoom(anchor, TileID.WorkBenches) && !AutoInventory.Has(ctx.Profile, ItemID.WorkBench))
-            return CraftNearBench(ctx, ItemID.WorkBench);
-        if (!HasDoor(anchor) && !AutoInventory.Has(ctx.Profile, ItemID.WoodenDoor))
-            return CraftNearBench(ctx, ItemID.WoodenDoor);
-        if (!HasTileInRoom(anchor, TileID.Chairs) && !AutoInventory.Has(ctx.Profile, ItemID.WoodenChair))
-            return CraftNearBench(ctx, ItemID.WoodenChair);
-        if (!HasTileInRoom(anchor, TileID.Torches) && !AutoInventory.Has(ctx.Profile, ItemID.Torch))
+        if (!AnchorUsable(a))
+            return false;
+        if (MissingSupport(a) || !RoomHas(a, 0, TileID.Containers))
+            return false;
+        int floorY = a.Y + RoomHeight - 1;
+        for (int x = a.X; x < a.X + TotalWidth; x++)
         {
-            if (ctx.Capabilities.Gel <= 0)
-                return AutoResourceController.LootPots(ctx);
-            return CraftResult(AutoCraftingService.TryCraft(ctx.Instance, ctx.Profile, ItemID.Torch));
+            if (!IsTile(x, a.Y, TileID.WoodBlock) || !IsTile(x, floorY, TileID.WoodBlock))
+                return false;
         }
-        if (!HasTileInRoom(anchor, TileID.Containers) && !AutoInventory.Has(ctx.Profile, ItemID.Chest))
+
+        for (int room = 0; room < RoomCount; room++)
         {
-            if (ctx.Capabilities.IronLeadBars < 2)
+            int left = a.X + room * (RoomWidth - 1);
+            int right = left + RoomWidth - 1;
+            for (int y = a.Y + 1; y < floorY; y++)
             {
-                if (ctx.Capabilities.IronLeadOre > 0)
-                    return AutoStationController.SmeltOre(ctx, ctx.State.Furnace,
-                        AutoProgressionPlanner.SmeltableBarItems);
-                return AutoResourceController.MineIronTierOre(ctx, 9);
+                if (!IsTile(left, y, TileID.WoodBlock) && room == 0)
+                    return false;
+                if (y < floorY - 3 && !IsTile(right, y, TileID.WoodBlock))
+                    return false;
             }
-            return CraftNearBench(ctx, ItemID.Chest);
+            for (int x = left + 1; x < right; x++)
+            for (int y = a.Y + 1; y < floorY; y++)
+                if (Main.tile[x, y].WallType != WallID.Wood)
+                    return false;
+            if (!RoomHas(a, room, TileID.WorkBenches) || !RoomHas(a, room, TileID.Chairs) ||
+                !RoomHas(a, room, TileID.Torches) || !HasDoorAt(right, floorY))
+                return false;
+            if (!VanillaRoomIsValid(left, right, a.Y, floorY))
+                return false;
+        }
+        return true;
+    }
+
+    /// <summary>Final authority is Terraria's own enclosure, furniture and home-spot scoring.
+    /// Passing the visual template alone is not enough if a tiny wall leak or evil-biome score
+    /// would still prevent a town NPC from using the room.</summary>
+    private static bool VanillaRoomIsValid(int left, int right, int top, int bottom)
+    {
+        int interiorX = (left + right) / 2;
+        int interiorY = (top + bottom) / 2;
+        if (!WorldGen.StartRoomCheck(interiorX, interiorY) || !WorldGen.RoomNeeds(NPCID.Guide))
+            return false;
+
+        int occupant = -1;
+        foreach (NPC npc in Main.ActiveNPCs)
+        {
+            if (!npc.active || !npc.townNPC || npc.homeless ||
+                npc.homeTileX < left || npc.homeTileX > right ||
+                npc.homeTileY < top || npc.homeTileY > bottom)
+                continue;
+            occupant = npc.whoAmI;
+            break;
+        }
+        WorldGen.ScoreRoom(occupant, NPCID.Guide);
+        return WorldGen.canSpawn && WorldGen.hiScore > 0;
+    }
+
+    private static AutoTaskResult EnsureSupplies(AutoContext ctx, Point a)
+    {
+        if (MissingSupport(a) && !AutoInventory.Has(ctx.Profile, ItemID.WoodPlatform))
+            return Craft(ctx, ItemID.WoodPlatform);
+        if (MissingWall(a) && !AutoInventory.Has(ctx.Profile, ItemID.WoodWall))
+            return Craft(ctx, ItemID.WoodWall);
+        if (HasForeignWall(a) && AutoInventory.BestHammer(ctx.Profile).hammer <= 0 &&
+            !AutoInventory.Has(ctx.Profile, ItemID.WoodenHammer))
+            return Craft(ctx, ItemID.WoodenHammer);
+        if (MissingFurniture(a, TileID.WorkBenches) && !AutoInventory.Has(ctx.Profile, ItemID.WorkBench))
+            return Craft(ctx, ItemID.WorkBench);
+        if (MissingFurniture(a, TileID.Chairs) && !AutoInventory.Has(ctx.Profile, ItemID.WoodenChair))
+            return Craft(ctx, ItemID.WoodenChair);
+        if (MissingDoor(a) && !AutoInventory.Has(ctx.Profile, ItemID.WoodenDoor))
+            return Craft(ctx, ItemID.WoodenDoor);
+        if (MissingFurniture(a, TileID.Torches) && !AutoInventory.Has(ctx.Profile, ItemID.Torch))
+        {
+            if (!AutoInventory.Has(ctx.Profile, ItemID.Gel))
+                return AutoResourceController.LootPots(ctx);
+            return Craft(ctx, ItemID.Torch);
+        }
+        if (!RoomHas(a, 0, TileID.Containers) && !AutoInventory.Has(ctx.Profile, ItemID.Chest))
+        {
+            if (AutoInventory.Count(ctx.Profile, ItemID.IronBar) + AutoInventory.Count(ctx.Profile, ItemID.LeadBar) < 2)
+                return AutoResourceController.MineIronTierOre(ctx, 9);
+            return Craft(ctx, ItemID.Chest);
         }
         return AutoTaskResult.Succeeded;
     }
 
-    private static AutoTaskResult CraftNearBench(AutoContext ctx, int itemType)
+    private static AutoTaskResult Craft(AutoContext ctx, int itemType)
     {
-        if (ctx.State.WorkBench is Point bench && !Near(ctx.Me, bench))
-        {
-            ctx.Navigator.Navigate(ctx.Me, TileCenter(bench));
-            return AutoTaskResult.Running;
-        }
-        return CraftResult(AutoCraftingService.TryCraft(ctx.Instance, ctx.Profile, itemType));
+        if (ctx.State.WorkBench is Point bench && Vector2.DistanceSquared(ctx.Me.Center,
+            Center(bench)) > 5f * 16f * 5f * 16f)
+            return AutoWorldTravelController.TravelTo(ctx, Center(bench), 4f);
+        bool made = AutoCraftingService.TryCraft(ctx.Instance, ctx.Profile, itemType);
+        return made ? AutoTaskResult.Running :
+            AutoCraftingService.IsAvailable ? AutoTaskResult.RetryLater : AutoTaskResult.Faulted;
     }
 
-    private static AutoTaskResult CraftResult(bool crafted) => crafted
-        ? AutoTaskResult.Running
-        : AutoCraftingService.IsAvailable ? AutoTaskResult.RetryLater : AutoTaskResult.Faulted;
-
-    private static bool TryPlaceMissingShell(AutoContext ctx, Point a)
+    private static bool TryClearTemplate(AutoContext ctx, Point a)
     {
-        // Floor first. Start at any naturally supported cell, then extend from the wood already
-        // placed; this works on ordinary uneven terrain and never relies on floating placement.
-        for (int x = 0; x < Width; x++)
+        int floor = a.Y + RoomHeight - 1;
+        for (int x = a.X; x < a.X + TotalWidth; x++)
+        for (int y = a.Y; y <= floor; y++)
         {
-            Point floor = new(a.X + x, a.Y + Height - 1);
-            if (!IsTile(floor, TileID.WoodBlock) && HasSolidNeighbor(floor) && PlaceWoodIfMissing(ctx, floor))
-                return true;
-        }
-
-        // Left post grows upward from the completed floor.
-        for (int y = Height - 2; y >= 0; y--)
-        {
-            Point left = new(a.X, a.Y + y);
-            if (!IsTile(left, TileID.WoodBlock) && HasSolidNeighbor(left) && PlaceWoodIfMissing(ctx, left))
-                return true;
-        }
-
-        // Roof extends horizontally from the left post.
-        for (int x = 1; x < Width; x++)
-        {
-            Point roof = new(a.X + x, a.Y);
-            if (!IsTile(roof, TileID.WoodBlock) && HasSolidNeighbor(roof) && PlaceWoodIfMissing(ctx, roof))
-                return true;
-        }
-
-        // Only the upper two right-post cells are solid; the lower three remain the doorway.
-        for (int y = 1; y < Height - 4; y++)
-        {
-            Point right = new(a.X + Width - 1, a.Y + y);
-            if (!IsTile(right, TileID.WoodBlock) && HasSolidNeighbor(right) && PlaceWoodIfMissing(ctx, right))
-                return true;
+            bool shell = y == a.Y || y == floor || (x - a.X) % (RoomWidth - 1) == 0;
+            Tile tile = Main.tile[x, y];
+            if (!tile.HasTile || AllowedTemplateTile(a, x, y, floor, shell, tile))
+                continue;
+            if (!WorldGen.CanKillTile(x, y))
+                continue;
+            int tool = AutoWorldKnowledge.IsChoppableTree(new Point(x, y))
+                ? AutoInventory.BestToolIndex(ctx.Me, item => item.axe)
+                : AutoInventory.BestToolIndex(ctx.Me, item => item.pick);
+            if (tool < 0)
+                return false;
+            ctx.Actuator.MoveAndWorkTile(ctx.Instance, ctx.Me, ctx.Navigator, tool, new Point(x, y));
+            return true;
         }
         return false;
     }
 
-    private static bool TryPlaceMissingWalls(AutoContext ctx, Point a)
+    private static bool AllowedTemplateTile(Point a, int x, int y, int floor, bool shell, Tile tile)
     {
-        int wallSlot = AutoInventory.FindInventoryIndex(ctx.Me, item => item.type == ItemID.WoodWall);
-        if (wallSlot < 0)
-            return false;
-        for (int x = 1; x < Width - 1; x++)
+        int type = tile.TileType;
+        if (shell)
         {
-            for (int y = 1; y < Height - 1; y++)
+            bool doorOpening = x > a.X && (x - a.X) % (RoomWidth - 1) == 0 &&
+                y >= floor - 3 && y < floor;
+            return doorOpening
+                ? type == TileID.ClosedDoor || TileLoader.CloseDoorID(tile) >= 0
+                : type == TileID.WoodBlock;
+        }
+        return type is TileID.WorkBenches or TileID.Chairs or TileID.Torches or
+            TileID.Containers or TileID.Containers2;
+    }
+
+    private static bool TryPlaceSupportColumns(AutoContext ctx, Point a)
+    {
+        int floor = a.Y + RoomHeight - 1;
+        for (int room = 0; room <= RoomCount; room++)
+        {
+            int x = a.X + room * (RoomWidth - 1);
+            int ground = FindGround(x);
+            for (int y = ground - 1; y > floor; y--)
             {
-                Point tile = new(a.X + x, a.Y + y);
-                if (Main.tile[tile.X, tile.Y].WallType == WallID.Wood)
+                if (IsTile(x, y, TileID.Platforms))
                     continue;
-                ctx.Actuator.MoveAndPlace(ctx.Instance, ctx.Me, ctx.Navigator, wallSlot, tile);
+                if (Main.tile[x, y].HasTile)
+                    continue;
+                return Place(ctx, ItemID.WoodPlatform, new Point(x, y));
+            }
+        }
+        return false;
+    }
+
+    private static bool TryPlaceShell(AutoContext ctx, Point a)
+    {
+        int floor = a.Y + RoomHeight - 1;
+        for (int x = a.X; x < a.X + TotalWidth; x++)
+        {
+            if (!IsTile(x, floor, TileID.WoodBlock) && !Main.tile[x, floor].HasTile)
+                return Place(ctx, ItemID.Wood, new Point(x, floor));
+            if (!IsTile(x, a.Y, TileID.WoodBlock) && !Main.tile[x, a.Y].HasTile)
+                return Place(ctx, ItemID.Wood, new Point(x, a.Y));
+        }
+        for (int room = 0; room <= RoomCount; room++)
+        {
+            int x = a.X + room * (RoomWidth - 1);
+            int startY = room == 0 ? floor - 1 : floor - 4;
+            for (int y = startY; y > a.Y; y--)
+                if (!IsTile(x, y, TileID.WoodBlock) && !Main.tile[x, y].HasTile)
+                    return Place(ctx, ItemID.Wood, new Point(x, y));
+        }
+        return false;
+    }
+
+    private static bool TryPlaceWalls(AutoContext ctx, Point a)
+    {
+        int slot = AutoInventory.FindInventoryIndex(ctx.Me, item => item.type == ItemID.WoodWall);
+        if (slot < 0)
+            return false;
+        int floor = a.Y + RoomHeight - 1;
+        for (int room = 0; room < RoomCount; room++)
+        {
+            int left = a.X + room * (RoomWidth - 1);
+            for (int x = left + 1; x < left + RoomWidth - 1; x++)
+            for (int y = a.Y + 1; y < floor; y++)
+            {
+                if (Main.tile[x, y].WallType == WallID.Wood)
+                    continue;
+                if (Main.tile[x, y].WallType != WallID.None)
+                {
+                    int hammer = AutoInventory.BestToolIndex(ctx.Me, item => item.hammer);
+                    if (hammer < 0)
+                        return false;
+                    ctx.Actuator.MoveAndWorkWall(ctx.Instance, ctx.Me, ctx.Navigator, hammer,
+                        new Point(x, y));
+                    return true;
+                }
+                ctx.Actuator.MoveAndPlace(ctx.Instance, ctx.Me, ctx.Navigator, slot, new Point(x, y));
                 return true;
             }
         }
@@ -149,29 +259,31 @@ public static class AutoShelterController
 
     private static bool TryPlaceFurniture(AutoContext ctx, Point a)
     {
-        if (!HasTileInRoom(a, TileID.WorkBenches) && PlaceItem(ctx, ItemID.WorkBench, new(a.X + 2, a.Y + Height - 2)))
-            return true;
-        if (!HasTileInRoom(a, TileID.Containers) && PlaceItem(ctx, ItemID.Chest, new(a.X + 5, a.Y + Height - 2)))
-            return true;
-        if (!HasTileInRoom(a, TileID.Chairs) && PlaceItem(ctx, ItemID.WoodenChair, new(a.X + 8, a.Y + Height - 2)))
-            return true;
-        if (!HasTileInRoom(a, TileID.Torches) && PlaceItem(ctx, ItemID.Torch, new(a.X + 1, a.Y + 3)))
-            return true;
-        if (!HasDoor(a) && PlaceItem(ctx, ItemID.WoodenDoor, new(a.X + Width - 1, a.Y + Height - 2)))
+        int floor = a.Y + RoomHeight - 1;
+        for (int room = 0; room < RoomCount; room++)
+        {
+            int left = a.X + room * (RoomWidth - 1);
+            int right = left + RoomWidth - 1;
+            if (!RoomHas(a, room, TileID.WorkBenches) &&
+                Place(ctx, ItemID.WorkBench, new Point(left + 2, floor - 1)))
+                return true;
+            if (!RoomHas(a, room, TileID.Chairs) &&
+                Place(ctx, ItemID.WoodenChair, new Point(left + 7, floor - 1)))
+                return true;
+            if (!RoomHas(a, room, TileID.Torches) &&
+                Place(ctx, ItemID.Torch, new Point(left + 1, a.Y + 2)))
+                return true;
+            if (!HasDoorAt(right, floor) &&
+                Place(ctx, ItemID.WoodenDoor, new Point(right, floor - 1)))
+                return true;
+        }
+        if (!RoomHas(a, 0, TileID.Containers) &&
+            Place(ctx, ItemID.Chest, new Point(a.X + 5, floor - 1)))
             return true;
         return false;
     }
 
-    private static bool PlaceWoodIfMissing(AutoContext ctx, Point tile)
-    {
-        if (IsTile(tile, TileID.WoodBlock))
-            return false;
-        if (Main.tile[tile.X, tile.Y].HasTile)
-            return false;
-        return PlaceItem(ctx, ItemID.Wood, tile);
-    }
-
-    private static bool PlaceItem(AutoContext ctx, int itemType, Point tile)
+    private static bool Place(AutoContext ctx, int itemType, Point tile)
     {
         int slot = AutoInventory.FindInventoryIndex(ctx.Me, item => item.type == itemType);
         if (slot < 0)
@@ -180,106 +292,136 @@ public static class AutoShelterController
         return true;
     }
 
-    private static Point? FindSite(Player me)
+    private static Point? FindSite()
     {
-        Point feet = me.Bottom.ToTileCoordinates();
-        for (int distance = 5; distance <= SiteSearchRadius; distance++)
+        for (int distance = 0; distance <= SiteRadius; distance += 4)
+        foreach (int sign in distance == 0 ? new[] { 1 } : new[] { 1, -1 })
         {
-            foreach (int sign in new[] { 1, -1 })
-            {
-                int startX = feet.X + distance * sign;
-                for (int floorY = feet.Y - 4; floorY <= feet.Y + 5; floorY++)
-                {
-                    Point anchor = new(startX, floorY - Height + 1);
-                    if (EmptyRoomWithGround(anchor))
-                        return anchor;
-                }
-            }
+            int center = System.Math.Clamp(Main.spawnTileX + distance * sign, 80, Main.maxTilesX - 80);
+            int ground = FindGround(center);
+            Point anchor = new(center - TotalWidth / 2, ground - Elevation - RoomHeight + 1);
+            if (AnchorUsable(anchor) && InitialSiteSafe(anchor))
+                return anchor;
         }
         return null;
     }
 
-    private static bool EmptyRoomWithGround(Point a)
+    private static int FindGround(int x)
     {
-        for (int x = 0; x < Width; x++)
+        int start = System.Math.Max(70, (int)Main.worldSurface - 180);
+        int end = System.Math.Min(Main.maxTilesY - 250, (int)Main.worldSurface + 220);
+        for (int y = start; y <= end; y++)
         {
-            int worldX = a.X + x;
-            int floorY = a.Y + Height - 1;
-            if (!WorldGen.InWorld(worldX, floorY, 10))
+            Tile tile = Main.tile[x, y];
+            if (tile.HasTile && Main.tileSolid[tile.TileType] && !Main.tileSolidTop[tile.TileType])
+                return y;
+        }
+        return Main.spawnTileY;
+    }
+
+    private static bool AnchorUsable(Point a) => WorldGen.InWorld(a.X, a.Y, 70) &&
+        WorldGen.InWorld(a.X + TotalWidth - 1, a.Y + RoomHeight - 1, 70);
+
+    private static bool MissingSupport(Point a)
+    {
+        int floor = a.Y + RoomHeight - 1;
+        for (int room = 0; room <= RoomCount; room++)
+        {
+            int x = a.X + room * (RoomWidth - 1);
+            int ground = FindGround(x);
+            for (int y = ground - 1; y > floor; y--)
+                if (!IsTile(x, y, TileID.Platforms))
+                    return true;
+        }
+        return false;
+    }
+
+    private static bool HasForeignWall(Point a)
+    {
+        int floor = a.Y + RoomHeight - 1;
+        for (int x = a.X + 1; x < a.X + TotalWidth - 1; x++)
+        for (int y = a.Y + 1; y < floor; y++)
+            if (Main.tile[x, y].WallType is not WallID.None and not WallID.Wood)
+                return true;
+        return false;
+    }
+
+    /// <summary>A new tower never overwrites an existing player structure. Natural foreground
+    /// terrain can be excavated, but placed walls, containers and frame-important objects select
+    /// a different site; every support also needs actual space below the raised floor.</summary>
+    private static bool InitialSiteSafe(Point a)
+    {
+        int floor = a.Y + RoomHeight - 1;
+        for (int room = 0; room <= RoomCount; room++)
+        {
+            int x = a.X + room * (RoomWidth - 1);
+            int ground = FindGround(x);
+            if (ground <= floor + 2)
                 return false;
-            for (int y = 0; y < Height; y++)
-            {
-                Tile tile = Main.tile[worldX, a.Y + y];
-                if (tile.HasTile && Main.tileSolid[tile.TileType])
+            for (int y = floor + 1; y < ground; y++)
+                if (Main.tile[x, y].WallType != WallID.None ||
+                    Main.tile[x, y].HasTile && Main.tileFrameImportant[Main.tile[x, y].TileType])
                     return false;
-            }
         }
-        // One real ground contact is enough: the floor is extended from it one adjacent block at a
-        // time. Requiring twelve perfectly level natural tiles made normal rolling terrain fail.
-        for (int x = 0; x < Width; x++)
+        for (int x = a.X; x < a.X + TotalWidth; x++)
+        for (int y = a.Y; y <= floor; y++)
         {
-            Tile support = Main.tile[a.X + x, a.Y + Height];
-            if (support.HasTile && Main.tileSolid[support.TileType] && !Main.tileSolidTop[support.TileType])
-                return true;
+            Tile tile = Main.tile[x, y];
+            if (tile.WallType != WallID.None || tile.HasTile &&
+                (Main.tileFrameImportant[tile.TileType] || tile.TileType is TileID.Containers or TileID.Containers2))
+                return false;
+        }
+        return true;
+    }
+
+    private static bool MissingWall(Point a)
+    {
+        int floor = a.Y + RoomHeight - 1;
+        for (int room = 0; room < RoomCount; room++)
+        {
+            int left = a.X + room * (RoomWidth - 1);
+            for (int x = left + 1; x < left + RoomWidth - 1; x++)
+            for (int y = a.Y + 1; y < floor; y++)
+                if (Main.tile[x, y].WallType != WallID.Wood)
+                    return true;
         }
         return false;
     }
 
-    private static bool AnchorStillUsable(Point a) => WorldGen.InWorld(a.X, a.Y, 10) &&
-        WorldGen.InWorld(a.X + Width - 1, a.Y + Height - 1, 10);
-
-    public static bool IsShelterComplete(Point a)
+    private static bool MissingFurniture(Point a, int tileType)
     {
-        for (int x = 0; x < Width; x++)
-        {
-            if (!IsTile(new(a.X + x, a.Y), TileID.WoodBlock) ||
-                !IsTile(new(a.X + x, a.Y + Height - 1), TileID.WoodBlock))
-                return false;
-        }
-        for (int y = 1; y < Height - 1; y++)
-        {
-            if (!IsTile(new(a.X, a.Y + y), TileID.WoodBlock))
-                return false;
-            if (y < Height - 4 && !IsTile(new(a.X + Width - 1, a.Y + y), TileID.WoodBlock))
-                return false;
-        }
-        for (int x = 1; x < Width - 1; x++)
-        for (int y = 1; y < Height - 1; y++)
-        {
-            if (Main.tile[a.X + x, a.Y + y].WallType != WallID.Wood)
-                return false;
-        }
-        return HasTileInRoom(a, TileID.WorkBenches) && HasTileInRoom(a, TileID.Containers) &&
-            HasTileInRoom(a, TileID.Chairs) && HasTileInRoom(a, TileID.Torches) && HasDoor(a);
-    }
-
-    private static bool HasTileInRoom(Point a, int tileType)
-    {
-        for (int x = a.X; x < a.X + Width; x++)
-        for (int y = a.Y; y < a.Y + Height; y++)
-        {
-            if (IsTile(new(x, y), tileType))
+        for (int room = 0; room < RoomCount; room++)
+            if (!RoomHas(a, room, tileType))
                 return true;
-        }
         return false;
     }
 
-    private static bool HasMissingInteriorWall(Point a)
+    private static bool MissingDoor(Point a)
     {
-        for (int x = 1; x < Width - 1; x++)
-        for (int y = 1; y < Height - 1; y++)
-        {
-            if (Main.tile[a.X + x, a.Y + y].WallType != WallID.Wood)
+        int floor = a.Y + RoomHeight - 1;
+        for (int room = 0; room < RoomCount; room++)
+            if (!HasDoorAt(a.X + (room + 1) * (RoomWidth - 1), floor))
                 return true;
-        }
         return false;
     }
 
-    private static bool HasDoor(Point a)
+    private static bool RoomHas(Point a, int room, int tileType)
     {
-        int x = a.X + Width - 1;
-        for (int y = a.Y + 1; y < a.Y + Height - 1; y++)
+        int left = a.X + room * (RoomWidth - 1);
+        for (int x = left; x <= left + RoomWidth - 1; x++)
+        for (int y = a.Y; y <= a.Y + RoomHeight - 1; y++)
+            if (IsTile(x, y, tileType) || tileType == TileID.Containers &&
+                IsTile(x, y, TileID.Containers2))
+                return true;
+        return false;
+    }
+
+    private static bool HasDoorAt(int x, int floorY)
+    {
+        for (int y = floorY - 3; y < floorY; y++)
         {
+            if (!WorldGen.InWorld(x, y, 5))
+                continue;
             Tile tile = Main.tile[x, y];
             if (tile.HasTile && (tile.TileType == TileID.ClosedDoor || TileLoader.CloseDoorID(tile) >= 0))
                 return true;
@@ -287,25 +429,34 @@ public static class AutoShelterController
         return false;
     }
 
-    private static bool IsTile(Point p, int type) => WorldGen.InWorld(p.X, p.Y, 2) &&
-        Main.tile[p.X, p.Y].HasTile && Main.tile[p.X, p.Y].TileType == type;
-
-    private static bool HasSolidNeighbor(Point p)
+    private static void CaptureFurnitureAnchors(AutoContext ctx, Point a)
     {
-        Point[] neighbors = [new(p.X - 1, p.Y), new(p.X + 1, p.Y), new(p.X, p.Y - 1), new(p.X, p.Y + 1)];
-        foreach (Point n in neighbors)
+        int floor = a.Y + RoomHeight - 1;
+        Point? bench = FindTile(a, TileID.WorkBenches);
+        if (bench.HasValue)
+            ctx.State.WorkBench = bench;
+        for (int i = 0; i < Main.maxChests; i++)
         {
-            if (!WorldGen.InWorld(n.X, n.Y, 2))
+            Chest chest = Main.chest[i];
+            if (chest is null || chest.x < a.X || chest.x >= a.X + TotalWidth ||
+                chest.y < a.Y || chest.y > floor)
                 continue;
-            Tile tile = Main.tile[n.X, n.Y];
-            if (tile.HasTile && Main.tileSolid[tile.TileType])
-                return true;
+            ctx.State.Chest = new Point(chest.x, chest.y);
+            break;
         }
-        return false;
     }
 
-    private static bool Near(Player me, Point tile) =>
-        Vector2.DistanceSquared(me.Center, TileCenter(tile)) <= 48f * 48f;
+    private static Point? FindTile(Point a, int type)
+    {
+        for (int x = a.X; x < a.X + TotalWidth; x++)
+        for (int y = a.Y; y < a.Y + RoomHeight; y++)
+            if (IsTile(x, y, type))
+                return new Point(x, y);
+        return null;
+    }
 
-    private static Vector2 TileCenter(Point tile) => new(tile.X * 16f + 8f, tile.Y * 16f + 8f);
+    private static bool IsTile(int x, int y, int type) => WorldGen.InWorld(x, y, 4) &&
+        Main.tile[x, y].HasTile && Main.tile[x, y].TileType == type;
+
+    private static Vector2 Center(Point tile) => new(tile.X * 16f + 8f, tile.Y * 16f + 8f);
 }

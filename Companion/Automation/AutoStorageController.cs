@@ -22,17 +22,41 @@ public static class AutoStorageController
 
     // Keep-stock per crafting material; only the excess above this is deposited. Junk (anything not
     // listed and not essential) has a keep of zero and is deposited in full.
-    private static int KeepThreshold(int type) => type switch
+    private static int KeepThreshold(int type, AutoCompanionState state)
     {
-        ItemID.Wood => 300,
+        AutoCampaignStage stage = state?.CampaignStage ?? AutoCampaignStage.Foundation;
+        return type switch
+        {
+        ItemID.Wood => AutoShelterController.WoodReserve,
         ItemID.StoneBlock => 200,
         ItemID.CopperOre or ItemID.TinOre or ItemID.IronOre or ItemID.LeadOre or
-        ItemID.SilverOre or ItemID.TungstenOre or ItemID.GoldOre or ItemID.PlatinumOre => 100,
+        ItemID.SilverOre or ItemID.TungstenOre or ItemID.GoldOre or ItemID.PlatinumOre
+            when stage == AutoCampaignStage.Foundation => 100,
         ItemID.CopperBar or ItemID.TinBar or ItemID.IronBar or ItemID.LeadBar or
-        ItemID.SilverBar or ItemID.TungstenBar or ItemID.GoldBar or ItemID.PlatinumBar => 50,
-        ItemID.Gel => 50,
+        ItemID.SilverBar or ItemID.TungstenBar or ItemID.GoldBar or ItemID.PlatinumBar
+            when stage == AutoCampaignStage.Foundation => 50,
+        ItemID.DemoniteOre or ItemID.CrimtaneOre or ItemID.DemoniteBar or ItemID.CrimtaneBar or
+        ItemID.ShadowScale or ItemID.TissueSample when stage <= AutoCampaignStage.WallOfFlesh => 100,
+        ItemID.Hellstone or ItemID.Obsidian when stage == AutoCampaignStage.WallOfFlesh => 240,
+        ItemID.HellstoneBar when stage == AutoCampaignStage.WallOfFlesh => 65,
+        ItemID.CobaltOre or ItemID.PalladiumOre or ItemID.MythrilOre or ItemID.OrichalcumOre or
+        ItemID.AdamantiteOre or ItemID.TitaniumOre
+            when stage is >= AutoCampaignStage.MechanicalBosses and <= AutoCampaignStage.Plantera => 240,
+        ItemID.CobaltBar or ItemID.PalladiumBar or ItemID.MythrilBar or ItemID.OrichalcumBar or
+        ItemID.AdamantiteBar or ItemID.TitaniumBar
+            when stage is >= AutoCampaignStage.MechanicalBosses and <= AutoCampaignStage.Plantera => 80,
+        ItemID.HallowedBar when stage is >= AutoCampaignStage.MechanicalBosses and < AutoCampaignStage.Completed => 80,
+        ItemID.ChlorophyteOre when stage is >= AutoCampaignStage.Plantera and < AutoCampaignStage.Completed => 240,
+        ItemID.ChlorophyteBar when stage is >= AutoCampaignStage.Plantera and < AutoCampaignStage.Completed => 80,
+        ItemID.SoulofMight or ItemID.SoulofSight or ItemID.SoulofFright or
+        ItemID.SoulofLight or ItemID.SoulofNight or ItemID.SoulofFlight
+            when Main.hardMode && stage < AutoCampaignStage.Completed => 99,
+        ItemID.FragmentSolar or ItemID.FragmentVortex or ItemID.FragmentNebula or
+        ItemID.FragmentStardust when stage < AutoCampaignStage.Completed => 99,
+        ItemID.Gel => 100,
         _ => 0
-    };
+        };
+    }
 
     public static AutoTaskResult DepositSurplus(AutoContext ctx)
     {
@@ -56,7 +80,7 @@ public static class AutoStorageController
         }
 
         ctx.Navigator.Idle(me);
-        bool moved = DepositSurplusInto(chest, ctx.Profile);
+        bool moved = DepositSurplusInto(chest, ctx.Profile, ctx.State);
         if (AutoInventory.HasBackpackSpace(ctx.Profile))
             return AutoTaskResult.Succeeded;
 
@@ -140,16 +164,50 @@ public static class AutoStorageController
 
     /// <summary>Moves surplus (non-essential material above its keep-stock) from the backpack into
     /// the chest. Returns true if anything moved.</summary>
-    private static bool DepositSurplusInto(Chest chest, CompanionProfile profile)
+    public static bool RestoreCampaignStock(AutoContext ctx)
+    {
+        if (ctx.State.Chest is not Point recorded)
+            return false;
+        int chestId = Chest.FindChest(recorded.X, recorded.Y);
+        if (chestId < 0 || Main.chest[chestId] is not Chest chest)
+            return false;
+        Vector2 center = new(chest.x * 16f + 16f, chest.y * 16f + 16f);
+        if (Vector2.DistanceSquared(ctx.Me.Center, center) > 4f * 16f * 4f * 16f)
+            return false;
+
+        foreach (Item source in chest.item)
+        {
+            if (source is null || source.IsAir)
+                continue;
+            int keep = KeepThreshold(source.type, ctx.State);
+            int missing = keep - AutoInventory.Count(ctx.Profile, source.type);
+            if (missing <= 0)
+                continue;
+            Item incoming = source.Clone();
+            incoming.stack = System.Math.Min(source.stack, missing);
+            int moved = incoming.stack;
+            if (!AutoInventory.CanFit(ctx.Profile, incoming) || !AutoInventory.Give(ctx.Profile, incoming))
+                continue;
+            source.stack -= moved;
+            if (source.stack <= 0)
+                source.TurnToAir();
+            ctx.TaskRuntime.RecordWorldProgress();
+            return true;
+        }
+        return false;
+    }
+
+    private static bool DepositSurplusInto(Chest chest, CompanionProfile profile,
+        AutoCompanionState state)
     {
         bool movedAny = false;
         for (int b = 0; b < profile.Backpack.Length; b++)
         {
             Item item = profile.Backpack[b];
-            if (item.IsAir || IsEssential(item))
+            if (item.IsAir || IsEssential(item, profile))
                 continue;
 
-            int keep = KeepThreshold(item.type);
+            int keep = KeepThreshold(item.type, state);
             int held = AutoInventory.Count(profile, item.type);
             int allowedToDeposit = keep <= 0 ? item.stack : Math.Max(0, held - keep);
             int depositFromSlot = Math.Min(item.stack, allowedToDeposit);
@@ -200,11 +258,16 @@ public static class AutoStorageController
 
     /// <summary>Items the companion must never store: its tools, weapons, gear, ammo, light supply,
     /// coins and its own chests. Everything else (raw blocks, ores, bars, gel, junk) is surplus.</summary>
-    private static bool IsEssential(Item item)
+    private static bool IsEssential(Item item, CompanionProfile profile)
     {
-        if (item.pick > 0 || item.axe > 0 || item.hammer > 0 || item.damage > 0 || item.accessory ||
+        if (item.pick > 0 || item.axe > 0 || item.hammer > 0 || item.accessory ||
             item.ammo > 0 || item.fishingPole > 0 || item.bait > 0 ||
             item.headSlot >= 0 || item.bodySlot >= 0 || item.legSlot >= 0 || item.mountType >= MountID.Rudolph)
+            return true;
+        if (item.damage > 0)
+            return !AutoWeaponEvaluator.IsObsolete(profile, item);
+        if (item.potion || item.healLife > 0 || item.healMana > 0 ||
+            item.consumable && item.buffType > 0 && item.buffTime > 0)
             return true;
 
         switch (item.type)
@@ -219,6 +282,8 @@ public static class AutoStorageController
         }
 
         // Never deposit a chest into a chest, and keep the basic stations it still has to place.
-        return item.createTile is TileID.Containers or TileID.WorkBenches or TileID.Furnaces or TileID.Anvils;
+        return item.createTile is TileID.Containers or TileID.WorkBenches or TileID.Furnaces or
+            TileID.Anvils or TileID.Hellforge or TileID.AdamantiteForge or
+            TileID.MythrilAnvil or TileID.LunarCraftingStation;
     }
 }

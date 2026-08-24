@@ -39,8 +39,7 @@ public static class AutoCombatController
             return AutoTaskResult.Running;
         }
 
-        int weapon = AutoInventory.FindInventoryIndex(ctx.Me, item =>
-            !item.IsAir && item.damage > 0 && item.pick <= 0 && item.hammer <= 0);
+        int weapon = BestCombatInventoryIndex(ctx, target, out _);
         if (weapon < 0)
             weapon = AutoInventory.BestToolIndex(ctx.Me, item => item.axe);
         if (weapon < 0)
@@ -50,6 +49,10 @@ public static class AutoCombatController
         ctx.Actuator.UseItemInSlot(ctx.Instance, ctx.Me, weapon, target.Center);
         return AutoTaskResult.Running;
     }
+
+    public static int BestCombatInventoryIndex(AutoContext ctx, NPC target,
+        out AutoWeaponAssessment assessment) =>
+        AutoCombatPhoneService.SelectBestWeapon(ctx, target, out assessment);
 
     private static NPC FindNearestSlime(Vector2 center)
     {

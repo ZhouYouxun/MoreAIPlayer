@@ -13,8 +13,9 @@ namespace MoreAIPlayer.Companion.Automation;
 ///
 /// Death/revive timing is automation-specific (1s / 5s during a boss). Beyond that, each tick it
 /// refreshes a capability snapshot, asks the planner for the next goal, and runs the matching
-/// controller through the shared navigator/actuator. Phase 2 covers the early resource loop
-/// (gather → craft stations → smelt); later phases add world scanning, fishing and combat.
+/// controller through the shared navigator/actuator. The deterministic early resource loop is
+/// augmented by bounded chest, fishing and exploration opportunities; later progression stages
+/// still extend the same capability scheduler rather than replacing it with a fixed walkthrough.
 /// </summary>
 public sealed class AutoCompanionBrain
 {
@@ -26,10 +27,15 @@ public sealed class AutoCompanionBrain
     private readonly CompanionNavigator navigator = new();
     private readonly AutoActuator actuator = new();
     private readonly AutoCapabilities capabilities = new();
+    private readonly AutoFishingController fishing = new();
+    private readonly AutoEscapeController escape = new();
     private readonly AutoTaskRuntime taskRuntime = new();
     private readonly AutoWatchdog watchdog;
     private AutoContext context;
     private bool runtimeInitialized;
+    private bool restoredPersistentMemory;
+    private long nextMinionSummonTick;
+    private long nextSentrySummonTick;
 
     // Simple surface wander used when the local area holds no more of what the current goal needs.
     private int wanderDir = 1;
@@ -56,10 +62,8 @@ public sealed class AutoCompanionBrain
         instance.WantsUseItem = false;
         instance.AimWorld = me.Center + new Vector2(me.direction * 160f, 0f);
 
-        if (HandleDeathAndRevive(instance, me, profile.AutoState))
+        if (HandleDeathAndRevive(instance, me, profile))
             return; // still dead this tick — nothing else runs
-
-        me.statMana = me.statManaMax2;
 
         if (profile.AutoState is null)
             return; // defensive: only runs while auto identity is live
@@ -77,20 +81,62 @@ public sealed class AutoCompanionBrain
         }
 
         AutoContext ctx = BuildContext(instance, owner, profile);
-        capabilities.Refresh(me, profile);
-
         if (!runtimeInitialized)
         {
             taskRuntime.BossFailureCount = profile.AutoState.BossFailureCount;
+            profile.AutoState.RestoreMemory(taskRuntime);
+            taskRuntime.BossFailureCount = profile.AutoState.BossFailureCount;
             runtimeInitialized = true;
+            restoredPersistentMemory = true;
         }
+        AutoClassController.Refresh(me, profile);
+        AutoCampaignController.RefreshStage(ctx);
+        if (escape.TryMineBodyObstruction(ctx))
+        {
+            CapturePersistentMemory(profile.AutoState, instance);
+            return;
+        }
+        // Boss bags, ore, hearts and arena materials must enter the same saved profile before the
+        // next milestone is planned. This collector is automation-only and still runs pickup hooks.
+        AutoInventory.TryCollectNearby(instance, profile, 12f, null);
+        AutoBagController.OpenOne(instance, profile);
+        AutoGearController.ConsumePermanentUpgrade(me, profile);
+        AutoGearController.OrganizeOwnedGear(me, profile);
+        // The companion's own chest is extended campaign memory, not a one-way trash sink. When
+        // it is physically back at that chest, restore one stage-relevant stack before planning.
+        AutoStorageController.RestoreCampaignStock(ctx);
+        MaintainAutomationSummons(instance, me, profile);
+        capabilities.Refresh(me, profile);
 
         AutoPlan plan = AutoProgressionPlanner.Plan(ctx);
+        AutoProgressReporter.ReportPlan(profile, profile.AutoState.CampaignStage, plan);
+        if (restoredPersistentMemory)
+        {
+            long now = (long)Main.GameUpdateCount;
+            if (taskRuntime.CurrentPlanKey == plan.StableKey)
+            {
+                taskRuntime.GoalStartedTick = now;
+                taskRuntime.StepStartedTick = now;
+                taskRuntime.LastProgressSignature = AutoTaskRuntime.ComputeSignature(ctx, plan);
+                taskRuntime.LastObservedProgressSerial = taskRuntime.ProgressSerial;
+                taskRuntime.WindowStartPosition = me.Center;
+                taskRuntime.TicksWithoutProgress = 0;
+                taskRuntime.TicksWithoutMetricChange = 0;
+            }
+            else
+            {
+                // The live world/inventory changed while recalled. Force the watchdog to start a
+                // clean window for the newly selected plan, while retaining any still-valid target.
+                taskRuntime.CurrentPlanKey = 0;
+            }
+            restoredPersistentMemory = false;
+        }
         taskRuntime.CurrentStep = plan.Goal;
         if (watchdog.OnBackoff(plan))
         {
             navigator.Idle(me);
             profile.AutoState.BossFailureCount = taskRuntime.BossFailureCount;
+            CapturePersistentMemory(profile.AutoState, instance);
             return;
         }
 
@@ -113,7 +159,11 @@ public sealed class AutoCompanionBrain
                 AnnounceBlocked(plan);
                 break;
         }
+        CapturePersistentMemory(profile.AutoState, instance);
     }
+
+    public void CapturePersistentMemory(AutoCompanionState state, CompanionInstance instance) =>
+        state?.CaptureMemory(taskRuntime, instance?.Entity, instance?.ReviveTicksLeft ?? 0);
 
     private AutoContext BuildContext(CompanionInstance instance, Player owner, CompanionProfile profile)
     {
@@ -126,6 +176,7 @@ public sealed class AutoCompanionBrain
         context.Actuator = actuator;
         context.Capabilities = capabilities;
         context.TaskRuntime = taskRuntime;
+        context.Fishing = fishing;
         return context;
     }
 
@@ -168,6 +219,33 @@ public sealed class AutoCompanionBrain
                 return AutoShelterController.Build(ctx);
             case AutoGoalId.DepositSurplus:
                 return AutoStorageController.DepositSurplus(ctx);
+            case AutoGoalId.LootChest:
+                return AutoLootController.LootBestNearbyChest(ctx);
+            case AutoGoalId.ExploreWorld:
+                return AutoExplorationController.Explore(ctx);
+            case AutoGoalId.FishOpportunity:
+                return ctx.Fishing.Fish(ctx);
+            case AutoGoalId.FightBoss:
+                return AutoBossController.Fight(ctx);
+            case AutoGoalId.AcquireVitalUpgrade:
+                return AutoVitalController.Acquire(ctx);
+            case AutoGoalId.ReturnToDeathSite:
+                return AutoRecoveryController.ReturnToDeathSite(ctx);
+            case AutoGoalId.PrepareArena:
+                return AutoArenaController.Prepare(ctx);
+            case AutoGoalId.AcquireExplosives:
+                return AutoExplosiveController.Acquire(ctx);
+            case AutoGoalId.SummonBoss:
+                return AutoCampaignController.Summon(ctx);
+            case AutoGoalId.RiskRecovery:
+                return AutoRecoveryController.RecoverRisk(ctx);
+            case AutoGoalId.UpgradeClassLoadout:
+                return AutoCampaignGearController.Upgrade(ctx);
+            case AutoGoalId.AcquireWeaponUpgrade:
+                return AutoVanillaWeaponRouteController.Execute(ctx,
+                    (AutoWeaponRouteKind)plan.Amount);
+            case AutoGoalId.AcquireCombatSupplies:
+                return AutoCombatSupplyController.Acquire(ctx);
             case AutoGoalId.Idle:
             default:
                 navigator.Idle(ctx.Me);
@@ -226,21 +304,78 @@ public sealed class AutoCompanionBrain
         me.releaseUseTile = true;
     }
 
+    /// <summary>Keeps legally owned minion and sentry staffs active without letting a broken
+    /// modded staff monopolise combat. Failed/no-op casts naturally wait two seconds before the
+    /// next attempt, while ordinary attacks and movement continue on all intervening ticks.</summary>
+    private void MaintainAutomationSummons(CompanionInstance instance, Player me,
+        CompanionProfile profile)
+    {
+        if (me.itemAnimation != 0)
+            return;
+        long now = (long)Main.GameUpdateCount;
+        Item minion = profile.SummonWeapon;
+        if (now >= nextMinionSummonTick && CompanionWeaponBehaviors.IsMinionStaff(minion) &&
+            me.slotsMinions < me.maxMinions)
+        {
+            actuator.UseItemInSlot(instance, me, CompanionProfile.SummonSlot,
+                me.Center + new Vector2(me.direction * 64f, -16f));
+            nextMinionSummonTick = now + 120;
+            return;
+        }
+
+        Item sentry = profile.SentryWeapon;
+        if (now < nextSentrySummonTick || !CompanionWeaponBehaviors.IsSentryStaff(sentry) ||
+            CountOwnedSentries(me) >= me.maxTurrets)
+            return;
+        actuator.UseItemInSlot(instance, me, CompanionProfile.SentrySlot,
+            me.Center + new Vector2(me.direction * 64f, -16f));
+        nextSentrySummonTick = now + 120;
+    }
+
+    private static int CountOwnedSentries(Player me)
+    {
+        int count = 0;
+        foreach (Projectile projectile in Main.ActiveProjectiles)
+            if (projectile.owner == me.whoAmI && projectile.sentry)
+                count++;
+        return count;
+    }
+
     /// <summary>
     /// The automation companion is hard to kill but not invincible. When it dies it stays down for
     /// 1s (5s during a boss fight, measured at the moment of death) and then revives at a safe spot
     /// that does not depend on the owner. Returns true while still dead so the rest of the brain
     /// sits out those ticks. Death drops no items and clears no tasks.
     /// </summary>
-    private bool HandleDeathAndRevive(CompanionInstance instance, Player me, AutoCompanionState state)
+    private bool HandleDeathAndRevive(CompanionInstance instance, Player me, CompanionProfile profile)
     {
+        AutoCompanionState state = profile.AutoState;
         bool down = me.dead || me.statLife <= 0;
         if (!down && instance.ReviveTicksLeft <= 0)
             return false;
 
         if (instance.ReviveTicksLeft <= 0)
         {
-            instance.ReviveTicksLeft = CompanionBrain.IsBossFightActive() ? BossReviveTicks : NormalReviveTicks;
+            bool bossFight = CompanionBrain.IsBossFightActive();
+            instance.ReviveTicksLeft = bossFight ? BossReviveTicks : NormalReviveTicks;
+            if (state is not null)
+            {
+                if (float.IsFinite(me.Center.X) && float.IsFinite(me.Center.Y))
+                {
+                    state.HasDeathReturnTarget = true;
+                    state.DeathReturnTarget = me.Center;
+                    state.DeathReturnAttempts++;
+                }
+                state.StageFailureCount++;
+                state.StrategyVariant++;
+                if (bossFight)
+                {
+                    state.BossFailureCount++;
+                    taskRuntime.BossFailureCount = state.BossFailureCount;
+                    state.ArenaCompleted = false;
+                }
+                AutoProgressReporter.ReportRecovery(profile, "AutomationDeathRecorded", profile.Name);
+            }
             CompanionEntitySystem.ResetCompanionDamageState(instance);
         }
 

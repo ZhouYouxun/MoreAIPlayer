@@ -1,6 +1,7 @@
 using Microsoft.Xna.Framework;
 using MoreAIPlayer.Companion.AI;
 using Terraria;
+using Terraria.ID;
 
 namespace MoreAIPlayer.Companion.Automation;
 
@@ -91,6 +92,25 @@ public sealed class AutoActuator
 
         navigator.Idle(me);
         UseItemInSlot(instance, me, slot, center, tile);
+        return true;
+    }
+
+    /// <summary>Wall-removal counterpart used by the self-repairing sky housing. A wall can exist
+    /// without a foreground tile, so it cannot pass through <see cref="MoveAndWorkTile"/>.</summary>
+    public bool MoveAndWorkWall(CompanionInstance instance, Player me, CompanionNavigator navigator,
+        int slot, Point wall)
+    {
+        if (!WorldGen.InWorld(wall.X, wall.Y, 3) || Main.tile[wall.X, wall.Y].WallType == WallID.None)
+            return false;
+        Vector2 center = new(wall.X * 16f + 8f, wall.Y * 16f + 8f);
+        Item tool = me.inventory[slot];
+        if (!IsTileInReach(me, tool, wall.X, wall.Y))
+        {
+            navigator.Navigate(me, center);
+            return true;
+        }
+        navigator.Idle(me);
+        UseItemInSlot(instance, me, slot, center, wall);
         return true;
     }
 

@@ -19,4 +19,5 @@ public sealed class AutoContext
     public AutoActuator Actuator;
     public AutoCapabilities Capabilities;
     public AutoTaskRuntime TaskRuntime;
+    public AutoFishingController Fishing;
 }

@@ -91,14 +91,12 @@ public static class AutoStationController
     }
 
     /// <summary>
-    /// Smelts the companion's basic ore into bars at the Furnace, one recipe per tick. Navigates to
-    /// <paramref name="furnace"/> first. Succeeds once it holds no more basic ore to smelt.
+    /// Smelts any caller-supplied bar family at its required furnace, one real recipe per tick.
+    /// Recipe.FindRecipes is the authority: this method must not inspect only the starter copper-
+    /// through-platinum ores because it is also used by Hellstone and every Hardmode ore tier.
     /// </summary>
     public static AutoTaskResult SmeltOre(AutoContext ctx, Point? furnace, int[] barTypes)
     {
-        if (AutoResourceController.CountBasicOre(ctx.Profile) <= 0)
-            return AutoTaskResult.Succeeded;
-
         if (furnace is Point f)
         {
             if (!IsAnyTileAt(f))

@@ -1,6 +1,8 @@
 using System.Collections.Generic;
 using Microsoft.Xna.Framework;
 using Terraria;
+using Terraria.ID;
+using Terraria.Localization;
 
 namespace MoreAIPlayer.Companion.Automation;
 
@@ -13,7 +15,7 @@ namespace MoreAIPlayer.Companion.Automation;
 public static class AutoDiagnostics
 {
     /// <summary>Compact multi-line readout for the current runtime. Most-recent first for the log.</summary>
-    public static string[] BuildLines(AutoTaskRuntime runtime)
+    public static string[] BuildLines(AutoTaskRuntime runtime, AutoCompanionState state = null)
     {
         if (runtime is null)
             return [];
@@ -41,6 +43,14 @@ public static class AutoDiagnostics
             lines.Add($"retry in: {runtime.BlockedUntilTick - now}t");
         if (runtime.BossFailureCount > 0)
             lines.Add($"boss fails: {runtime.BossFailureCount}");
+        if (state is not null)
+        {
+            lines.Add($"campaign: {state.CampaignStage}  class: {state.PreferredClass}");
+            lines.Add($"weapon route: {state.LastWeaponRoute}");
+            if (state.LastSelectedWeaponItemType > ItemID.None)
+                lines.Add($"weapon: {Language.GetTextValue(Lang.GetItemName(state.LastSelectedWeaponItemType).Key)}  " +
+                    $"score: {state.LastSelectedWeaponScore}  why: {state.LastSelectedWeaponReason}");
+        }
 
         int shown = 0;
         foreach (string entry in runtime.RecentLog())

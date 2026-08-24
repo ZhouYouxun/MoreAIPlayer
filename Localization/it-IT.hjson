@@ -46,6 +46,11 @@ Mods: {
 					Tooltip: Mostra dati di debug dello sviluppo.
 				}
 
+				ShowAutomationProgress: {
+					Label: "[i:Radar] Mostra progressi del giocatore automatico"
+					Tooltip: Mostra in chat ogni avanzamento significativo del giocatore automatico.
+				}
+
 				ShowCompanionHealthBars: {
 					Label: "[i:LifeCrystal] Mostra barra della vita aggiuntiva"
 					Tooltip: Disegna la barra della vita di questa mod. Attivala solo se la barra della vita predefinita non funziona.
@@ -234,8 +239,8 @@ Mods: {
 				Tooltip:
 					'''
 					[Solo per divertimento; questa funzione è ancora in fase di test]
-					Clic sinistro: evoca il tuo unico compagno automatico (quello esistente non viene mai azzerato o sostituito)
-					Clic destro: apre il suo zaino
+					Clic sinistro: evoca il compagno automatico; un altro clic sinistro lo richiama e salva posizione, inventario e memoria dei progressi
+					Clic destro: sposta la visuale sul compagno automatico; clicca di nuovo per tornare a te
 					Proverà autonomamente a esplorare, raccogliere, costruire, combattere e avanzare nel mondo; al termine diventerà un normale compagno fantasma
 					Può ancora bloccarsi, sbagliare o incontrare altri bug. Esegui prima un backup del mondo. Solo giocatore singolo.
 					'''
@@ -479,8 +484,71 @@ Mods: {
 			AutomationNoFreeSlot: Al momento non c'è nessuno slot libero per il compagno automatico.
 			AutomationNotCreated: Questo mondo non ha ancora un compagno automatico. Fai clic sinistro per evocarne uno.
 			AutomationSummoned: "{0} è stato evocato e inizierà ad avanzare nel mondo da solo."
+			AutomationRecalled: "{0} è stato richiamato temporaneamente; oggetti, posizione e memoria dei progressi sono stati salvati."
+			AutomationCameraStarted: La visuale ora segue {0}. Continui a controllare il tuo giocatore.
+			AutomationCameraStopped: La visuale è tornata al tuo giocatore.
 			AutomationBlocked: Il compagno automatico è bloccato su «{0}»: {1}. Riproverà periodicamente da solo.
 			AutomationCompleted: "{0} ha sconfitto il Signore della Luna. La sequenza automatica è finita; ora è un normale compagno fantasma."
+			AutomationProgressStep: "[Automazione · {0}] Fase: {1} · Passo: {2} · Classe: {3}"
+			AutomationWeaponSelected: "[Laboratorio cellulare · {0}] Scelta {1} · punteggio {2} · DPS teorico {3}"
+			AutomationDeathRecorded: "[Automazione] {0} è stato sconfitto; rinascerà nella base aerea e tornerà al punto del fallimento."
+			AutomationReturnResumed: "[Automazione] {0} ha raggiunto il punto del fallimento precedente e ha ripreso l'obiettivo salvato."
+
+			AutomationStage: {
+				// Foundation: Foundation
+				// EyeOfCthulhu: Eye of Cthulhu
+				// EvilBoss: World evil boss
+				// Skeletron: Skeletron
+				// WallOfFlesh: Wall of Flesh
+				// MechanicalBosses: Mechanical bosses
+				// Plantera: Plantera
+				// Golem: Golem
+				// LunaticCultist: Lunatic Cultist
+				// SolarPillar: Solar Pillar
+				// VortexPillar: Vortex Pillar
+				// NebulaPillar: Nebula Pillar
+				// StardustPillar: Stardust Pillar
+				// MoonLord: Moon Lord
+				// Completed: Complete
+			}
+
+			AutomationClass: {
+				// Flexible: Flexible
+				// Melee: Melee
+				// Ranged: Ranged
+				// Magic: Magic
+				// Summoner: Summoner
+			}
+
+			AutomationGoal: {
+				// Idle: Re-evaluate
+				// GatherWood: Gather wood
+				// GatherStone: Gather stone
+				// GatherGel: Gather gel
+				// MineOre: Mine ore
+				// MineIronTierOre: Mine iron-tier ore
+				// CraftStation: Craft station
+				// CraftGear: Upgrade equipment
+				// CraftConsumable: Craft supplies
+				// BuildShelter: Build sky base
+				// DepositSurplus: Store surplus
+				// Shop: Purchase supplies
+				// LootChest: Loot chest
+				// ExploreWorld: Explore world
+				// EscapeTerrain: Excavate obstruction
+				// FishOpportunity: Bounded fishing
+				// FightBoss: Fight progression target
+				// AcquireVitalUpgrade: Locate permanent health upgrade
+				// ReturnToDeathSite: Return to failed location
+				// PrepareArena: Prepare boss arena
+				// AcquireExplosives: Acquire explosives
+				// SummonBoss: Summon progression target
+				// RiskRecovery: Risk recovery
+				// UpgradeClassLoadout: Mine and craft class loadout
+				// AcquireWeaponUpgrade: Run a weapon-upgrade route
+				// AcquireCombatSupplies: Craft or buy combat ammunition
+			}
+
 			AutomationUnsupportedWorld: Questo mondo speciale non ha ancora una strategia automatica; il compagno automatico si è fermato in sicurezza.
 			AutomationUnsupportedMod: La progressione di questo mod non ha un fornitore di automazione; il compagno segue solo il percorso vanilla.
 			AutomationBackpackUnavailable: Lo zaino del compagno automatico non è disponibile in questo momento.

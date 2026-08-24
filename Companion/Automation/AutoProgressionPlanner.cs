@@ -6,10 +6,10 @@ namespace MoreAIPlayer.Companion.Automation;
 
 /// <summary>
 /// Chooses the automation companion's next goal from its current capabilities and what it has
-/// already built (§5, §11 stage A/B). It is a priority ladder that always leaves the companion with
-/// a legal thing to do or an honest blocked reason — never a silent stall. Phase 2 covers the
-/// early resource loop up to a Furnace, with ore and bars flowing toward the first Anvil; the
-/// remaining stage-B goals (metal armour, NPC rooms, Merchant, shopping) are added incrementally.
+/// already built (§5, §11 stage A/B). A deterministic hard-gate ladder competes with live chest and
+/// bounded fishing opportunities, so equivalent lucky finds can retire redundant gear routes. It
+/// always leaves the companion with legal work, continued exploration, or an honest blocked reason
+/// — never a silent stall.
 /// </summary>
 public static class AutoProgressionPlanner
 {
@@ -104,12 +104,33 @@ public static class AutoProgressionPlanner
 
     private static bool IsGatherGoal(AutoGoalId goal) => goal is
         AutoGoalId.GatherWood or AutoGoalId.GatherStone or AutoGoalId.GatherGel or
-        AutoGoalId.MineOre or AutoGoalId.MineIronTierOre;
+        AutoGoalId.MineOre or AutoGoalId.MineIronTierOre or AutoGoalId.LootChest or
+        AutoGoalId.ExploreWorld or AutoGoalId.FishOpportunity or AutoGoalId.AcquireVitalUpgrade or
+        AutoGoalId.PrepareArena or AutoGoalId.AcquireExplosives or AutoGoalId.UpgradeClassLoadout or
+        AutoGoalId.AcquireWeaponUpgrade or AutoGoalId.AcquireCombatSupplies;
 
     private static AutoPlan PlanCore(AutoContext ctx)
     {
         AutoCapabilities cap = ctx.Capabilities;
         AutoCompanionState st = ctx.State;
+
+        if (AutoBossController.HasActiveBoss())
+            return AutoPlan.Simple(AutoGoalId.FightBoss, AutoPlanKind.HardGate, 5);
+
+        if (st.HasDeathReturnTarget)
+            return AutoPlan.Simple(AutoGoalId.ReturnToDeathSite, AutoPlanKind.HardGate, 5);
+
+        if (AutoRecoveryController.IsOverwhelmed(ctx))
+            return AutoPlan.Simple(AutoGoalId.RiskRecovery, AutoPlanKind.Support, 4);
+
+        // A nearby unlocked chest is an opportunity, not a prescribed detour. Its live contents
+        // must be valuable enough relative to the current loadout; once looted, the ordinary
+        // capability checks below automatically skip redundant crafting/expeditions.
+        if (AutoLootController.HasWorthwhileNearbyChest(ctx, out int chestUtility) && chestUtility >= 24 &&
+            (st.CampaignStage == AutoCampaignStage.Foundation || AutoCampaignController.NeedsLoadoutWork(ctx)))
+            return AutoPlan.Simple(AutoGoalId.LootChest, AutoPlanKind.Optional, 2);
+        if (ctx.Fishing.HasOpportunity(ctx) && st.CampaignStage == AutoCampaignStage.Foundation)
+            return AutoPlan.Simple(AutoGoalId.FishOpportunity, AutoPlanKind.Optional, 2);
 
         // 1. Work Bench — the first station, craftable anywhere from wood.
         if (!StationStanding(st.WorkBench, TileID.WorkBenches))
@@ -167,7 +188,50 @@ public static class AutoProgressionPlanner
             return AutoPlan.Simple(AutoGoalId.BuildShelter);
         }
 
-        return AutoPlan.Idle(AutoTaskResult.RetryLater);
+        AutoCampaignController.RefreshStage(ctx);
+        if (st.CampaignStage == AutoCampaignStage.Completed)
+            return AutoPlan.Idle(AutoTaskResult.Succeeded);
+
+        if (AutoVitalController.NeedsUpgrade(ctx))
+            return AutoPlan.Simple(AutoGoalId.AcquireVitalUpgrade, AutoPlanKind.HardGate, 6);
+
+        if (AutoCampaignGearController.NeedsMiningUpgrade(ctx))
+            return AutoPlan.Simple(AutoGoalId.UpgradeClassLoadout, AutoPlanKind.Capability, 8);
+
+        if (AutoCombatSupplyController.NeedsRestock(ctx))
+            return AutoPlan.Simple(AutoGoalId.AcquireCombatSupplies, AutoPlanKind.Capability, 4);
+
+        // Preparation is bounded. Three exploration segments look for legal upgrades and lucky
+        // drops; then the real arena/attempt proceeds. A wipe changes the strategy variant and
+        // opens another preparation window instead of farming forever for a prescribed item.
+        if (AutoCampaignController.NeedsLoadoutWork(ctx) &&
+            (st.ExplorationSegments + st.StageFailureCount * 3) % 6 < 3)
+        {
+            AutoWeaponRouteKind route = AutoVanillaWeaponStrategy.ChooseUpgradeRoute(ctx);
+            if (route != AutoWeaponRouteKind.None)
+                return AutoPlan.WeaponRoute(route);
+        }
+
+        if (cap.Wood < AutoArenaController.WoodReserve)
+            return AutoPlan.Gather(AutoGoalId.GatherWood, AutoArenaController.WoodReserve,
+                AutoPlanKind.Support, 4);
+
+        bool undergroundArena = st.CampaignStage is AutoCampaignStage.WallOfFlesh or
+            AutoCampaignStage.Plantera or AutoCampaignStage.Golem;
+        if (undergroundArena && AutoExplosiveController.Count(ctx.Profile) < AutoExplosiveController.DesiredStock &&
+            AutoExplosiveController.DemolitionistExists(out _) &&
+            AutoExplosiveController.CanAffordBomb(ctx.Profile))
+            return AutoPlan.Simple(AutoGoalId.AcquireExplosives, AutoPlanKind.Support, 3);
+
+        if (!AutoArenaController.IsPrepared(st))
+            return AutoPlan.Simple(AutoGoalId.PrepareArena, AutoPlanKind.HardGate, 8);
+
+        // Night-only bosses use the waiting window productively. The summoner never changes the
+        // world's clock and never starts a boss that would instantly despawn in daylight.
+        if (AutoCampaignController.RequiresNight(st.CampaignStage) && Main.dayTime)
+            return AutoPlan.Simple(AutoGoalId.ExploreWorld, AutoPlanKind.Support, 3);
+
+        return AutoPlan.Simple(AutoGoalId.SummonBoss, AutoPlanKind.HardGate, 8);
     }
 
     private static bool StationStanding(System.Nullable<Microsoft.Xna.Framework.Point> recorded, int tileType)

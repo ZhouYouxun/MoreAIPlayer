@@ -238,7 +238,9 @@ public sealed class CompanionUISystem : ModSystem
 
             if (instance.IsAutoIdentity)
             {
-                foreach (string line in AutoDiagnostics.BuildLines(instance.AutoBrain.TaskRuntime))
+                instance.TryGetContext(out _, out CompanionProfile autoProfile);
+                foreach (string line in AutoDiagnostics.BuildLines(instance.AutoBrain.TaskRuntime,
+                    autoProfile?.AutoState))
                 {
                     lines.Add(line);
                     colors.Add(new Color(120, 220, 255));

@@ -1,5 +1,5 @@
 using Microsoft.Xna.Framework;
-using MoreAIPlayer.Companion.UI;
+using MoreAIPlayer.Companion.Automation;
 using Terraria;
 using Terraria.ID;
 using Terraria.Localization;
@@ -11,13 +11,12 @@ namespace MoreAIPlayer.Companion.Content;
 /// Sixth book: the Automation Tome (自动书). A standalone entertainment item, like the Hunter's Tome
 /// and the Crystal Matrix Tome, it is not part of the ordinary companion command/build system.
 ///
-/// Left click: summon this character-and-world's one automation companion. If it is already active,
-/// nothing is reset or replaced — it just reports that it is already running. If a saved automation
-/// companion for this world exists but is not currently out, left click re-summons that same
-/// instance state (same name, same backpack) rather than making a new one.
+/// Left click: summon this character-and-world's one automation companion, or temporarily recall it
+/// when it is already active. Recall captures the live planner/position memory into the saved
+/// profile; the next summon resumes that same run instead of replacing or resetting it.
 ///
-/// Right click: open that automation companion's ordinary companion backpack. If none has been
-/// summoned yet, it only shows a hint and never summons one on a right click.
+/// Right click: toggle the local camera between the real player and the active automation companion.
+/// This only changes the view; local-player identity and controls remain with the real player.
 ///
 /// Single-player only, sharing the project's existing virtual-Player boundary.
 /// </summary>
@@ -58,14 +57,14 @@ public sealed class CompanionAutomationBook : ModItem
 
         CompanionPlayer data = player.GetModPlayer<CompanionPlayer>();
         if (player.altFunctionUse == 2)
-            OpenBackpack(player, data);
+            ToggleCamera(player, data);
         else
-            SummonOrReport(player, data);
+            ToggleSummon(player, data);
         return true;
     }
 
-    /// <summary>Left click: create/summon/re-summon the one automation companion for this world.</summary>
-    private static void SummonOrReport(Player player, CompanionPlayer data)
+    /// <summary>Left click: create/summon/re-summon, or recall the live automation companion.</summary>
+    private static void ToggleSummon(Player player, CompanionPlayer data)
     {
         // The run already finished in this world: the profile has converted to a normal companion,
         // and a second automation companion must never be created here.
@@ -81,21 +80,26 @@ public sealed class CompanionAutomationBook : ModItem
         {
             profile = data.CreateAutomationProfileForCurrentWorld();
         }
-        else if (CompanionEntitySystem.FindByProfile(player.whoAmI, profile.Id) is not null)
+        else if (CompanionEntitySystem.FindByProfile(player.whoAmI, profile.Id) is CompanionInstance active)
         {
-            // Already out: never reset, refresh, replace, teleport or re-roll it.
-            Message("AutomationAlreadyActive", WarnColor);
+            active.AutoBrain.CapturePersistentMemory(profile.AutoState, active);
+            CompanionAutomationCameraSystem.StopFollowing(profile.Id);
+            CompanionEntitySystem.Dismiss(active.Slot);
+            Message("AutomationRecalled", InfoColor, profile.Name);
             return;
         }
 
-        if (CompanionEntitySystem.Summon(player, profile, Main.MouseWorld))
+        Vector2 spawn = profile.AutoState?.TryGetResumePosition(out Vector2 remembered) == true
+            ? remembered
+            : Main.MouseWorld;
+        if (CompanionEntitySystem.Summon(player, profile, ClampToWorld(spawn)))
             Message("AutomationSummoned", InfoColor, profile.Name);
         else
             Message("AutomationNoFreeSlot", WarnColor);
     }
 
-    /// <summary>Right click: open the automation companion's backpack; hint-only if not summoned.</summary>
-    private static void OpenBackpack(Player player, CompanionPlayer data)
+    /// <summary>Right click: follow the live automation companion, or return to the real player.</summary>
+    private static void ToggleCamera(Player player, CompanionPlayer data)
     {
         CompanionProfile profile = data.GetAutomationProfileForCurrentWorld();
         if (profile is null)
@@ -107,12 +111,27 @@ public sealed class CompanionAutomationBook : ModItem
         CompanionInstance active = CompanionEntitySystem.FindByProfile(player.whoAmI, profile.Id);
         if (active is null)
         {
-            // Never summon on a right click; only advertise that the companion must be out first.
             Message("AutomationNotCreated", WarnColor);
             return;
         }
 
-        CompanionUISystem.Open(active.Slot);
+        if (CompanionAutomationCameraSystem.IsFollowing(player.whoAmI, profile.Id))
+        {
+            CompanionAutomationCameraSystem.StopFollowing(profile.Id);
+            Message("AutomationCameraStopped", InfoColor);
+        }
+        else
+        {
+            CompanionAutomationCameraSystem.Follow(player.whoAmI, profile.Id, active.Entity.Center);
+            Message("AutomationCameraStarted", InfoColor, profile.Name);
+        }
+    }
+
+    private static Vector2 ClampToWorld(Vector2 position)
+    {
+        float x = MathHelper.Clamp(position.X, 16f * 10f, 16f * (Main.maxTilesX - 10));
+        float y = MathHelper.Clamp(position.Y, 16f * 10f, 16f * (Main.maxTilesY - 10));
+        return new Vector2(x, y);
     }
 
     private static void Message(string key, Color color, params object[] args) =>

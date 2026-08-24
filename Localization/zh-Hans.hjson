@@ -46,6 +46,11 @@ Mods: {
 					Tooltip: 显示开发调试读数
 				}
 
+				ShowAutomationProgress: {
+					Label: "[i:Radar] 显示自动玩家进度"
+					Tooltip: 开启后自动玩家每推进一个有效步骤，都会在聊天框中显示
+				}
+
 				ShowCompanionHealthBars: {
 					Label: "[i:LifeCrystal] 显示伙伴额外血条"
 					Tooltip: 绘制一条本模组自己的血条【仅建议当默认血条不起作用时再开启】
@@ -234,8 +239,8 @@ Mods: {
 				Tooltip:
 					'''
 					【仅供娱乐，功能仍在测试】
-					左键：召唤唯一一名自动伙伴（已经存在时不会重置或替换）
-					右键：打开它的背包
+					左键：召唤自动伙伴；再次左键会暂时收回，并保存它的位置、背包和推进记忆
+					右键：将摄像机切换到自动伙伴；再次右键回到自己
 					它会尝试独立探索、收集、建造、战斗并推进世界；通关后会变成普通幻影伙伴
 					目前可能卡住、误判或出现其他问题，建议先备份世界。仅限单人模式。
 					'''
@@ -485,8 +490,71 @@ Mods: {
 			AutomationNoFreeSlot: 现在没有空余槽位可以召唤自动伙伴。
 			AutomationNotCreated: 这个世界还没有自动伙伴，请先左键召唤。
 			AutomationSummoned: "{0} 已召唤，开始自行推进世界。"
+			AutomationRecalled: "{0} 已暂时收回；它的物品、位置和推进记忆已经保存。"
+			AutomationCameraStarted: 摄像机已转到 {0}。你仍然控制自己的玩家。
+			AutomationCameraStopped: 摄像机已回到你的玩家。
 			AutomationBlocked: 自动伙伴卡在了“{0}”：{1}。它会自己定期重试。
 			AutomationCompleted: "{0} 已经击败月亮领主。自动流程结束，它现在是一名普通幻影伙伴了。"
+			AutomationProgressStep: 【自动推进·{0}】阶段：{1} · 步骤：{2} · 职业：{3}
+			AutomationWeaponSelected: 【手机战斗实验室·{0}】选择 {1} · 实战分 {2} · 理论DPS {3}
+			AutomationDeathRecorded: 【自动推进】{0} 已阵亡；它会从空中基地复活，并重新赶往失败地点。
+			AutomationReturnResumed: 【自动推进】{0} 已回到上次失败地点，继续执行保存的目标。
+
+			AutomationStage: {
+				Foundation: 开局建设
+				EyeOfCthulhu: 克苏鲁之眼
+				EvilBoss: 世界邪恶Boss
+				Skeletron: 骷髅王
+				WallOfFlesh: 血肉墙
+				MechanicalBosses: 机械三王
+				Plantera: 世纪之花
+				Golem: 石巨人
+				LunaticCultist: 拜月教邪教徒
+				SolarPillar: 日耀柱
+				VortexPillar: 星旋柱
+				NebulaPillar: 星云柱
+				StardustPillar: 星尘柱
+				MoonLord: 月亮领主
+				Completed: 已通关
+			}
+
+			AutomationClass: {
+				Flexible: 灵活混合
+				Melee: 战士
+				Ranged: 射手
+				Magic: 法师
+				Summoner: 召唤师
+			}
+
+			AutomationGoal: {
+				Idle: 重新决策
+				GatherWood: 收集木材
+				GatherStone: 收集石材
+				GatherGel: 收集凝胶
+				MineOre: 定位并开采矿物
+				MineIronTierOre: 开采铁铅矿
+				CraftStation: 制作工作站
+				CraftGear: 升级装备
+				CraftConsumable: 制作补给
+				BuildShelter: 建造空中基地
+				DepositSurplus: 存放冗余物资
+				Shop: 购买补给
+				LootChest: 锁定并搜索宝箱
+				ExploreWorld: 探索世界
+				EscapeTerrain: 挖掘脱困
+				FishOpportunity: 限次钓鱼
+				FightBoss: 对抗进度目标
+				AcquireVitalUpgrade: 定位永久生命升级
+				ReturnToDeathSite: 返回失败地点
+				PrepareArena: 修建Boss场地
+				AcquireExplosives: 获取爆破物
+				SummonBoss: 召唤进度Boss
+				RiskRecovery: 风险恢复与改道
+				UpgradeClassLoadout: 挖矿并制作职业套装
+				AcquireWeaponUpgrade: 执行武器升级路线
+				AcquireCombatSupplies: 制作或购买战斗弹药
+			}
+
 			AutomationUnsupportedWorld: 这个特殊世界暂时没有对应的自动策略，自动伙伴已安全停下。
 			AutomationUnsupportedMod: 这个模组的进度没有自动适配器，自动伙伴只会推进原版主线。
 			AutomationBackpackUnavailable: 现在无法打开自动伙伴的背包。
