@@ -51,6 +51,7 @@ public sealed class CompanionPlayer : ModPlayer
     /// <summary>Whether the selected tactic is currently switched on. One left click toggles it;
     /// switching tactic keeps this flag, so turning the book on once lets you cycle tactics live.</summary>
     public bool BuildTacticActive;
+    public bool BaseProtectionMiningTipShown;
     public int RequestedTarget = -1;
     public int CombatRequestTime;
 
@@ -111,6 +112,7 @@ public sealed class CompanionPlayer : ModPlayer
         autoBindings.Clear();
         BuildMode = CompanionBuildMode.SmartBuild;
         BuildTacticActive = false;
+        BaseProtectionMiningTipShown = false;
         buildSnapshotValid = false;
     }
 
@@ -259,6 +261,7 @@ public sealed class CompanionPlayer : ModPlayer
         tag[nameof(Profiles)] = savedProfiles;
         tag[nameof(BuildMode)] = (int)BuildMode;
         tag[nameof(BuildTacticActive)] = BuildTacticActive;
+        tag[nameof(BaseProtectionMiningTipShown)] = BaseProtectionMiningTipShown;
         tag[nameof(PhantomOwnerIdentity)] = PhantomOwnerIdentity;
         tag[nameof(nextPhantomStaffNumber)] = nextPhantomStaffNumber;
 
@@ -287,6 +290,8 @@ public sealed class CompanionPlayer : ModPlayer
             ? (CompanionBuildMode)savedMode
             : CompanionBuildMode.SmartBuild;
         BuildTacticActive = tag.ContainsKey(nameof(BuildTacticActive)) && tag.GetBool(nameof(BuildTacticActive));
+        BaseProtectionMiningTipShown = tag.ContainsKey(nameof(BaseProtectionMiningTipShown)) &&
+            tag.GetBool(nameof(BaseProtectionMiningTipShown));
 
         autoBindings.Clear();
         if (tag.ContainsKey("AutoBindings"))

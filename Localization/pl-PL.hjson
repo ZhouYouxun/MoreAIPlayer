@@ -27,7 +27,7 @@ Mods: {
 
 				OrdinaryCompanionsHostileToPlayers: {
 					Label: "[i:BloodyMachete] Zwykli towarzysze mogą ranić graczy"
-					Tooltip: Domyślnie wyłączone i przeznaczone wyłącznie do zabawy oraz testów. Dotyczy tylko zwykłych towarzyszy przywołanych książką debugowania. Nadal są sojusznikami i celują wyłącznie we wrogich NPC. Gracze mogą ich ranić, a ich broń lub pociski mogą zranić graczy przy kontakcie. Łowcy oraz obecni i dawni automatyczni towarzysze są wykluczeni.
+					Tooltip: Towarzysze każdego gracza mogą przypadkowo zranić każdego gracza, niezależnie od włączenia PvP.
 				}
 			}
 
@@ -42,53 +42,58 @@ Mods: {
 				}
 
 				EnablePhantomPlayerDebugText: {
-					Label: "[i:GoldenKey] Włącz tekst diagnostyczny widmowych graczy"
-					Tooltip: Wyświetla nad widmowymi towarzyszami bieżące informacje diagnostyczne. Domyślnie wyłączone.
+					Label: "[i:GoldenKey] Pokaż odczyty debugowania"
+					Tooltip: Wyświetla odczyty debugowania deweloperskiego.
 				}
 
 				ShowCompanionHealthBars: {
-					// Label: "[i:LifeCrystal] Show companion health bars"
-					// Tooltip: Disabled by default. Companions occupy real player slots, so the game already draws a health bar over them. Enable to also show the mod's own bar below each companion.
+					Label: "[i:LifeCrystal] Pokaż dodatkowy pasek zdrowia towarzysza"
+					Tooltip: Rysuje własny pasek zdrowia tego moda. Włącz tylko, gdy domyślny pasek zdrowia nie działa.
 				}
 
 				UseChatForCompanionReviveTimer: {
-					Label: "[i:RecallPotion] Powiadomienia o odrodzeniu na czacie"
-					Tooltip: Domyślnie wyłączone. Zastępuje licznik nad graczem wiadomością przy śmierci i po odrodzeniu.
+					Label: "[i:RecallPotion] Powiadomienia czatu o śmierci i odrodzeniu"
+					Tooltip: Wysyła powiadomienie, gdy towarzysz ginie lub odradza się.
 				}
 
 				AllowRightClickOpenBackpack: {
-					// Label: "[i:Chest] Right-click a companion to open its backpack"
-					// Tooltip: Disabled by default. When off, right-clicking a companion does nothing and the backpack opens only through the matrix panel at the top of the screen. Enable to open it by right-clicking the companion.
+					Label: "[i:Chest] Kliknij towarzysza prawym, aby otworzyć plecak"
+					Tooltip: Kolejny sposób na otwarcie plecaka; działa jak bezpośrednie kliknięcie jego karty.
 				}
 
 				CompanionsFightAfterOwnerDeath: {
 					Label: "[i:EnchantedSword] Towarzysze walczą po śmierci gracza"
-					Tooltip: Domyślnie włączone. Gdy zginiesz podczas walki z bossem, związani towarzysze zostają i walczą dalej. Wyłącz, aby natychmiast ich rozproszyć po śmierci.
+					Tooltip: Gdy wyłączone, towarzysze znikają natychmiast po twojej śmierci.
 				}
 
 				CompanionsTakeDamage: {
 					Label: "[i:CobaltShield] Towarzysze otrzymują obrażenia"
-					Tooltip: Domyślnie wyłączone. Włącz, aby towarzysze otrzymywali normalne obrażenia, mogli zginąć i odradzali się po zwykłym czasie oczekiwania. Gdy opcja jest wyłączona, są odporni na wszystkie obrażenia.
+					Tooltip: Pozwala towarzyszom otrzymywać normalne obrażenia, ginąć i czekać na odrodzenie.
 				}
 
 				CompanionsRescueWhenOwnerHurt: {
 					Label: "[i:MagicMirror] Przywołaj towarzyszy po otrzymaniu obrażeń"
-					Tooltip: Domyślnie wyłączone. Towarzysze teleportują się na bezpieczne, oddzielne miejsca obok ciebie.
+					Tooltip: Po otrzymaniu obrażeń natychmiast teleportuje wszystkich towarzyszy do ciebie.
+				}
+
+				ProtectBaseFromCompanionMining: {
+					Label: "[i:PeaceCandle] Ochrona bazy"
+					Tooltip: Gdy włączona, towarzysze nie uznają bloków w promieniu 200 pól od punktu odrodzenia świata za zniszczalne.
 				}
 
 				ExtraAccessorySlots: {
-					Label: "[i:CelestialShell] Dodatkowe sloty akcesoriów towarzysza"
-					Tooltip: Suwak klienta od 0 do 7. Obniżenie wartości zachowuje przedmioty, ale wyłącza ich efekty.
+					Label: "[i:CelestialShell] Dodatkowe sloty akcesoriów"
+					Tooltip: Pozwala towarzyszom zakładać więcej akcesoriów.
 				}
 
 				CompanionsAutoCollectWorldItems: {
-					Label: "[i:TreasureMagnet] Towarzysze automatycznie zbierają przedmioty świata"
-					Tooltip: Domyślnie wyłączone. Gdy opcja jest wyłączona, towarzysze nie skanują, nie rezerwują, nie podchodzą ani nie zbierają przedmiotów świata. Włącz ją dopiero po sprawdzeniu zgodności z zapisem i innymi modami.
+					Label: "[i:TreasureMagnet] Automatycznie zbieraj przedmioty świata"
+					Tooltip: Określa, czy towarzysze mogą próbować podnosić dowolne przedmioty świata.
 				}
 
 				CompanionsAllowBackpackWorldDrops: {
-					Label: "[i:TrashCan] Pozwól towarzyszom wyrzucać przedmioty z plecaka do świata"
-					Tooltip: Domyślnie wyłączone. Opróżnij plecak tworzy przedmioty świata i może wywołać hooki innych modów. Włącz dopiero po potwierdzeniu stabilności zapisu.
+					Label: "[i:TrashCan] Zezwalaj na szybkie opróżnianie"
+					Tooltip: Określa, czy plecak towarzysza jest opróżniany jedną czynnością. Może powodować spadki płynności.
 				}
 			}
 		}
@@ -119,6 +124,7 @@ Mods: {
 
 			DevelopmentNotice: {
 				DisplayName: Informacja o rozwoju Widmowych Towarzyszy
+				CombatControls: Lewy przycisk: zamach kluczem | Prawy przycisk: rzut wirującym kluczem
 				Development: Ten mod jest nadal aktywnie rozwijany.
 				SoloCreator: Jest tworzony i utrzymywany przez jedną osobę.
 				Updates: Będę go dalej aktualizować, ulepszać towarzyszy i naprawiać problemy zgłaszane przez graczy.
@@ -467,6 +473,7 @@ Mods: {
 			// WheelCommandCaptureFixed: Fixed capture
 			// WheelCommandCaptureFree: Free capture
 			// WheelCommandCaptureBreak: Clear debris
+			BaseProtectionMiningTip: Ochrona bazy jest włączona: zwykli widmowi towarzysze nie mogą kopać w promieniu {0} pól od punktu odrodzenia świata. Aby na to pozwolić, wyłącz Ochronę bazy w konfiguracji. Automatyczni towarzysze nie podlegają temu ograniczeniu.
 			AutomationSingleplayerOnly: Księga automatyzacji na razie działa tylko w trybie jednoosobowym.
 			AutomationAlreadyActive: Ten automatyczny towarzysz jest już zajęty; ponowne kliknięcie go nie zresetuje.
 			AutomationNoFreeSlot: Obecnie nie ma wolnego miejsca dla automatycznego towarzysza.
@@ -564,6 +571,11 @@ Mods: {
 		}
 
 		NPCs.DamageTestDummyNPC.DisplayName: Manekin testowy obrażeń
-		// Projectiles.DevelopmentNoticeSwing.DisplayName: Development Notice Swing
+
+		Projectiles: {
+			// DevelopmentNoticeSwing.DisplayName: Development Notice Swing
+			// DevelopmentNoticeThrown.DisplayName: Development Notice Thrown
+			// DevelopmentNoticeExplosion.DisplayName: Development Notice Explosion
+		}
 	}
 }

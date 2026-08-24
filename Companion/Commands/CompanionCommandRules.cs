@@ -170,6 +170,8 @@ public static class CompanionCommandRules
             _ => CompanionMode.Attack
         };
         profile.Mode = mode;
+        if (mode == CompanionMode.Mining)
+            CompanionMiningSafety.NotifyFirstMiningTactic(owner);
 
         CompanionPlayer data = owner.GetModPlayer<CompanionPlayer>();
         if (profile.WorkMode == CompanionWorkMode.Building)

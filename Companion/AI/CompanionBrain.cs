@@ -1276,9 +1276,9 @@ public sealed class CompanionBrain
             : -1;
         if (pickaxeSlot >= 0 && wheelExploration && profile.ExplorationGathering)
         {
-            Point ore = FindNearestExposedOreTile(me.Center, 14);
+            Point ore = FindNearestExposedOreTile(instance, me.Center, 14);
             if (ore.X >= 0)
-                return MoveAndWorkTile(instance, me, pickaxeSlot, ore);
+                return MoveAndWorkTile(instance, me, pickaxeSlot, ore, mining: true);
         }
         if (pickaxeSlot >= 0 && observation.MiningObservationTime > 0)
         {
@@ -1298,9 +1298,9 @@ public sealed class CompanionBrain
             if (TryLightMiningTunnel(instance, me, profile, observation))
                 return true;
 
-            Point targetTile = FindReachableMiningTile(me, observation, pick, sustainedTunnel);
+            Point targetTile = FindReachableMiningTile(instance, me, observation, pick, sustainedTunnel);
             if (targetTile.X >= 0)
-                return MoveAndWorkTile(instance, me, pickaxeSlot, targetTile);
+                return MoveAndWorkTile(instance, me, pickaxeSlot, targetTile, mining: true);
 
             // Nothing minable within reach: close in on the spot the owner is digging so fresh
             // tiles come into range, rather than standing back and swinging at nothing.
@@ -1358,7 +1358,7 @@ public sealed class CompanionBrain
         return true;
     }
 
-    private static Point FindNearestExposedOreTile(Vector2 center, int radiusInTiles)
+    private static Point FindNearestExposedOreTile(CompanionInstance instance, Vector2 center, int radiusInTiles)
     {
         Point origin = center.ToTileCoordinates();
         Point best = new(-1, -1);
@@ -1370,7 +1370,8 @@ public sealed class CompanionBrain
                 if (!WorldGen.InWorld(x, y, 3))
                     continue;
                 Tile tile = Main.tile[x, y];
-                if (!tile.HasTile || !IsOreTile(tile.TileType) || !WorldGen.CanKillTile(x, y))
+                if (!tile.HasTile || !IsOreTile(tile.TileType) || !WorldGen.CanKillTile(x, y) ||
+                    CompanionMiningSafety.IsMiningBlocked(instance, x, y))
                     continue;
                 bool exposed = !Main.tile[x - 1, y].HasTile || !Main.tile[x + 1, y].HasTile ||
                     !Main.tile[x, y - 1].HasTile || !Main.tile[x, y + 1].HasTile;
@@ -1396,7 +1397,8 @@ public sealed class CompanionBrain
     /// tunnelling — so the companion clears the same passage instead of poking scattered holes off
     /// to the side (which is what made its digging look misaligned).
     /// </summary>
-    private static Point FindReachableMiningTile(Player me, CompanionPlayer observation, Item pick, bool sustainedTunnel)
+    private static Point FindReachableMiningTile(CompanionInstance instance, Player me,
+        CompanionPlayer observation, Item pick, bool sustainedTunnel)
     {
         Point dig = new(observation.ObservedTileX, observation.ObservedTileY);
         Point tunnel = observation.TunnelDirection;
@@ -1412,8 +1414,9 @@ public sealed class CompanionBrain
             for (int y = meTile.Y - reachY; y <= meTile.Y + reachY; y++)
             {
                 // Cheap reach test first — it culls most of the box before the more expensive
-                // CanKillTile check inside CanMineNaturalTile ever runs.
-                if (!IsTileInMiningReach(me, pick, x, y) || !CanMineNaturalTile(x, y, requiredOreType))
+                // CanKillTile check inside CanMineOrdinaryTarget ever runs.
+                if (!IsTileInMiningReach(me, pick, x, y) ||
+                    !CanMineOrdinaryTarget(instance, x, y, requiredOreType))
                     continue;
 
                 // Once the owner has been cutting a deliberate shaft/tunnel for two seconds,
@@ -1545,9 +1548,11 @@ public sealed class CompanionBrain
         me.position.Y / 16f - Player.tileRangeY - tool.tileBoost <= y &&
         (me.position.Y + me.height) / 16f + Player.tileRangeY + tool.tileBoost - 2f >= y;
 
-    private static bool CanMineNaturalTile(int x, int y, int? requiredType)
+    private static bool CanMineOrdinaryTarget(CompanionInstance instance, int x, int y, int? requiredType)
     {
         if (!WorldGen.InWorld(x, y, 3))
+            return false;
+        if (CompanionMiningSafety.IsMiningBlocked(instance, x, y))
             return false;
         Tile tile = Main.tile[x, y];
         if (!tile.HasTile || requiredType.HasValue && tile.TileType != requiredType.Value)
@@ -1582,9 +1587,14 @@ public sealed class CompanionBrain
         return best;
     }
 
-    private bool MoveAndWorkTile(CompanionInstance instance, Player me, int toolInventorySlot, Point targetTile)
+    private bool MoveAndWorkTile(CompanionInstance instance, Player me, int toolInventorySlot,
+        Point targetTile, bool mining = false)
     {
         if (!WorldGen.InWorld(targetTile.X, targetTile.Y, 3) || !Main.tile[targetTile.X, targetTile.Y].HasTile)
+            return false;
+        // Re-check at actuation time as well as during target selection. A cached target must not
+        // survive a live config change and reach vanilla ItemCheck after protection is enabled.
+        if (mining && CompanionMiningSafety.IsMiningBlocked(instance, targetTile.X, targetTile.Y))
             return false;
 
         Vector2 targetCenter = new(targetTile.X * 16f + 8f, targetTile.Y * 16f + 8f);

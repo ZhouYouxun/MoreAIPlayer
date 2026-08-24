@@ -58,6 +58,12 @@ public sealed class MoreAIPlayerClientConfig : ModConfig
     [DefaultValue(false)]
     public bool CompanionsRescueWhenOwnerHurt;
 
+    // Ordinary companions must not turn a spawn-area base into a mining target merely because a
+    // mining tactic remained selected between summons. The automation companion is deliberately
+    // exempt: autonomous world progression is its explicit purpose.
+    [DefaultValue(true)]
+    public bool ProtectBaseFromCompanionMining;
+
     // These are companion-owned functional slots, separate from the world's normal accessory
     // progression. Items stay safely stored when the slider is lowered and become active again
     // when it is raised. The synthetic companion runtime is singleplayer-only today, so this is

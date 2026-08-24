@@ -27,7 +27,7 @@ Mods: {
 
 				OrdinaryCompanionsHostileToPlayers: {
 					Label: "[i:BloodyMachete] Les compagnons ordinaires peuvent blesser les joueurs"
-					Tooltip: Désactivé par défaut et réservé au divertissement et aux tests. Seuls les compagnons ordinaires invoqués par le livre de débogage sont concernés. Ils restent alliés entre eux et ne ciblent activement que les PNJ hostiles. Les joueurs peuvent les blesser et leurs armes ou projectiles peuvent blesser les joueurs au contact. Les chasseurs et les compagnons automatiques présents ou passés sont exclus.
+					Tooltip: Les compagnons de tout joueur peuvent blesser accidentellement n'importe quel joueur, que le PvP soit activé ou non.
 				}
 			}
 
@@ -42,53 +42,58 @@ Mods: {
 				}
 
 				EnablePhantomPlayerDebugText: {
-					Label: "[i:GoldenKey] Activer le texte de débogage des joueurs fantômes"
-					Tooltip: Affiche des informations de développement en direct au-dessus des compagnons fantômes. Désactivé par défaut.
+					Label: "[i:GoldenKey] Afficher les relevés de débogage"
+					Tooltip: Affiche les relevés de débogage du développement.
 				}
 
 				ShowCompanionHealthBars: {
-					// Label: "[i:LifeCrystal] Show companion health bars"
-					// Tooltip: Disabled by default. Companions occupy real player slots, so the game already draws a health bar over them. Enable to also show the mod's own bar below each companion.
+					Label: "[i:LifeCrystal] Afficher une barre de vie supplémentaire"
+					Tooltip: Dessine la propre barre de vie de ce mod. À activer seulement si la barre de vie par défaut ne fonctionne pas.
 				}
 
 				UseChatForCompanionReviveTimer: {
-					Label: "[i:RecallPotion] Annoncer la réanimation dans le chat"
-					Tooltip: Désactivé par défaut. Remplace le décompte au-dessus de vous par un message à la mort et un autre à la réanimation.
+					Label: "[i:RecallPotion] Avis de mort et de réanimation dans le chat"
+					Tooltip: Envoie un avis lorsqu'un compagnon meurt ou revient à la vie.
 				}
 
 				AllowRightClickOpenBackpack: {
-					// Label: "[i:Chest] Right-click a companion to open its backpack"
-					// Tooltip: Disabled by default. When off, right-clicking a companion does nothing and the backpack opens only through the matrix panel at the top of the screen. Enable to open it by right-clicking the companion.
+					Label: "[i:Chest] Clic droit sur un compagnon pour ouvrir le sac"
+					Tooltip: Une autre manière d'ouvrir le sac ; équivaut à cliquer directement sur son onglet.
 				}
 
 				CompanionsFightAfterOwnerDeath: {
 					Label: "[i:EnchantedSword] Les compagnons combattent après votre mort"
-					Tooltip: Activé par défaut. Si vous mourez durant un boss, vos compagnons liés restent et continuent de combattre. Désactivez-le pour les dissiper immédiatement.
+					Tooltip: S'il est désactivé, les compagnons disparaissent immédiatement après votre mort.
 				}
 
 				CompanionsTakeDamage: {
 					Label: "[i:CobaltShield] Les compagnons subissent des dégâts"
-					Tooltip: Désactivé par défaut. Activez-le pour que les compagnons subissent des dégâts normaux, puissent mourir et reviennent après leur délai normal. Désactivé, ils sont immunisés contre tous les dégâts.
+					Tooltip: Autorise les compagnons à subir des dégâts normaux, mourir et attendre de revenir à la vie.
 				}
 
 				CompanionsRescueWhenOwnerHurt: {
 					Label: "[i:MagicMirror] Rappeler les compagnons quand vous êtes blessé"
-					Tooltip: Désactivé par défaut. Les compagnons se téléportent près de vous sur des emplacements sûrs et distincts.
+					Tooltip: Téléporte immédiatement tous les compagnons vers vous lorsque vous êtes blessé.
+				}
+
+				ProtectBaseFromCompanionMining: {
+					Label: "[i:PeaceCandle] Protection de la base"
+					Tooltip: Lorsqu'elle est activée, les compagnons ne considèrent pas les blocs à moins de 200 cases du point d'apparition comme destructibles.
 				}
 
 				ExtraAccessorySlots: {
-					Label: "[i:CelestialShell] Emplacements d'accessoires supplémentaires du compagnon"
-					Tooltip: Curseur client de 0 à 7. Réduire la valeur conserve les objets mais désactive leurs effets.
+					Label: "[i:CelestialShell] Emplacements d'accessoires supplémentaires"
+					Tooltip: Permet aux compagnons d'équiper davantage d'accessoires.
 				}
 
 				CompanionsAutoCollectWorldItems: {
-					Label: "[i:TreasureMagnet] Les compagnons ramassent automatiquement les objets du monde"
-					Tooltip: Désactivé par défaut. Lorsqu'elle est désactivée, les compagnons ne cherchent, ne réservent, ne poursuivent et ne ramassent aucun objet du monde. Activez-la seulement après avoir vérifié la compatibilité avec votre sauvegarde et vos mods.
+					Label: "[i:TreasureMagnet] Ramasser automatiquement les objets du monde"
+					Tooltip: Définit si les compagnons peuvent essayer de ramasser tout objet du monde.
 				}
 
 				CompanionsAllowBackpackWorldDrops: {
-					Label: "[i:TrashCan] Autoriser les compagnons à jeter les objets du sac dans le monde"
-					Tooltip: Désactivé par défaut. Tout jeter crée des objets du monde et peut appeler les hooks d'autres mods. Activez-le seulement après avoir confirmé que la sauvegarde est stable.
+					Label: "[i:TrashCan] Autoriser le vidage rapide"
+					Tooltip: Définit si le sac d'un compagnon est vidé en une action. Cela peut causer des ralentissements.
 				}
 			}
 		}
@@ -119,6 +124,7 @@ Mods: {
 
 			DevelopmentNotice: {
 				DisplayName: Note de développement des compagnons fantômes
+				CombatControls: Clic gauche : manier la clé | Clic droit : lancer la clé tournoyante
 				Development: Ce mod est toujours en développement actif.
 				SoloCreator: Il est créé et maintenu par une seule personne.
 				Updates: Je continuerai de le mettre à jour, d'améliorer les compagnons et de corriger les problèmes signalés par les joueurs.
@@ -467,6 +473,7 @@ Mods: {
 			// WheelCommandCaptureFixed: Fixed capture
 			// WheelCommandCaptureFree: Free capture
 			// WheelCommandCaptureBreak: Clear debris
+			BaseProtectionMiningTip: La protection de la base est activée : les compagnons fantômes ordinaires ne peuvent pas miner dans un rayon de {0} blocs autour du point d'apparition du monde. Pour l'autoriser, désactivez Protection de la base dans la configuration. Les compagnons automatiques ne sont pas concernés.
 			AutomationSingleplayerOnly: Le Grimoire automatique est pour l'instant réservé au solo.
 			AutomationAlreadyActive: Ce compagnon automatique est déjà occupé ; recliquer ne le réinitialise pas.
 			AutomationNoFreeSlot: Aucun emplacement libre n'est disponible pour le compagnon automatique.
@@ -564,6 +571,11 @@ Mods: {
 		}
 
 		NPCs.DamageTestDummyNPC.DisplayName: Mannequin de test de dégâts
-		// Projectiles.DevelopmentNoticeSwing.DisplayName: Development Notice Swing
+
+		Projectiles: {
+			// DevelopmentNoticeSwing.DisplayName: Development Notice Swing
+			// DevelopmentNoticeThrown.DisplayName: Development Notice Thrown
+			// DevelopmentNoticeExplosion.DisplayName: Development Notice Explosion
+		}
 	}
 }

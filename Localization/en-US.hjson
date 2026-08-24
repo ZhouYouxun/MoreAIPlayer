@@ -27,7 +27,7 @@ Mods: {
 
 				OrdinaryCompanionsHostileToPlayers: {
 					Label: "[i:BloodyMachete] Ordinary companions can hurt players"
-					Tooltip: Disabled by default and intended for entertainment and testing. Only ordinary companions summoned by the debug book are affected. They remain allies with one another and still target only hostile NPCs. Players can hurt them, and their item or projectile attacks can hurt players on contact. Hunters and present or former automation companions are excluded.
+					Tooltip: Companions belonging to any player can accidentally hurt any player, whether PvP is enabled or not.
 				}
 			}
 
@@ -42,53 +42,58 @@ Mods: {
 				}
 
 				EnablePhantomPlayerDebugText: {
-					Label: "[i:GoldenKey] Enable Phantom Player Debug Text"
-					Tooltip: Shows the live development readout above phantom companions. Disabled by default.
+					Label: "[i:GoldenKey] Display companion debug text"
+					Tooltip: Displays development debug readings.
 				}
 
 				ShowCompanionHealthBars: {
-					Label: "[i:LifeCrystal] Show companion health bars"
-					Tooltip: Disabled by default. Companions occupy real player slots, so the game already draws a health bar over them. Enable to also show the mod's own bar below each companion.
+					Label: "[i:LifeCrystal] Display extra companion health bar"
+					Tooltip: Draws this mod's own health bar. Enable only if the default health bar does not work.
 				}
 
 				UseChatForCompanionReviveTimer: {
-					Label: "[i:RecallPotion] Put companion revival notices in chat"
-					Tooltip: Disabled by default: the current countdown remains above you. Enable to replace it with one chat notice on death and one on revival.
+					Label: "[i:RecallPotion] Companion revival chat notices"
+					Tooltip: Sends a notice when a companion dies or revives.
 				}
 
 				AllowRightClickOpenBackpack: {
-					Label: "[i:Chest] Right-click a companion to open its backpack"
-					Tooltip: Disabled by default. When off, right-clicking a companion does nothing and the backpack opens only through the matrix panel at the top of the screen. Enable to open it by right-clicking the companion.
+					Label: "[i:Chest] Right-click companion to open backpack"
+					Tooltip: Another way to open the backpack; equivalent to clicking its tab directly.
 				}
 
 				CompanionsFightAfterOwnerDeath: {
 					Label: "[i:EnchantedSword] Companions fight after owner death"
-					Tooltip: Enabled by default. If you die during a boss fight, your bound companions remain and keep fighting. Disable to dismiss all bound companions immediately when you die.
+					Tooltip: When disabled, companions disappear immediately after you die.
 				}
 
 				CompanionsTakeDamage: {
 					Label: "[i:CobaltShield] Companions take damage"
-					Tooltip: Disabled by default. Enable for companions to take normal damage, die, and revive after their normal delay. While disabled, companions are immune to all damage.
+					Tooltip: Allows companions to take normal damage, die, and wait to revive.
 				}
 
 				CompanionsRescueWhenOwnerHurt: {
 					Label: "[i:MagicMirror] Rescue companions when you are hurt"
-					Tooltip: Disabled by default. When enabled, being hurt recalls companions to separate nearby spots that are clear of terrain, hazards, and nearby threats. If no safe spot is found, they stay put.
+					Tooltip: Immediately teleports all companions to you when you are hurt.
+				}
+
+				ProtectBaseFromCompanionMining: {
+					Label: "[i:PeaceCandle] Base protection"
+					Tooltip: When enabled, companions will not treat blocks within 200 tiles of the world spawn as breakable.
 				}
 
 				ExtraAccessorySlots: {
-					Label: "[i:CelestialShell] Extra companion accessory slots"
-					Tooltip: Client-side slider, from 0 to 7. Saving enables that many companion-only accessory slots. Lowering it keeps the items safely stored but disables their effects.
+					Label: "[i:CelestialShell] Extra accessory slots"
+					Tooltip: Allows companions to equip more accessories.
 				}
 
 				CompanionsAutoCollectWorldItems: {
-					Label: "[i:TreasureMagnet] Companions automatically collect world items"
-					Tooltip: Disabled by default. When off, companions do not scan, reserve, approach, or collect world drops. Enable only after confirming compatibility with your save and other mods.
+					Label: "[i:TreasureMagnet] Auto-pick up world drops"
+					Tooltip: Whether companions may attempt to pick up any world drops.
 				}
 
 				CompanionsAllowBackpackWorldDrops: {
-					Label: "[i:TrashCan] Allow companions to drop backpack items into the world"
-					Tooltip: Disabled by default. Drop All creates world items and can invoke other mods' item hooks. Enable only after confirming that your save is stable.
+					Label: "[i:TrashCan] Allow quick drop all"
+					Tooltip: Whether to empty a companion backpack with one action. This may cause lag.
 				}
 			}
 		}
@@ -119,6 +124,7 @@ Mods: {
 
 			DevelopmentNotice: {
 				DisplayName: Phantom Companion Development Notice
+				CombatControls: Left click: swing the key | Right click: throw the rapidly spinning key
 				Development: This mod is actively under development.
 				SoloCreator: It is made and maintained by one creator.
 				Updates: I will keep updating it, improving companions, and fixing problems reported by players.
@@ -473,6 +479,7 @@ Mods: {
 			WheelCommandCaptureFixed: Fixed capture
 			WheelCommandCaptureFree: Free capture
 			WheelCommandCaptureBreak: Clear debris
+			BaseProtectionMiningTip: Base protection is enabled: ordinary phantom companions cannot mine within {0} tiles of the world spawn. To allow mining near your base, disable Base Protection in Config. Automation companions are unaffected.
 			AutomationSingleplayerOnly: The Automation Tome is single-player only for now.
 			AutomationAlreadyActive: This automation companion is already busy; clicking again will not refresh it.
 			AutomationNoFreeSlot: No free slot is available for the automation companion right now.
@@ -570,6 +577,11 @@ Mods: {
 		}
 
 		NPCs.DamageTestDummyNPC.DisplayName: Damage Test Dummy N P C
-		Projectiles.DevelopmentNoticeSwing.DisplayName: Development Notice Swing
+
+		Projectiles: {
+			DevelopmentNoticeSwing.DisplayName: Development Notice Swing
+			DevelopmentNoticeThrown.DisplayName: Development Notice Thrown
+			DevelopmentNoticeExplosion.DisplayName: Development Notice Explosion
+		}
 	}
 }

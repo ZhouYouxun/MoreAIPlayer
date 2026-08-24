@@ -27,7 +27,7 @@ Mods: {
 
 				OrdinaryCompanionsHostileToPlayers: {
 					Label: "[i:BloodyMachete] Обычные спутники могут ранить игроков"
-					Tooltip: По умолчанию выключено и предназначено только для развлечения и тестирования. Влияет лишь на обычных спутников из отладочной книги. Они остаются союзниками друг для друга и по-прежнему выбирают целью только враждебных NPC. Игроки могут ранить их, а их оружие и снаряды могут ранить игроков при контакте. Охотники и нынешние либо бывшие автоматические спутники исключены.
+					Tooltip: Спутники любого игрока могут случайно ранить любого игрока, независимо от того, включено ли PvP.
 				}
 			}
 
@@ -42,53 +42,58 @@ Mods: {
 				}
 
 				EnablePhantomPlayerDebugText: {
-					Label: "[i:GoldenKey] Включить отладочный текст призрачных игроков"
-					Tooltip: Показывает над призрачными спутниками текущие данные разработки. По умолчанию выключено.
+					Label: "[i:GoldenKey] Показывать отладочные данные"
+					Tooltip: Показывает отладочные данные разработки.
 				}
 
 				ShowCompanionHealthBars: {
-					// Label: "[i:LifeCrystal] Show companion health bars"
-					// Tooltip: Disabled by default. Companions occupy real player slots, so the game already draws a health bar over them. Enable to also show the mod's own bar below each companion.
+					Label: "[i:LifeCrystal] Показывать дополнительную шкалу здоровья"
+					Tooltip: Рисует собственную шкалу здоровья этого мода. Включайте, только если стандартная шкала здоровья не работает.
 				}
 
 				UseChatForCompanionReviveTimer: {
-					Label: "[i:RecallPotion] Сообщать о возрождении в чате"
-					Tooltip: По умолчанию выключено. Заменяет таймер над игроком сообщениями при смерти и возрождении.
+					Label: "[i:RecallPotion] Сообщения о смерти и возрождении в чате"
+					Tooltip: Отправляет сообщение, когда спутник погибает или возрождается.
 				}
 
 				AllowRightClickOpenBackpack: {
-					// Label: "[i:Chest] Right-click a companion to open its backpack"
-					// Tooltip: Disabled by default. When off, right-clicking a companion does nothing and the backpack opens only through the matrix panel at the top of the screen. Enable to open it by right-clicking the companion.
+					Label: "[i:Chest] Открывать рюкзак спутника правой кнопкой"
+					Tooltip: Ещё один способ открыть рюкзак; равнозначен прямому нажатию на его вкладку.
 				}
 
 				CompanionsFightAfterOwnerDeath: {
 					Label: "[i:EnchantedSword] Спутники сражаются после смерти игрока"
-					Tooltip: Включено по умолчанию. Если вы погибнете во время битвы с боссом, связанные спутники останутся и продолжат сражаться. Отключите, чтобы сразу распустить их после смерти.
+					Tooltip: Если выключено, спутники исчезают сразу после вашей смерти.
 				}
 
 				CompanionsTakeDamage: {
 					Label: "[i:CobaltShield] Спутники получают урон"
-					Tooltip: По умолчанию выключено. Включите, чтобы спутники получали обычный урон, могли погибнуть и возрождались после обычной задержки. Пока выключено, они неуязвимы для любого урона.
+					Tooltip: Позволяет спутникам получать обычный урон, погибать и ждать возрождения.
 				}
 
 				CompanionsRescueWhenOwnerHurt: {
 					Label: "[i:MagicMirror] Призывать спутников при получении урона"
-					Tooltip: По умолчанию выключено. Спутники телепортируются на отдельные безопасные места рядом с вами.
+					Tooltip: При получении урона немедленно телепортирует всех спутников к вам.
+				}
+
+				ProtectBaseFromCompanionMining: {
+					Label: "[i:PeaceCandle] Защита базы"
+					Tooltip: Когда включено, спутники не считают разрушаемыми блоки в пределах 200 клеток от точки появления мира.
 				}
 
 				ExtraAccessorySlots: {
-					Label: "[i:CelestialShell] Дополнительные слоты аксессуаров спутника"
-					Tooltip: Клиентский ползунок от 0 до 7. При уменьшении значения предметы сохраняются, но их эффекты отключаются.
+					Label: "[i:CelestialShell] Дополнительные слоты аксессуаров"
+					Tooltip: Позволяет спутникам экипировать больше аксессуаров.
 				}
 
 				CompanionsAutoCollectWorldItems: {
-					Label: "[i:TreasureMagnet] Спутники автоматически собирают предметы мира"
-					Tooltip: По умолчанию выключено. Пока опция выключена, спутники не ищут, не резервируют, не преследуют и не собирают предметы мира. Включайте её только после проверки совместимости с сохранением и другими модами.
+					Label: "[i:TreasureMagnet] Автоматически подбирать предметы мира"
+					Tooltip: Определяет, могут ли спутники пытаться подбирать любые предметы мира.
 				}
 
 				CompanionsAllowBackpackWorldDrops: {
-					Label: "[i:TrashCan] Разрешить спутникам выбрасывать предметы рюкзака в мир"
-					Tooltip: По умолчанию выключено. Очистить рюкзак создаёт предметы мира и может вызвать хуки других модов. Включайте только после подтверждения стабильности сохранения.
+					Label: "[i:TrashCan] Разрешить быстрое опустошение"
+					Tooltip: Определяет, опустошается ли рюкзак спутника одним действием. Это может вызвать задержки.
 				}
 			}
 		}
@@ -119,6 +124,7 @@ Mods: {
 
 			DevelopmentNotice: {
 				DisplayName: Сведения о разработке призрачных спутников
+				CombatControls: Левая кнопка: взмах ключом | Правая кнопка: бросок вращающегося ключа
 				Development: Этот мод находится в активной разработке.
 				SoloCreator: Он создаётся и поддерживается одним человеком.
 				Updates: Я буду продолжать обновлять его, улучшать спутников и исправлять проблемы, о которых сообщают игроки.
@@ -467,6 +473,7 @@ Mods: {
 			// WheelCommandCaptureFixed: Fixed capture
 			// WheelCommandCaptureFree: Free capture
 			// WheelCommandCaptureBreak: Clear debris
+			BaseProtectionMiningTip: Защита базы включена: обычные фантомные спутники не могут копать в радиусе {0} блоков от точки появления мира. Чтобы разрешить это, отключите Защиту базы в настройках. Автоматические спутники не затрагиваются.
 			AutomationSingleplayerOnly: Книга автоматизации пока только для одиночной игры.
 			AutomationAlreadyActive: Этот автоматический спутник уже занят; повторный клик его не сбросит.
 			AutomationNoFreeSlot: Сейчас нет свободного слота для автоматического спутника.
@@ -564,6 +571,11 @@ Mods: {
 		}
 
 		NPCs.DamageTestDummyNPC.DisplayName: Манекен для проверки урона
-		// Projectiles.DevelopmentNoticeSwing.DisplayName: Development Notice Swing
+
+		Projectiles: {
+			// DevelopmentNoticeSwing.DisplayName: Development Notice Swing
+			// DevelopmentNoticeThrown.DisplayName: Development Notice Thrown
+			// DevelopmentNoticeExplosion.DisplayName: Development Notice Explosion
+		}
 	}
 }

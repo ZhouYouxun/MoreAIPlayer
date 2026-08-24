@@ -129,6 +129,7 @@ public static class CompanionModeWheel
         List<CompanionInstance> squad = CompanionCommandBook.OwnedActiveCompanions(Main.myPlayer);
         if (squad.Count == 0)
             return;
+        bool miningSelected = false;
 
         // A mode whose tool slot is empty is refused outright rather than silently selected and
         // then ignored by the AI, so the player finds out immediately and knows what to equip.
@@ -150,7 +151,11 @@ public static class CompanionModeWheel
 
             profile.Mode = chosen;
             profile.WheelCommandsActive = false;
+            miningSelected |= chosen == CompanionMode.Mining;
         }
+
+        if (miningSelected)
+            CompanionMiningSafety.NotifyFirstMiningTactic(Main.LocalPlayer);
 
         Player owner = Main.LocalPlayer;
         Rectangle overHead = new((int)owner.position.X, (int)owner.position.Y - 36, owner.width, owner.height);

@@ -27,7 +27,7 @@ Mods: {
 
 				OrdinaryCompanionsHostileToPlayers: {
 					Label: "[i:BloodyMachete] Normale Gefährten können Spieler verletzen"
-					Tooltip: Standardmäßig deaktiviert und nur für Unterhaltung und Tests gedacht. Betrifft nur normale Gefährten aus dem Debug-Buch. Sie bleiben untereinander verbündet und greifen weiterhin nur feindliche NPCs an. Spieler können sie verletzen und ihre Waffen oder Projektile können Spieler bei Berührung verletzen. Jäger sowie aktuelle oder ehemalige Automatikgefährten sind ausgeschlossen.
+					Tooltip: Begleiter jedes Spielers können jeden Spieler versehentlich verletzen, unabhängig davon, ob PvP aktiviert ist.
 				}
 			}
 
@@ -42,53 +42,58 @@ Mods: {
 				}
 
 				EnablePhantomPlayerDebugText: {
-					Label: "[i:GoldenKey] Debug-Text für Phantomspieler aktivieren"
-					Tooltip: Zeigt über Phantom-Begleitern eine Live-Entwicklungsanzeige. Standardmäßig deaktiviert.
+					Label: "[i:GoldenKey] Entwickler-Debugwerte anzeigen"
+					Tooltip: Zeigt Entwicklungs-Debugwerte an.
 				}
 
 				ShowCompanionHealthBars: {
-					// Label: "[i:LifeCrystal] Show companion health bars"
-					// Tooltip: Disabled by default. Companions occupy real player slots, so the game already draws a health bar over them. Enable to also show the mod's own bar below each companion.
+					Label: "[i:LifeCrystal] Zusätzliche Begleiter-Lebensleiste anzeigen"
+					Tooltip: Zeichnet die eigene Lebensleiste dieser Mod. Nur aktivieren, wenn die Standard-Lebensleiste nicht funktioniert.
 				}
 
 				UseChatForCompanionReviveTimer: {
-					Label: "[i:RecallPotion] Wiederbelebung im Chat melden"
-					Tooltip: Standardmäßig aus. Ersetzt den Countdown über dir durch je eine Chatmeldung beim Tod und bei der Wiederbelebung.
+					Label: "[i:RecallPotion] Chat-Hinweise zu Tod und Wiederbelebung"
+					Tooltip: Sendet einen Hinweis, wenn ein Begleiter stirbt oder wiederbelebt wird.
 				}
 
 				AllowRightClickOpenBackpack: {
-					// Label: "[i:Chest] Right-click a companion to open its backpack"
-					// Tooltip: Disabled by default. When off, right-clicking a companion does nothing and the backpack opens only through the matrix panel at the top of the screen. Enable to open it by right-clicking the companion.
+					Label: "[i:Chest] Begleiter rechtsklicken, um Rucksack zu öffnen"
+					Tooltip: Eine weitere Möglichkeit, den Rucksack zu öffnen; entspricht einem direkten Klick auf seinen Tab.
 				}
 
 				CompanionsFightAfterOwnerDeath: {
 					Label: "[i:EnchantedSword] Begleiter kämpfen nach dem Tod weiter"
-					Tooltip: Standardmäßig aktiviert. Bei deinem Tod im Bosskampf bleiben gebundene Begleiter und kämpfen weiter. Deaktivieren, um sie beim Tod sofort aufzulösen.
+					Tooltip: Wenn deaktiviert, verschwinden Begleiter sofort nach deinem Tod.
 				}
 
 				CompanionsTakeDamage: {
 					Label: "[i:CobaltShield] Begleiter erleiden Schaden"
-					Tooltip: Standardmäßig deaktiviert. Aktivieren, damit Begleiter normalen Schaden erleiden, sterben und nach ihrer normalen Wartezeit wiederbelebt werden. Deaktiviert sind sie gegen allen Schaden immun.
+					Tooltip: Erlaubt Begleitern, normalen Schaden zu erleiden, zu sterben und auf ihre Wiederbelebung zu warten.
 				}
 
 				CompanionsRescueWhenOwnerHurt: {
 					Label: "[i:MagicMirror] Gefährten bei Schaden herbeirufen"
-					Tooltip: Standardmäßig deaktiviert. Bei Schaden werden Gefährten auf getrennte, sichere Plätze in deiner Nähe teleportiert.
+					Tooltip: Teleportiert bei Schaden sofort alle Begleiter zu dir.
+				}
+
+				ProtectBaseFromCompanionMining: {
+					Label: "[i:PeaceCandle] Basisschutz"
+					Tooltip: Wenn aktiviert, betrachten Begleiter Blöcke im Umkreis von 200 Feldern um den Weltspawn nicht als zerstörbar.
 				}
 
 				ExtraAccessorySlots: {
-					Label: "[i:CelestialShell] Zusätzliche Begleiter-Zubehörplätze"
-					Tooltip: Client-Regler von 0 bis 7. Gespeicherte Gegenstände bleiben erhalten, wenn der Wert gesenkt wird, sind dann aber inaktiv.
+					Label: "[i:CelestialShell] Zusätzliche Zubehörplätze"
+					Tooltip: Erlaubt Begleitern, mehr Zubehör anzulegen.
 				}
 
 				CompanionsAutoCollectWorldItems: {
-					Label: "[i:TreasureMagnet] Begleiter sammeln Weltgegenstände automatisch ein"
-					Tooltip: Standardmäßig deaktiviert. Ist die Option aus, scannen, reservieren, verfolgen und sammeln Begleiter keine Weltgegenstände. Erst nach einer Kompatibilitätsprüfung mit Spielstand und Mods aktivieren.
+					Label: "[i:TreasureMagnet] Welt-Drops automatisch aufsammeln"
+					Tooltip: Legt fest, ob Begleiter versuchen dürfen, Welt-Drops aufzuheben.
 				}
 
 				CompanionsAllowBackpackWorldDrops: {
-					Label: "[i:TrashCan] Begleiter dürfen Rucksackgegenstände in die Welt werfen"
-					Tooltip: Standardmäßig deaktiviert. Rucksack leeren erzeugt Weltgegenstände und kann Item-Hooks anderer Mods auslösen. Erst aktivieren, wenn dein Spielstand stabil ist.
+					Label: "[i:TrashCan] Schnelles Leeren erlauben"
+					Tooltip: Legt fest, ob ein Begleiter-Rucksack mit einer Aktion geleert wird. Dies kann Ruckler verursachen.
 				}
 			}
 		}
@@ -119,6 +124,7 @@ Mods: {
 
 			DevelopmentNotice: {
 				DisplayName: Entwicklungsnotiz zu Phantom-Begleitern
+				CombatControls: Linksklick: Schlüssel schwingen | Rechtsklick: schnell rotierenden Schlüssel werfen
 				Development: Dieser Mod befindet sich weiterhin in aktiver Entwicklung.
 				SoloCreator: Er wird von einer Person erstellt und gepflegt.
 				Updates: Ich werde ihn weiter aktualisieren, die Begleiter verbessern und von Spielern gemeldete Probleme beheben.
@@ -467,6 +473,7 @@ Mods: {
 			// WheelCommandCaptureFixed: Fixed capture
 			// WheelCommandCaptureFree: Free capture
 			// WheelCommandCaptureBreak: Clear debris
+			BaseProtectionMiningTip: Der Basisschutz ist aktiviert: Gewöhnliche Phantomgefährten können im Umkreis von {0} Blöcken um den Weltspawn nicht graben. Deaktiviere den Basisschutz in der Konfiguration, um dort graben zu lassen. Automatische Gefährten sind nicht betroffen.
 			AutomationSingleplayerOnly: Das Automatisierungsbuch ist vorerst nur für Einzelspieler.
 			AutomationAlreadyActive: Dieser automatische Begleiter ist bereits beschäftigt; erneutes Klicken setzt ihn nicht zurück.
 			AutomationNoFreeSlot: Derzeit ist kein freier Platz für den automatischen Begleiter verfügbar.
@@ -564,6 +571,11 @@ Mods: {
 		}
 
 		NPCs.DamageTestDummyNPC.DisplayName: Schadens-Testpuppe
-		// Projectiles.DevelopmentNoticeSwing.DisplayName: Development Notice Swing
+
+		Projectiles: {
+			// DevelopmentNoticeSwing.DisplayName: Development Notice Swing
+			// DevelopmentNoticeThrown.DisplayName: Development Notice Thrown
+			// DevelopmentNoticeExplosion.DisplayName: Development Notice Explosion
+		}
 	}
 }

@@ -27,7 +27,7 @@ Mods: {
 
 				OrdinaryCompanionsHostileToPlayers: {
 					Label: "[i:BloodyMachete] Companheiros comuns podem ferir jogadores"
-					Tooltip: Desativado por padrão e destinado apenas a diversão e testes. Afeta somente companheiros comuns invocados pelo livro de depuração. Eles continuam aliados entre si e miram apenas NPCs hostis. Jogadores podem feri-los, e suas armas ou projéteis podem ferir jogadores por contato. Caçadores e companheiros automáticos atuais ou antigos ficam de fora.
+					Tooltip: Companheiros de qualquer jogador podem ferir acidentalmente qualquer jogador, independentemente de o PvP estar ativado.
 				}
 			}
 
@@ -42,53 +42,58 @@ Mods: {
 				}
 
 				EnablePhantomPlayerDebugText: {
-					Label: "[i:GoldenKey] Ativar texto de depuração de jogadores fantasma"
-					Tooltip: Mostra leituras de desenvolvimento em tempo real sobre os companheiros fantasma. Desativado por padrão.
+					Label: "[i:GoldenKey] Mostrar leituras de depuração"
+					Tooltip: Mostra leituras de depuração de desenvolvimento.
 				}
 
 				ShowCompanionHealthBars: {
-					// Label: "[i:LifeCrystal] Show companion health bars"
-					// Tooltip: Disabled by default. Companions occupy real player slots, so the game already draws a health bar over them. Enable to also show the mod's own bar below each companion.
+					Label: "[i:LifeCrystal] Mostrar barra de vida extra do companheiro"
+					Tooltip: Desenha a própria barra de vida deste mod. Ative apenas se a barra de vida padrão não funcionar.
 				}
 
 				UseChatForCompanionReviveTimer: {
-					Label: "[i:RecallPotion] Avisar renascimento no chat"
-					Tooltip: Desativado por padrão. Substitui a contagem acima do jogador por um aviso ao morrer e outro ao renascer.
+					Label: "[i:RecallPotion] Avisos de morte e renascimento no chat"
+					Tooltip: Envia um aviso quando um companheiro morre ou revive.
 				}
 
 				AllowRightClickOpenBackpack: {
-					// Label: "[i:Chest] Right-click a companion to open its backpack"
-					// Tooltip: Disabled by default. When off, right-clicking a companion does nothing and the backpack opens only through the matrix panel at the top of the screen. Enable to open it by right-clicking the companion.
+					Label: "[i:Chest] Clique com o botão direito no companheiro para abrir a mochila"
+					Tooltip: Outra forma de abrir a mochila; equivale a clicar diretamente na aba dela.
 				}
 
 				CompanionsFightAfterOwnerDeath: {
 					Label: "[i:EnchantedSword] Companheiros lutam após a morte do jogador"
-					Tooltip: Ativado por padrão. Se você morrer durante um chefe, os companheiros vinculados permanecem e continuam lutando. Desative para dispensá-los imediatamente ao morrer.
+					Tooltip: Quando desativado, os companheiros desaparecem imediatamente após sua morte.
 				}
 
 				CompanionsTakeDamage: {
 					Label: "[i:CobaltShield] Companheiros recebem dano"
-					Tooltip: Desativado por padrão. Ative para que os companheiros recebam dano normal, possam morrer e revivam após o tempo normal. Quando desativado, eles ficam imunes a todo dano.
+					Tooltip: Permite que os companheiros recebam dano normal, morram e aguardem para reviver.
 				}
 
 				CompanionsRescueWhenOwnerHurt: {
 					Label: "[i:MagicMirror] Chamar companheiros ao sofrer dano"
-					Tooltip: Desativado por padrão. Os companheiros se teleportam para locais seguros e separados perto de você.
+					Tooltip: Ao sofrer dano, teleporta imediatamente todos os companheiros até você.
+				}
+
+				ProtectBaseFromCompanionMining: {
+					Label: "[i:PeaceCandle] Proteção da base"
+					Tooltip: Quando ativada, os companheiros não consideram quebráveis os blocos em até 200 quadrados do ponto de surgimento do mundo.
 				}
 
 				ExtraAccessorySlots: {
-					Label: "[i:CelestialShell] Espaços extras de acessórios do companheiro"
-					Tooltip: Controle do cliente de 0 a 7. Reduzir o valor mantém os itens guardados, mas desativa seus efeitos.
+					Label: "[i:CelestialShell] Espaços extras de acessórios"
+					Tooltip: Permite que companheiros equipem mais acessórios.
 				}
 
 				CompanionsAutoCollectWorldItems: {
-					Label: "[i:TreasureMagnet] Companheiros coletam itens do mundo automaticamente"
-					Tooltip: Desativado por padrão. Quando desligado, os companheiros não examinam, reservam, perseguem nem coletam itens do mundo. Ative somente após confirmar a compatibilidade com seu mundo e outros mods.
+					Label: "[i:TreasureMagnet] Coletar automaticamente itens do mundo"
+					Tooltip: Define se os companheiros podem tentar pegar quaisquer itens do mundo.
 				}
 
 				CompanionsAllowBackpackWorldDrops: {
-					Label: "[i:TrashCan] Permitir que companheiros soltem itens da mochila no mundo"
-					Tooltip: Desativado por padrão. Esvaziar mochila cria itens no mundo e pode chamar hooks de outros mods. Ative somente após confirmar que o salvamento está estável.
+					Label: "[i:TrashCan] Permitir esvaziamento rápido"
+					Tooltip: Define se a mochila de um companheiro é esvaziada com uma ação. Isso pode causar lentidão.
 				}
 			}
 		}
@@ -119,6 +124,7 @@ Mods: {
 
 			DevelopmentNotice: {
 				DisplayName: Aviso de desenvolvimento dos Companheiros Fantasmas
+				CombatControls: Clique esquerdo: golpear com a chave | Clique direito: lançar a chave giratória
 				Development: Este mod continua em desenvolvimento ativo.
 				SoloCreator: Ele é criado e mantido por uma única pessoa.
 				Updates: Continuarei a atualizá-lo, melhorar os companheiros e corrigir os problemas relatados pelos jogadores.
@@ -467,6 +473,7 @@ Mods: {
 			// WheelCommandCaptureFixed: Fixed capture
 			// WheelCommandCaptureFree: Free capture
 			// WheelCommandCaptureBreak: Clear debris
+			BaseProtectionMiningTip: A proteção da base está ativada: companheiros fantasmas comuns não podem minerar num raio de {0} blocos do ponto de surgimento do mundo. Para permitir, desative Proteção da base na configuração. Companheiros automáticos não são afetados.
 			AutomationSingleplayerOnly: O Tomo Automático é somente para um jogador por enquanto.
 			AutomationAlreadyActive: Este companheiro automático já está ocupado; clicar de novo não o reinicia.
 			AutomationNoFreeSlot: No momento não há espaço livre para o companheiro automático.
@@ -564,6 +571,11 @@ Mods: {
 		}
 
 		NPCs.DamageTestDummyNPC.DisplayName: Boneco de teste de dano
-		// Projectiles.DevelopmentNoticeSwing.DisplayName: Development Notice Swing
+
+		Projectiles: {
+			// DevelopmentNoticeSwing.DisplayName: Development Notice Swing
+			// DevelopmentNoticeThrown.DisplayName: Development Notice Thrown
+			// DevelopmentNoticeExplosion.DisplayName: Development Notice Explosion
+		}
 	}
 }

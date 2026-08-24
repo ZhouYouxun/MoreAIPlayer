@@ -27,7 +27,7 @@ Mods: {
 
 				OrdinaryCompanionsHostileToPlayers: {
 					Label: "[i:BloodyMachete] 普通伙伴可误伤玩家"
-					Tooltip: 默认关闭，仅供娱乐与测试。只影响调试书召唤的普通幻影伙伴；它们彼此为友军，依然只主动锁定敌对 NPC。玩家可以伤害它们，而它们的物品或弹幕攻击接触玩家时也会造成伤害。猎人以及当前或曾经的自动伙伴均不受影响。
+					Tooltip: 任何玩家的伙伴都可能会误伤任何玩家，无论是否开启PVP
 				}
 			}
 
@@ -42,53 +42,58 @@ Mods: {
 				}
 
 				EnablePhantomPlayerDebugText: {
-					Label: "[i:GoldenKey] 开启幻影玩家的调试文本"
-					Tooltip: 在幻影伙伴头顶显示实时开发调试读数。默认关闭，仅在需要排查问题时手动开启。
+					Label: "[i:GoldenKey] 打开伙伴调试文本"
+					Tooltip: 显示开发调试读数
 				}
 
 				ShowCompanionHealthBars: {
-					Label: "[i:LifeCrystal] 显示伙伴血条"
-					Tooltip: 默认关闭。伙伴占用真实玩家槽位，游戏本身已经会在其头顶画一条血条；开启后会额外在每个伙伴脚下再画一条本模组自己的血条。
+					Label: "[i:LifeCrystal] 显示伙伴额外血条"
+					Tooltip: 绘制一条本模组自己的血条【仅建议当默认血条不起作用时再开启】
 				}
 
 				UseChatForCompanionReviveTimer: {
 					Label: "[i:RecallPotion] 在聊天栏提示伙伴复活"
-					Tooltip: 默认关闭，继续在玩家头顶显示当前倒计时；开启后改为阵亡时和复活时各发送一条聊天提示。
+					Tooltip: 伙伴阵亡或复活都会发送提示
 				}
 
 				AllowRightClickOpenBackpack: {
-					Label: "[i:Chest] 右键幻影玩家打开其背包"
-					Tooltip: 默认关闭。关闭时右键点击幻影玩家不会有任何反应，只能通过屏幕顶部的矩阵小框来打开背包；开启后即可像之前一样右键幻影玩家打开背包。
+					Label: "[i:Chest] 右键伙伴打开背包"
+					Tooltip: 多一种打开背包的方式，效果相当于直接点击选项卡
 				}
 
 				CompanionsFightAfterOwnerDeath: {
 					Label: "[i:EnchantedSword] 主控死亡后伙伴继续战斗"
-					Tooltip: 默认开启。Boss 战中主控玩家死亡后，已绑定的伙伴会留在场上继续战斗；关闭后，主控死亡时其所有已召唤伙伴都会立刻解散。
+					Tooltip: 如果关闭则死亡后伙伴直接消失
 				}
 
 				CompanionsTakeDamage: {
 					Label: "[i:CobaltShield] 伙伴会受到伤害"
-					Tooltip: 默认关闭。开启后伙伴会正常受伤、死亡，并在原有等待时间后复活；关闭时伙伴免疫所有伤害。
+					Tooltip: 允许伙伴正常受伤死亡并等待复活
 				}
 
 				CompanionsRescueWhenOwnerHurt: {
 					Label: "[i:MagicMirror] 受伤时紧急召回伙伴"
-					Tooltip: 默认关闭。开启后，受伤会将伙伴传送到你周围彼此分开、避开实体方块、危险地块和附近威胁的位置；找不到安全落点时，伙伴会留在原地。
+					Tooltip: 受伤时会让所有伙伴立刻传送到自己身边
+				}
+
+				ProtectBaseFromCompanionMining: {
+					Label: "[i:PeaceCandle] 基地保护"
+					Tooltip: 开启后出生点周围200格内的方块将不会被伙伴视为可破坏方块
 				}
 
 				ExtraAccessorySlots: {
-					Label: "[i:CelestialShell] 额外伙伴饰品栏"
-					Tooltip: 客户端滑块，范围为 0 到 7。保存后会启用对应数量的伙伴专属额外饰品栏；调低时其中的物品会保留，但暂不生效。
+					Label: "[i:CelestialShell] 额外配饰栏"
+					Tooltip: 允许给伙伴安装更多的配饰
 				}
 
 				CompanionsAutoCollectWorldItems: {
-					Label: "[i:TreasureMagnet] 伙伴自动拾取世界掉落物"
-					Tooltip: 默认关闭。关闭时伙伴不会扫描、预约、靠近或拾取地面掉落物；确认存档和其他模组兼容后再手动开启。
+					Label: "[i:TreasureMagnet] 自动拾取掉落物"
+					Tooltip: 伙伴是否被允许尝试捡起任何掉落物
 				}
 
 				CompanionsAllowBackpackWorldDrops: {
-					Label: "[i:TrashCan] 允许伙伴将背包物品丢到世界中"
-					Tooltip: 默认关闭。“全部丢出”会创建世界掉落物，并可能触发其他模组的物品钩子；确认存档稳定后再手动开启。
+					Label: "[i:TrashCan] 允许一键丢弃"
+					Tooltip: 是否一键将伙伴背包里的东西倒出【该功能可能导致卡顿】
 				}
 			}
 		}
@@ -119,6 +124,7 @@ Mods: {
 
 			DevelopmentNotice: {
 				DisplayName: 幻影伙伴开发说明
+				CombatControls: 左键：挥舞钥匙斩击｜右键：投出高速旋转的钥匙
 				Development: 本模组仍在持续开发中。
 				SoloCreator: 目前由作者一人制作与维护。
 				Updates: 我会持续更新、完善伙伴功能，并处理玩家遇到的各种问题。
@@ -473,6 +479,7 @@ Mods: {
 			WheelCommandCaptureFixed: 定点捕捉
 			WheelCommandCaptureFree: 自由捕捉
 			WheelCommandCaptureBreak: 破坏杂草碎石
+			BaseProtectionMiningTip: 基地保护已开启：世界生成点周围 {0} 格内，普通幻影伙伴不会挖掘。如果希望在基地周边挖掘，请前往配置选项并关闭“基地保护”。自动伙伴不受此限制。
 			AutomationSingleplayerOnly: 自动书暂时仅支持单人模式。
 			AutomationAlreadyActive: 这位自动伙伴已经在忙了，再点也不会刷新它。
 			AutomationNoFreeSlot: 现在没有空余槽位可以召唤自动伙伴。
@@ -570,6 +577,11 @@ Mods: {
 		}
 
 		NPCs.DamageTestDummyNPC.DisplayName: 伤害测试傀儡
-		// Projectiles.DevelopmentNoticeSwing.DisplayName: Development Notice Swing
+
+		Projectiles: {
+			// DevelopmentNoticeSwing.DisplayName: Development Notice Swing
+			// DevelopmentNoticeThrown.DisplayName: Development Notice Thrown
+			// DevelopmentNoticeExplosion.DisplayName: Development Notice Explosion
+		}
 	}
 }

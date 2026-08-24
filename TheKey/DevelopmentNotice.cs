@@ -1,4 +1,5 @@
 using Microsoft.Xna.Framework;
+using System;
 using Terraria;
 using Terraria.DataStructures;
 using Terraria.ID;
@@ -12,9 +13,15 @@ namespace MoreAIPlayer;
 public sealed class DevelopmentNotice : ModItem
 {
     private const string CatDoodle = "      ╱|、\n    (˚ˎ 。7\n     |、˜〵\n     じしˍ,)ノ";
+    private const int LeftClickUseFrames = 17;
+    private const int RightClickUseFrames = 50;
+    private const float RightClickDamageMultiplier = 2.5f;
 
     // Borrow the vanilla Keybrand sprite until the mod has a dedicated icon for this notice.
     public override string Texture => $"Terraria/Images/Item_{ItemID.Keybrand}";
+
+    public override void SetStaticDefaults() =>
+        ItemID.Sets.ItemsThatAllowRepeatedRightClick[Type] = true;
 
     public override void SetDefaults()
     {
@@ -27,7 +34,7 @@ public sealed class DevelopmentNotice : ModItem
         Item.DamageType = DamageClass.Melee;
         Item.crit = 30;
         Item.knockBack = 4f;
-        Item.useTime = Item.useAnimation = 17;
+        Item.useTime = Item.useAnimation = LeftClickUseFrames;
         Item.useStyle = ItemUseStyleID.Swing;
         Item.UseSound = SoundID.Item1;
         Item.autoReuse = true;
@@ -38,9 +45,35 @@ public sealed class DevelopmentNotice : ModItem
         Item.shootsEveryUse = true;
     }
 
+    public override bool AltFunctionUse(Player player) => true;
+
+    public override bool CanUseItem(Player player)
+    {
+        bool throwing = player.altFunctionUse == 2;
+        Item.useTime = Item.useAnimation = throwing ? RightClickUseFrames : LeftClickUseFrames;
+        Item.useStyle = throwing ? ItemUseStyleID.Shoot : ItemUseStyleID.Swing;
+        Item.noUseGraphic = throwing;
+        Item.shoot = throwing
+            ? ModContent.ProjectileType<DevelopmentNoticeThrown>()
+            : ModContent.ProjectileType<DevelopmentNoticeSwing>();
+        Item.shootSpeed = throwing ? 24f : 1f;
+        return true;
+    }
+
     public override bool Shoot(Player player, EntitySource_ItemUse_WithAmmo source, Vector2 position, Vector2 velocity,
         int type, int damage, float knockback)
     {
+        if (player.altFunctionUse == 2)
+        {
+            int thrownDamage = Math.Max(1, (int)Math.Round(
+                damage * RightClickDamageMultiplier, MidpointRounding.AwayFromZero));
+            Vector2 launchVelocity = velocity.SafeNormalize(new Vector2(player.direction, 0f)) * Item.shootSpeed;
+            Projectile.NewProjectile(source, player.MountedCenter, launchVelocity,
+                ModContent.ProjectileType<DevelopmentNoticeThrown>(), thrownDamage, knockback,
+                player.whoAmI, launchVelocity.X < 0f ? -1f : 1f);
+            return false;
+        }
+
         float adjustedItemScale = player.GetAdjustedItemScale(Item);
         Projectile.NewProjectile(source, player.MountedCenter, new Vector2(player.direction, 0f), type, damage,
             knockback, player.whoAmI, player.direction * player.gravDir, player.itemAnimationMax, adjustedItemScale);
@@ -49,6 +82,10 @@ public sealed class DevelopmentNotice : ModItem
 
     public override void ModifyTooltips(System.Collections.Generic.List<TooltipLine> tooltips)
     {
+        tooltips.Add(new TooltipLine(Mod, "CombatControls", GetText("CombatControls"))
+        {
+            OverrideColor = new Color(255, 235, 145)
+        });
         tooltips.Add(new TooltipLine(Mod, "Development", GetText("Development"))
         {
             OverrideColor = new Color(255, 205, 92)
