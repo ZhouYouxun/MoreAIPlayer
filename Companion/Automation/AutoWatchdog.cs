@@ -45,6 +45,7 @@ public sealed class AutoWatchdog
     private const int RetryBackoffCapTicks = 600;   // 10s
     private const int BlockedRetryTicks = 300;       // 5s between blocked-state re-checks
     private const int MaxRetryAttemptsBeforeAlternative = 3;
+    private const int ImmediateAlternativeAttempts = 3;
 
     private readonly AutoTaskRuntime runtime;
 
@@ -131,6 +132,7 @@ public sealed class AutoWatchdog
 
         if (metricChanged || worldChanged)
         {
+            runtime.AttemptCount = 0;
             runtime.TicksWithoutMetricChange = 0;
             runtime.TicksWithoutProgress = 0;
             runtime.WindowStartPosition = ctx.Me.Center;
@@ -180,8 +182,18 @@ public sealed class AutoWatchdog
                 return EnterBlocked(AutoBlockReason.Faulted, now);
 
             case AutoTaskResult.AlternativeRequired:
-                // The local target is gone/unreachable: climb toward relocation immediately.
+                // A rejected tree/vein/chest normally means “choose the next known target”, not
+                // “the whole goal is stuck”. Give target selection a few clean ticks before
+                // escalating; the former immediate escalation reached Blocked in a handful of
+                // frames and handed control to the oscillating background patrol.
                 RejectCurrentTarget(plan.Goal);
+                ctx.Navigator.Reset();
+                runtime.AttemptCount++;
+                runtime.TicksWithoutProgress = 0;
+                runtime.TicksWithoutMetricChange = 0;
+                runtime.WindowStartPosition = ctx.Me.Center;
+                if (runtime.AttemptCount < ImmediateAlternativeAttempts)
+                    return AutoWatchdogAction.Continue;
                 return Escalate(ctx, plan, now, AutoBlockReason.NoAlternative);
 
             case AutoTaskResult.Running:

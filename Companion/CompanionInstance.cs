@@ -26,11 +26,16 @@ public sealed class CompanionInstance
     /// Ordinary companions never allocate it.</summary>
     public Automation.AutoCompanionBrain AutoBrain => autoBrain ??= new();
 
-    /// <summary>Cheap per-tick cache of <see cref="CompanionProfile.IsAutoRunning"/>, refreshed in
-    /// <see cref="BindProfile"/>. Lets every enumeration hook (squad spread, command book, build
-    /// material sourcing, manager panel, whip buff) exclude the automation companion without
-    /// re-resolving its profile each time.</summary>
+    /// <summary>Latched identity of this live summon. Once a player slot was summoned for
+    /// automation it may never fall through to the ordinary companion brain merely because the
+    /// persisted run flag changed during this update. Completion retires that live entity instead.
+    /// This also lets every enumeration hook exclude it without re-resolving its profile.</summary>
     public bool IsAutoIdentity;
+
+    /// <summary>Set by the automation brain when the live synthetic player must be retired after
+    /// the current update. The entity system owns the actual dismissal so its player-slot
+    /// dictionary is never mutated from inside the update enumeration.</summary>
+    public bool DismissRequested;
 
     /// <summary>Cached persistent origin used by the optional player-hostility damage pass.</summary>
     public bool IsOrdinaryDebugIdentity;
@@ -301,12 +306,20 @@ public sealed class CompanionInstance
     public void BindProfile(Player owner, CompanionProfile profile)
     {
         Player me = Entity;
-        IsAutoIdentity = profile.IsAutoRunning;
+        // Promotion is allowed during initial bind; demotion is not. Running is persistent planner
+        // state, not a safe live-brain discriminator. If it changes after Moon Lord (or a damaged
+        // save is repaired), this slot remains automation-owned until the entity system dismisses
+        // it instead of suddenly becoming an escort that follows the real player.
+        if (profile.IsAutoRunning)
+            IsAutoIdentity = true;
         IsOrdinaryDebugIdentity = profile.Origin == CompanionOrigin.OrdinaryDebug;
         if (IsAutoIdentity)
         {
-            AutoMaxLife = profile.AutoState.MaxLife();
-            AutoMaxMana = profile.AutoState.MaxMana();
+            // Also migrates automation profiles created by versions that randomized appearance.
+            // Applying this every bind keeps later dresser changes in exact lockstep with owner.
+            profile.MirrorAppearanceFrom(owner);
+            AutoMaxLife = profile.AutoState?.MaxLife() ?? 100;
+            AutoMaxMana = profile.AutoState?.MaxMana() ?? 20;
         }
         else
         {

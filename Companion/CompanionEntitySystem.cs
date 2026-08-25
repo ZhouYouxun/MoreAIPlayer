@@ -202,6 +202,11 @@ public sealed class CompanionEntitySystem : ModSystem
             !owner.active || owner.whoAmI != Main.myPlayer || FindByProfile(owner.whoAmI, profile.Id) is not null)
             return false;
 
+        // Completed automation profiles remain owned by the Automation Tome forever. A damaged
+        // binding or another summon item may not reinterpret one as an ordinary escort.
+        if (profile.IsAutomationProfile && !profile.IsAutoRunning)
+            return false;
+
         VirtualPlayerExecutionContext.RegisterRealPlayer(owner);
 
         // The automation companion is independent of the owner's minion economy: it does not need a
@@ -496,7 +501,7 @@ public sealed class CompanionEntitySystem : ModSystem
             // preference, so every companion bound to that owner is released this same update.
             // The automation companion is independent of its owner and is never dismissed by the
             // owner dying, whatever this preference says.
-            if (owner.dead && !profile.IsAutoRunning &&
+            if (owner.dead && !instance.IsAutoIdentity &&
                 MoreAIPlayerClientConfig.Current?.CompanionsFightAfterOwnerDeath == false)
             {
                 (expired ??= []).Add(slot);
@@ -525,8 +530,17 @@ public sealed class CompanionEntitySystem : ModSystem
             bool updated = CompanionFaultGuard.Run($"companion update #{slot}", () =>
             {
                 instance.BindProfile(owner, profile);
-                if (profile.IsAutoRunning)
+                if (instance.IsAutoIdentity)
+                {
+                    // An automation slot must fail closed. A missing state is corrupted binding
+                    // data, never permission to run the ordinary follow/escort brain.
+                    if (profile.AutoState is null)
+                    {
+                        instance.DismissRequested = true;
+                        return;
+                    }
                     instance.AutoBrain.Update(instance, owner, profile);
+                }
                 else
                     instance.Brain.Update(instance, owner, profile);
                 instance.AimWorld = SanitizeAim(instance.Entity, instance.AimWorld, instance);
@@ -537,6 +551,8 @@ public sealed class CompanionEntitySystem : ModSystem
             if (updated)
             {
                 instance.FaultStreak = 0;
+                if (instance.DismissRequested)
+                    (expired ??= []).Add(slot);
                 continue;
             }
 

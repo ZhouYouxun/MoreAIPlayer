@@ -41,9 +41,11 @@ public static class AutoCampaignGearController
         }
         int lateDefense = ctx.State.PreferredClass switch
         {
-            AutoCombatClass.Melee => 42,
-            AutoCombatClass.Ranged => 36,
-            _ => 30
+            AutoCombatClass.Melee => 52,
+            AutoCombatClass.Ranged => 42,
+            AutoCombatClass.Magic => 36,
+            AutoCombatClass.Summoner => 36,
+            _ => 42
         };
         int defenseTarget = ctx.State.CampaignStage >= AutoCampaignStage.Plantera ? lateDefense : 28;
         // A 200%-power Drax/Pickaxe Axe consumes drops from all three mechanical bosses. Requiring
@@ -424,27 +426,34 @@ public static class AutoCampaignGearController
     {
         AutoCombatClass.Melee => [ItemID.PalladiumMask, ItemID.CobaltMask, ItemID.PalladiumBreastplate, ItemID.CobaltBreastplate, ItemID.PalladiumLeggings, ItemID.CobaltLeggings],
         AutoCombatClass.Ranged => [ItemID.PalladiumHelmet, ItemID.CobaltHelmet, ItemID.PalladiumBreastplate, ItemID.CobaltBreastplate, ItemID.PalladiumLeggings, ItemID.CobaltLeggings],
-        _ => [ItemID.PalladiumHeadgear, ItemID.CobaltHat, ItemID.PalladiumBreastplate, ItemID.CobaltBreastplate, ItemID.PalladiumLeggings, ItemID.CobaltLeggings]
+        AutoCombatClass.Magic => [ItemID.PalladiumHeadgear, ItemID.CobaltHat, ItemID.PalladiumBreastplate, ItemID.CobaltBreastplate, ItemID.PalladiumLeggings, ItemID.CobaltLeggings],
+        // Vanilla ore armour has no summoner headpiece. Use the highest-defense fallback until a
+        // real class set (Spider/Hallowed/etc.) is found rather than pretending the magic helmet
+        // benefits summons.
+        _ => [ItemID.PalladiumMask, ItemID.CobaltMask, ItemID.PalladiumBreastplate, ItemID.CobaltBreastplate, ItemID.PalladiumLeggings, ItemID.CobaltLeggings]
     };
 
     private static int[] Tier2Armour(AutoCombatClass cls) => cls switch
     {
         AutoCombatClass.Melee => [ItemID.OrichalcumMask, ItemID.MythrilHelmet, ItemID.OrichalcumBreastplate, ItemID.MythrilChainmail, ItemID.OrichalcumLeggings, ItemID.MythrilGreaves],
         AutoCombatClass.Ranged => [ItemID.OrichalcumHelmet, ItemID.MythrilHat, ItemID.OrichalcumBreastplate, ItemID.MythrilChainmail, ItemID.OrichalcumLeggings, ItemID.MythrilGreaves],
-        _ => [ItemID.OrichalcumHeadgear, ItemID.MythrilHood, ItemID.OrichalcumBreastplate, ItemID.MythrilChainmail, ItemID.OrichalcumLeggings, ItemID.MythrilGreaves]
+        AutoCombatClass.Magic => [ItemID.OrichalcumHeadgear, ItemID.MythrilHood, ItemID.OrichalcumBreastplate, ItemID.MythrilChainmail, ItemID.OrichalcumLeggings, ItemID.MythrilGreaves],
+        _ => [ItemID.OrichalcumMask, ItemID.MythrilHelmet, ItemID.OrichalcumBreastplate, ItemID.MythrilChainmail, ItemID.OrichalcumLeggings, ItemID.MythrilGreaves]
     };
 
     private static int[] Tier3Armour(AutoCombatClass cls) => cls switch
     {
         AutoCombatClass.Melee => [ItemID.TitaniumMask, ItemID.AdamantiteHelmet, ItemID.TitaniumBreastplate, ItemID.AdamantiteBreastplate, ItemID.TitaniumLeggings, ItemID.AdamantiteLeggings],
         AutoCombatClass.Ranged => [ItemID.TitaniumHelmet, ItemID.AdamantiteMask, ItemID.TitaniumBreastplate, ItemID.AdamantiteBreastplate, ItemID.TitaniumLeggings, ItemID.AdamantiteLeggings],
-        _ => [ItemID.TitaniumHeadgear, ItemID.AdamantiteHeadgear, ItemID.TitaniumBreastplate, ItemID.AdamantiteBreastplate, ItemID.TitaniumLeggings, ItemID.AdamantiteLeggings]
+        AutoCombatClass.Magic => [ItemID.TitaniumHeadgear, ItemID.AdamantiteHeadgear, ItemID.TitaniumBreastplate, ItemID.AdamantiteBreastplate, ItemID.TitaniumLeggings, ItemID.AdamantiteLeggings],
+        _ => [ItemID.TitaniumMask, ItemID.AdamantiteHelmet, ItemID.TitaniumBreastplate, ItemID.AdamantiteBreastplate, ItemID.TitaniumLeggings, ItemID.AdamantiteLeggings]
     };
 
     private static int[] ChlorophyteArmour(AutoCombatClass cls) => cls switch
     {
         AutoCombatClass.Melee => [ItemID.ChlorophyteMask, ItemID.ChlorophytePlateMail, ItemID.ChlorophyteGreaves],
         AutoCombatClass.Ranged => [ItemID.ChlorophyteHelmet, ItemID.ChlorophytePlateMail, ItemID.ChlorophyteGreaves],
-        _ => [ItemID.ChlorophyteHeadgear, ItemID.ChlorophytePlateMail, ItemID.ChlorophyteGreaves]
+        AutoCombatClass.Magic => [ItemID.ChlorophyteHeadgear, ItemID.ChlorophytePlateMail, ItemID.ChlorophyteGreaves],
+        _ => [ItemID.ChlorophyteMask, ItemID.ChlorophytePlateMail, ItemID.ChlorophyteGreaves]
     };
 }

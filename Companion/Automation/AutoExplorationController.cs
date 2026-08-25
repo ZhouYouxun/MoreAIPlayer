@@ -19,7 +19,7 @@ public static class AutoExplorationController
             item => AutoLootController.OpportunityValue(ctx.Profile, item) > 0);
         AutoGearController.OrganizeOwnedGear(ctx.Me, ctx.Profile);
 
-        if (TryDefendAgainstNearbyEnemy(ctx))
+        if (AutoThreatController.TryDefendWhileExploring(ctx))
             return AutoTaskResult.Running;
 
         AutoCompanionState state = ctx.State;
@@ -68,36 +68,4 @@ public static class AutoExplorationController
         return me.Center.Y;
     }
 
-    private static bool TryDefendAgainstNearbyEnemy(AutoContext ctx)
-    {
-        NPC best = null;
-        float bestDistance = 14f * 16f;
-        foreach (NPC npc in Main.ActiveNPCs)
-        {
-            if (!npc.active || npc.friendly || npc.townNPC || npc.boss || npc.life <= 0 ||
-                npc.dontTakeDamage || npc.damage <= 0)
-                continue;
-            float distance = Vector2.Distance(ctx.Me.Center, npc.Center);
-            if (distance >= bestDistance)
-                continue;
-            bestDistance = distance;
-            best = npc;
-        }
-        if (best is null)
-            return false;
-
-        int weapon = AutoCombatController.BestCombatInventoryIndex(ctx, best, out _);
-        if (weapon < 0)
-            return false;
-        Item item = ctx.Me.inventory[weapon];
-        float attackRange = item.shoot > ProjectileID.None || item.shootSpeed > 0f ? 9f * 16f : 3.5f * 16f;
-        if (bestDistance > attackRange)
-            ctx.Navigator.Navigate(ctx.Me, best.Center);
-        else
-        {
-            ctx.Navigator.Idle(ctx.Me);
-            ctx.Actuator.UseItemInSlot(ctx.Instance, ctx.Me, weapon, best.Center);
-        }
-        return true;
-    }
 }

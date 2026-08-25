@@ -231,19 +231,19 @@ public sealed class CompanionPlayer : ModPlayer
 
     /// <summary>
     /// Creates the from-scratch automation companion for the current world and binds it. The
-    /// appearance and name are randomized so it reads as a distinct new player, and it receives
-    /// only its two starting tools — the whole flow builds up from there.
+    /// name remains independent, while its dresser appearance mirrors the controlling player. It
+    /// receives only its two starting tools — the whole flow builds up from there.
     /// </summary>
     public CompanionProfile CreateAutomationProfileForCurrentWorld()
     {
-        CompanionProfile profile = CreateProfile(mirrorOwner: false);
+        CompanionProfile profile = CreateProfile(mirrorOwner: true);
         profile.BeginAutomation();
         autoBindings[CurrentWorldKey()] = new AutoWorldBinding { ProfileId = profile.Id, Completed = false };
         return profile;
     }
 
-    /// <summary>Marks the current world's automation run finished and converts the profile back to
-    /// a normal companion. Used by the Moon Lord completion path (later phase).</summary>
+    /// <summary>Marks the current world's automation run finished. The saved profile remains owned
+    /// by the Automation Tome and can never enter an ordinary companion summon path.</summary>
     public void MarkAutomationCompletedForCurrentWorld()
     {
         AutoWorldBinding binding = CurrentWorldAutoBinding();
@@ -361,6 +361,31 @@ public sealed class CompanionPlayer : ModPlayer
                 Profiles.Add(CompanionProfile.RecoverInventory(recoveredId, Player, savedProfile));
                 CompanionFaultGuard.ReportRecovered($"profile {recoveredId} metadata", exception, true);
             }
+        }
+
+        RepairAutomationBindingsAfterLoad();
+    }
+
+    /// <summary>World bindings are the authoritative ownership record. If a legacy loader or the
+    /// inventory-preserving recovery path had to rebuild profile metadata, immediately restore the
+    /// automation identity before any ordinary summon item can inspect or claim that profile.</summary>
+    private void RepairAutomationBindingsAfterLoad()
+    {
+        HashSet<int> unfinishedProfileIds = [];
+        foreach (AutoWorldBinding binding in autoBindings.Values)
+            if (!binding.Completed)
+                unfinishedProfileIds.Add(binding.ProfileId);
+
+        foreach (AutoWorldBinding binding in autoBindings.Values)
+        {
+            CompanionProfile profile = GetProfile(binding.ProfileId);
+            if (profile is null)
+                continue;
+
+            if (unfinishedProfileIds.Contains(binding.ProfileId))
+                profile.EnsureAutomationRunning();
+            else
+                profile.EnsureAutomationCompleted();
         }
     }
 

@@ -211,7 +211,7 @@ public sealed class CompanionNavigator
         }
 
         if (path is not null && pathIndex < path.Count)
-            FollowPath(me);
+            FollowPath(me, goalWorld);
         else
             DirectSteer(me, goalWorld);
 
@@ -229,19 +229,23 @@ public sealed class CompanionNavigator
         dropCommitmentSourceRow = -1;
     }
 
-    private void FollowPath(Player me)
+    private void FollowPath(Player me, Vector2 goalWorld)
     {
         Vector2 feet = me.Bottom;
+        int goalDirection = HorizontalDirection(feet.X, goalWorld.X);
 
-        // Skip waypoints that are already reached (checks a couple ahead so shallow
-        // zig-zags do not force the companion to touch every node exactly).
+        // Skip waypoints that are already reached, as well as ordinary ground waypoints which are
+        // now behind the player while the final destination is still ahead. A knockback, conveyor,
+        // or slope step which moves the player toward the destination is useful progress; never
+        // spend a jump's airtime walking backward merely to touch an obsolete A* node.
         int probes = 0;
-        while (pathIndex < path.Count && probes < 3)
+        while (pathIndex < path.Count && probes < 8)
         {
             PathStep step = path[pathIndex];
             Vector2 waypoint = step.FeetWorld;
-            if (System.Math.Abs(waypoint.X - feet.X) <= WaypointReachX &&
-                System.Math.Abs(waypoint.Y - feet.Y) <= WaypointReachY)
+            if ((System.Math.Abs(waypoint.X - feet.X) <= WaypointReachX &&
+                 System.Math.Abs(waypoint.Y - feet.Y) <= WaypointReachY) ||
+                HasSafelyPassedGroundWaypoint(feet, waypoint, goalDirection, step))
             {
                 pathIndex++;
                 probes++;
@@ -267,10 +271,15 @@ public sealed class CompanionNavigator
         float dx = target.X - feet.X;
         float dy = target.Y - feet.Y; // positive: waypoint below the feet
 
-        if (dx > 6f)
-            me.controlRight = true;
-        else if (dx < -6f)
-            me.controlLeft = true;
+        int steerDirection = HorizontalDirection(feet.X, target.X);
+        // Preserve net forward progress in the air. Ground paths may legitimately route around a
+        // wall, but an old same-height node behind an airborne player is never worth reversing for.
+        if (me.velocity.Y != 0f && goalDirection != 0 && steerDirection == -goalDirection &&
+            System.Math.Abs(target.Y - feet.Y) <= 3f * 16f)
+        {
+            steerDirection = goalDirection;
+        }
+        ApplyHorizontalDirection(me, steerDirection);
 
         // Leaving a rope onto a platform/ground: stop climbing, walk toward the exit tile. Not
         // pressing up/down lets vanilla release the pulley as horizontal movement carries the
@@ -278,7 +287,7 @@ public sealed class CompanionNavigator
         if (current.Kind == PathMoveKind.ExitRope)
         {
             dropCommitmentSourceRow = -1;
-            ApplyJumpControls(me, dy < -8f);
+            ApplyJumpControls(me, dy < -24f);
             TryOpenDoorForCurrentMovement(me);
             return;
         }
@@ -289,11 +298,15 @@ public sealed class CompanionNavigator
         if (current.Kind == PathMoveKind.DropThroughPlatform)
             ExecutePlatformDrop(me, dy);
 
-        bool needUp = dy < -8f;
+        // Terraria walks up a clear one-tile rise by itself. The pathfinder emits that as a normal
+        // walk edge, so treating its -16px waypoint delta as a jump is both wasteful and the source
+        // of the visible hop-on-every-step behaviour. Two or more tiles (or a real gap) still jump.
+        bool needUp = dy < -24f;
 
         // Same-height waypoints across a gap need a running jump: without this the
         // companion would walk straight off the edge into the hole.
         if (!needUp && me.velocity.Y == 0f && dy < 24f && System.Math.Abs(dx) > 24f &&
+            !CanWalkUpSingleTile(me, System.Math.Sign(dx)) &&
             NoGroundAhead(me, System.Math.Sign(dx)))
         {
             needUp = true;
@@ -441,7 +454,9 @@ public sealed class CompanionNavigator
         // A hammered platform briefly reduces horizontal speed while vanilla resolves the
         // one-way slope. That is normal stair contact, not a wall. Treating it as blocked made
         // the old fallback spam fresh jumps and wedge the companion on the next sloped piece.
-        bool blocked = !onHammeredPlatformStair && (me.controlLeft || me.controlRight) && me.velocity.Y == 0f &&
+        bool oneTileWalkUp = movementDirection != 0 && CanWalkUpSingleTile(me, movementDirection);
+        bool blocked = !onHammeredPlatformStair && !oneTileWalkUp &&
+                       (me.controlLeft || me.controlRight) && me.velocity.Y == 0f &&
                        System.Math.Abs(me.velocity.X) < 0.35f && stuckTicks > 10;
         bool needUp = toGoal.Y < -48f || blocked;
 
@@ -452,7 +467,8 @@ public sealed class CompanionNavigator
             toGoal.Y > 48f && System.Math.Abs(toGoal.X) < 160f && StandingOnPlatform(me))
             ExecutePlatformDrop(me, toGoal.Y);
 
-        if (!needUp && me.velocity.Y == 0f && toGoal.Y < 32f && (me.controlLeft || me.controlRight) &&
+        if (!needUp && !oneTileWalkUp && me.velocity.Y == 0f && toGoal.Y < 32f &&
+            (me.controlLeft || me.controlRight) &&
             NoGroundAhead(me, me.controlRight ? 1f : -1f))
         {
             needUp = true; // hop gaps instead of walking into them
@@ -469,6 +485,50 @@ public sealed class CompanionNavigator
             : 0;
         if (direction != 0)
             TryOpenDoorAhead(me, direction);
+    }
+
+    private static bool HasSafelyPassedGroundWaypoint(Vector2 feet, Vector2 waypoint,
+        int goalDirection, PathStep step) =>
+        step.Kind == PathMoveKind.Move && goalDirection != 0 &&
+        (feet.X - waypoint.X) * goalDirection > WaypointReachX &&
+        System.Math.Abs(feet.Y - waypoint.Y) <= 3f * 16f;
+
+    private static int HorizontalDirection(float fromX, float toX)
+    {
+        float delta = toX - fromX;
+        return delta > 6f ? 1 : delta < -6f ? -1 : 0;
+    }
+
+    private static void ApplyHorizontalDirection(Player me, int direction)
+    {
+        if (direction > 0)
+            me.controlRight = true;
+        else if (direction < 0)
+            me.controlLeft = true;
+    }
+
+    /// <summary>True when the immediate front column is a clear, ordinary one-tile walk-up. This
+    /// mirrors the pathfinder's existing walk edge and deliberately includes solid blocks and
+    /// platforms/stairs which vanilla can step onto without pressing Jump.</summary>
+    private static bool CanWalkUpSingleTile(Player me, int direction)
+    {
+        if (me.velocity.Y != 0f || direction == 0)
+            return false;
+        int frontX = (int)((direction > 0 ? me.Right.X + 4f : me.Left.X - 4f) / 16f);
+        int feetRow = (int)((me.Bottom.Y - 2f) / 16f);
+        int bodyColumn = (int)(me.Bottom.X / 16f);
+        if (!WorldGen.InWorld(frontX, feetRow, 3))
+            return false;
+        // SolidOrSlopedTile covers ordinary blocks, half blocks and solid slopes. Hammered
+        // platforms are covered by IsPlatform; neither shape should be misclassified as a wall
+        // merely because horizontal speed briefly reaches zero during vanilla's step-up physics.
+        bool hasStepSupport = WorldGen.SolidOrSlopedTile(frontX, feetRow) ||
+            CompanionPathfinder.IsPlatform(frontX, feetRow);
+        bool clearAboveStep = !WorldGen.SolidOrSlopedTile(frontX, feetRow - 1) &&
+            !CompanionPathfinder.IsPlatform(frontX, feetRow - 1);
+        return hasStepSupport && clearAboveStep &&
+            CompanionPathfinder.BodyFits(frontX, feetRow - 1) &&
+            CompanionPathfinder.BodyFits(bodyColumn, feetRow - 1);
     }
 
     /// <summary>

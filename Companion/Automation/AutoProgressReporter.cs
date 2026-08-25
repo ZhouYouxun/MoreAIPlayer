@@ -38,6 +38,19 @@ public static class AutoProgressReporter
             $"Mods.MoreAIPlayer.CompanionCommand.{key}", args), 255, 190, 105);
     }
 
+    public static void ReportSelfRescue(CompanionProfile profile, AutoSelfRescueReason reason,
+        int level, AutoSelfRescueAction action)
+    {
+        if (!MoreAIPlayerClientConfig.AutomationProgressChatEnabled || profile is null)
+            return;
+        Main.NewText(Language.GetTextValue(
+            "Mods.MoreAIPlayer.CompanionCommand.AutomationSelfRescue",
+            profile.Name,
+            LocalizedEnum("AutomationSelfRescueReason", reason.ToString()),
+            level,
+            LocalizedEnum("AutomationSelfRescueAction", action.ToString())), 255, 175, 95);
+    }
+
     public static void ReportWeapon(CompanionProfile profile, Item item,
         AutoWeaponAssessment assessment)
     {

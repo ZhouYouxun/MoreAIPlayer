@@ -66,8 +66,8 @@ public sealed class CompanionAutomationBook : ModItem
     /// <summary>Left click: create/summon/re-summon, or recall the live automation companion.</summary>
     private static void ToggleSummon(Player player, CompanionPlayer data)
     {
-        // The run already finished in this world: the profile has converted to a normal companion,
-        // and a second automation companion must never be created here.
+        // The run already finished in this world. Its saved profile remains automation-owned, and
+        // a second automation companion must never be created here.
         if (data.IsAutomationCompletedForCurrentWorld())
         {
             CompanionProfile finished = data.GetAutomationProfileForCurrentWorld();
@@ -88,6 +88,11 @@ public sealed class CompanionAutomationBook : ModItem
             Message("AutomationRecalled", InfoColor, profile.Name);
             return;
         }
+
+        // The binding says this run is unfinished, therefore this profile must enter the
+        // automation brain. Older/damaged saves can retain the binding while losing or clearing
+        // Running; repair that state in place so the book can never summon an ordinary follower.
+        profile.EnsureAutomationRunning();
 
         Vector2 spawn = profile.AutoState?.TryGetResumePosition(out Vector2 remembered) == true
             ? remembered

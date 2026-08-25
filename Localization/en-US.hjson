@@ -241,7 +241,7 @@ Mods: {
 					[For entertainment only; this feature is still in testing]
 					Left click: summon the automation companion; left-click again to recall it and save its position, inventory, and progression memory
 					Right click: move the camera to the automation companion; right-click again to return to yourself
-					It will try to explore, gather, build, fight, and progress the world independently; after finishing, it becomes a normal phantom companion
+					It will try to explore, gather, build, fight, and progress the world independently; after finishing, it stops and keeps its save, never joining the ordinary companion follow system
 					It may still get stuck, make mistakes, or encounter other bugs. Back up your world first. Single-player only.
 					'''
 			}
@@ -494,11 +494,26 @@ Mods: {
 			AutomationCameraStarted: The camera is now following {0}. You still control your own player.
 			AutomationCameraStopped: The camera has returned to your player.
 			AutomationBlocked: The automation companion is stuck on "{0}": {1}. It will keep retrying on its own.
-			AutomationCompleted: "{0} has defeated the Moon Lord. The automation run is over; it is now a normal phantom companion."
+			AutomationCompleted: "{0} has defeated the Moon Lord. The automation run is saved and complete; it will not become an ordinary following companion."
 			AutomationProgressStep: "[Automation · {0}] Stage: {1} · Step: {2} · Class: {3}"
 			AutomationWeaponSelected: "[Phone combat lab · {0}] Selected {1} · combat score {2} · theoretical DPS {3}"
 			AutomationDeathRecorded: "[Automation] {0} was defeated. It will revive at the sky base and return to the failed location."
 			AutomationReturnResumed: "[Automation] {0} reached the previous failure location and resumed the saved objective."
+			AutomationSelfRescue: "[Self-rescue · {0}] Detected {1} with no task progress; starting recovery level {2}: {3}."
+
+			AutomationSelfRescueReason: {
+				Stationary: stationary deadlock
+				Oscillation: repeated small-area oscillation
+				Embedded: collision box trapped in blocks
+				ReturnRouteFailed: return route also made no progress
+			}
+
+			AutomationSelfRescueAction: {
+				MineEscape: mine the body and immediate corridor clear
+				ChangeRoute: reject the bad target and change route and tactics
+				ReturnHome: physically return to the base or spawn
+				ForceRecall: safely recall home and re-plan
+			}
 
 			AutomationStage: {
 				Foundation: Foundation

@@ -319,14 +319,14 @@ public sealed class PhantomStaff : ModItem
             return null;
         CompanionPlayer data = owner.GetModPlayer<CompanionPlayer>();
         CompanionProfile byIdentity = data.GetProfileByPhantomStaff(staffIdentity);
-        if (byIdentity is not null && !byIdentity.IsAutoRunning)
+        if (byIdentity is not null && !byIdentity.IsAutomationProfile)
         {
             profileId = byIdentity.Id;
             return byIdentity;
         }
 
         CompanionProfile existing = data.GetProfile(profileId);
-        if (existing is not null && !existing.IsAutoRunning &&
+        if (existing is not null && !existing.IsAutomationProfile &&
             (string.IsNullOrWhiteSpace(existing.PhantomStaffIdentity) ||
              string.Equals(existing.PhantomStaffIdentity, staffIdentity, StringComparison.Ordinal)))
         {
@@ -345,7 +345,7 @@ public sealed class PhantomStaff : ModItem
 
         foreach (CompanionProfile candidate in data.Profiles)
         {
-            if (!candidate.IsAutoRunning && !claimed.Contains(candidate.Id) &&
+            if (!candidate.IsAutomationProfile && !claimed.Contains(candidate.Id) &&
                 string.IsNullOrWhiteSpace(candidate.PhantomStaffIdentity))
             {
                 profileId = candidate.Id;

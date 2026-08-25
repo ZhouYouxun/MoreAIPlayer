@@ -241,7 +241,7 @@ Mods: {
 					[Nur zur Unterhaltung; diese Funktion befindet sich noch im Test]
 					Linksklick: Beschwört den automatischen Begleiter; ein weiterer Linksklick ruft ihn zurück und speichert Position, Inventar und Fortschrittsgedächtnis
 					Rechtsklick: Bewegt die Kamera zum automatischen Begleiter; erneut rechtsklicken, um zurückzukehren
-					Er versucht selbstständig zu erkunden, zu sammeln, zu bauen, zu kämpfen und die Welt voranzutreiben; danach wird er zu einem normalen Phantomgefährten
+					Er versucht selbstständig zu erkunden, zu sammeln, zu bauen, zu kämpfen und die Welt voranzutreiben; danach wird der Lauf gespeichert und beendet, ohne dem normalen Begleiter-Folgesystem beizutreten
 					Er kann noch stecken bleiben, Fehler machen oder andere Bugs verursachen. Erstelle vorher eine Sicherung der Welt. Nur Einzelspieler.
 					'''
 			}
@@ -488,11 +488,26 @@ Mods: {
 			AutomationCameraStarted: Die Kamera folgt jetzt {0}. Du steuerst weiterhin deinen eigenen Spieler.
 			AutomationCameraStopped: Die Kamera ist zu deinem Spieler zurückgekehrt.
 			AutomationBlocked: Der automatische Begleiter hängt bei „{0}“ fest: {1}. Er versucht es von selbst regelmäßig erneut.
-			AutomationCompleted: "{0} hat den Mondherrn besiegt. Der Automatiklauf ist beendet; es ist jetzt ein normaler Phantomgefährte."
+			AutomationCompleted: "{0} hat den Mondherrn besiegt. Der Automatiklauf ist gespeichert und beendet; es wird kein normaler folgender Begleiter."
 			AutomationProgressStep: "[Automatik · {0}] Phase: {1} · Schritt: {2} · Klasse: {3}"
 			AutomationWeaponSelected: "[Handy-Kampflabor · {0}] {1} gewählt · Kampfwert {2} · theoretische DPS {3}"
 			AutomationDeathRecorded: "[Automatik] {0} wurde besiegt, erscheint an der Himmelsbasis wieder und kehrt zum Fehlerort zurück."
 			AutomationReturnResumed: "[Automatik] {0} hat den vorherigen Fehlerort erreicht und setzt das gespeicherte Ziel fort."
+			AutomationSelfRescue: "[Selbstrettung · {0}] {1} ohne Aufgabenfortschritt erkannt; Wiederherstellungsstufe {2}: {3}."
+
+			AutomationSelfRescueReason: {
+				Stationary: Stillstand
+				Oscillation: wiederholtes Pendeln auf engem Raum
+				Embedded: Kollisionsbox in Blöcken gefangen
+				ReturnRouteFailed: Rückweg macht ebenfalls keinen Fortschritt
+			}
+
+			AutomationSelfRescueAction: {
+				MineEscape: Körper und unmittelbaren Weg freigraben
+				ChangeRoute: schlechtes Ziel verwerfen und Taktik wechseln
+				ReturnHome: physisch zur Basis oder zum Spawn zurückkehren
+				ForceRecall: sicher zurückrufen und neu planen
+			}
 
 			AutomationStage: {
 				// Foundation: Foundation

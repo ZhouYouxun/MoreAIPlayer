@@ -241,7 +241,7 @@ Mods: {
 					[Pour le divertissement uniquement ; cette fonction est encore en phase de test]
 					Clic gauche : invoque le compagnon automatique ; un autre clic gauche le rappelle et mémorise position, inventaire et progression
 					Clic droit : déplace la caméra sur le compagnon automatique ; recliquez pour revenir à vous
-					Il tentera d'explorer, récolter, construire, combattre et progresser de manière autonome ; une fois terminé, il deviendra un compagnon fantôme normal
+					Il tentera d'explorer, récolter, construire, combattre et progresser de manière autonome ; une fois terminé, sa sauvegarde sera conservée et il s'arrêtera sans rejoindre le système de suivi des compagnons ordinaires
 					Il peut encore se bloquer, se tromper ou rencontrer d'autres bugs. Sauvegardez le monde d'abord. Solo uniquement.
 					'''
 			}
@@ -488,11 +488,26 @@ Mods: {
 			AutomationCameraStarted: La caméra suit maintenant {0}. Vous contrôlez toujours votre propre joueur.
 			AutomationCameraStopped: La caméra est revenue sur votre joueur.
 			AutomationBlocked: Le compagnon automatique est bloqué sur « {0} » : {1}. Il réessaiera régulièrement de lui-même.
-			AutomationCompleted: "{0} a vaincu le Seigneur de la Lune. Le parcours automatique est terminé ; c'est désormais un compagnon fantôme normal."
+			AutomationCompleted: "{0} a vaincu le Seigneur de la Lune. Le parcours automatique est sauvegardé et terminé ; il ne deviendra pas un compagnon ordinaire qui suit le joueur."
 			AutomationProgressStep: "[Automatisation · {0}] Étape : {1} · Action : {2} · Classe : {3}"
 			AutomationWeaponSelected: "[Laboratoire mobile · {0}] {1} sélectionné · score {2} · DPS théorique {3}"
 			AutomationDeathRecorded: "[Automatisation] {0} a été vaincu ; il réapparaîtra à la base aérienne puis retournera sur les lieux."
 			AutomationReturnResumed: "[Automatisation] {0} a rejoint le lieu de l'échec précédent et reprend l'objectif mémorisé."
+			AutomationSelfRescue: "[Auto-sauvetage · {0}] {1} sans progression détecté ; récupération niveau {2} : {3}."
+
+			AutomationSelfRescueReason: {
+				Stationary: blocage sur place
+				Oscillation: oscillation répétée dans une petite zone
+				Embedded: boîte de collision coincée dans des blocs
+				ReturnRouteFailed: le trajet de retour ne progresse pas non plus
+			}
+
+			AutomationSelfRescueAction: {
+				MineEscape: dégager le corps et le passage immédiat
+				ChangeRoute: abandonner la mauvaise cible et changer de tactique
+				ReturnHome: retourner physiquement à la base ou au point d'apparition
+				ForceRecall: se téléporter en sécurité et refaire le plan
+			}
 
 			AutomationStage: {
 				// Foundation: Foundation

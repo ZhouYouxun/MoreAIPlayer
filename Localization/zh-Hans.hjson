@@ -241,7 +241,7 @@ Mods: {
 					【仅供娱乐，功能仍在测试】
 					左键：召唤自动伙伴；再次左键会暂时收回，并保存它的位置、背包和推进记忆
 					右键：将摄像机切换到自动伙伴；再次右键回到自己
-					它会尝试独立探索、收集、建造、战斗并推进世界；通关后会变成普通幻影伙伴
+					它会尝试独立探索、收集、建造、战斗并推进世界；通关后结束运行并保留存档，绝不会加入普通伙伴的跟随系统
 					目前可能卡住、误判或出现其他问题，建议先备份世界。仅限单人模式。
 					'''
 			}
@@ -494,11 +494,26 @@ Mods: {
 			AutomationCameraStarted: 摄像机已转到 {0}。你仍然控制自己的玩家。
 			AutomationCameraStopped: 摄像机已回到你的玩家。
 			AutomationBlocked: 自动伙伴卡在了“{0}”：{1}。它会自己定期重试。
-			AutomationCompleted: "{0} 已经击败月亮领主。自动流程结束，它现在是一名普通幻影伙伴了。"
+			AutomationCompleted: "{0} 已经击败月亮领主。自动流程结束并已保存；它不会转为普通跟随伙伴。"
 			AutomationProgressStep: 【自动推进·{0}】阶段：{1} · 步骤：{2} · 职业：{3}
 			AutomationWeaponSelected: 【手机战斗实验室·{0}】选择 {1} · 实战分 {2} · 理论DPS {3}
 			AutomationDeathRecorded: 【自动推进】{0} 已阵亡；它会从空中基地复活，并重新赶往失败地点。
 			AutomationReturnResumed: 【自动推进】{0} 已回到上次失败地点，继续执行保存的目标。
+			AutomationSelfRescue: 【自动自救·{0}】检测到“{1}”且任务没有推进；启动第 {2} 级补救：{3}。
+
+			AutomationSelfRescueReason: {
+				Stationary: 原地卡死
+				Oscillation: 小范围反复徘徊
+				Embedded: 碰撞箱被方块卡住
+				ReturnRouteFailed: 回城路线也未能推进
+			}
+
+			AutomationSelfRescueAction: {
+				MineEscape: 挖开身体和前路
+				ChangeRoute: 放弃坏目标并改变路线和战术
+				ReturnHome: 物理返回基地或出生点
+				ForceRecall: 安全强制回城并重新规划
+			}
 
 			AutomationStage: {
 				Foundation: 开局建设

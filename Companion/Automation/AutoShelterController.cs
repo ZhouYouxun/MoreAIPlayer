@@ -10,19 +10,30 @@ namespace MoreAIPlayer.Companion.Automation;
 /// placed and consumed through the companion's own inventory.</summary>
 public static class AutoShelterController
 {
-    public const int WoodReserve = 760;
     private const int RoomWidth = 12;
     private const int RoomHeight = 7;
-    private const int RoomCount = 4;
-    private const int TotalWidth = (RoomWidth - 1) * RoomCount + 1;
+    private static int RoomCount => AutoResourceBudget.RequiredHousingRooms();
+    private static int TotalWidth => (RoomWidth - 1) * RoomCount + 1;
     private const int Elevation = 20;
-    private const int SiteRadius = 100;
+    private const int SiteRadius = 480;
 
     public static AutoTaskResult Build(AutoContext ctx)
     {
+        // A site which repeatedly defeats real mining/placement is abandoned after the watchdog's
+        // relocation rung. The partially built shell makes InitialSiteSafe reject the same spot,
+        // while StrategyVariant changes the next search direction. This closes the old permanent
+        // loop on an unmineable block or a structure placed through the template mid-build.
+        if (ctx.TaskRuntime.RecoveryLevel >= 3 && ctx.State.HomeAnchor.HasValue &&
+            !IsShelterComplete(ctx.State.HomeAnchor.Value))
+        {
+            ctx.State.HomeAnchor = null;
+            ctx.State.ShelterCompleted = false;
+            ctx.State.StrategyVariant++;
+            ctx.Navigator.Reset();
+        }
         if (ctx.State.HomeAnchor is not Point anchor || !AnchorUsable(anchor))
         {
-            ctx.State.HomeAnchor = FindSite();
+            ctx.State.HomeAnchor = FindSite(ctx.State.StrategyVariant);
             ctx.State.ShelterCompleted = false;
             if (ctx.State.HomeAnchor is not Point selected)
                 return AutoTaskResult.AlternativeRequired;
@@ -32,6 +43,7 @@ public static class AutoShelterController
         if (IsShelterComplete(anchor))
         {
             ctx.State.ShelterCompleted = true;
+            ctx.State.HousingRoomsCompleted = RoomCount;
             CaptureFurnitureAnchors(ctx, anchor);
             return AutoTaskResult.Succeeded;
         }
@@ -83,6 +95,40 @@ public static class AutoShelterController
                 return false;
         }
         return true;
+    }
+
+    /// <summary>Whether the next unfinished shelter operation must first create/collect an item
+    /// type which cannot fit in the currently full backpack. Direct placements from already held
+    /// stacks remain legal and must not be interrupted by storage.</summary>
+    public static bool NeedsDepositForNextSupply(AutoContext ctx)
+    {
+        if (AutoInventory.HasBackpackSpace(ctx.Profile) ||
+            ctx.State.HomeAnchor is not Point a || !AnchorUsable(a))
+            return false;
+        if (MissingSupport(a) && !AutoInventory.Has(ctx.Profile, ItemID.WoodPlatform))
+            return !AutoInventory.HasBackpackCapacityFor(ctx.Profile, ItemID.WoodPlatform);
+        if (MissingWall(a) && !AutoInventory.Has(ctx.Profile, ItemID.WoodWall))
+            return !AutoInventory.HasBackpackCapacityFor(ctx.Profile, ItemID.WoodWall);
+        if (HasForeignWall(a) && AutoInventory.BestHammer(ctx.Profile).hammer <= 0 &&
+            !AutoInventory.Has(ctx.Profile, ItemID.WoodenHammer))
+            return !AutoInventory.HasBackpackCapacityFor(ctx.Profile, ItemID.WoodenHammer);
+        if (MissingFurniture(a, TileID.WorkBenches) && !AutoInventory.Has(ctx.Profile, ItemID.WorkBench))
+            return !AutoInventory.HasBackpackCapacityFor(ctx.Profile, ItemID.WorkBench);
+        if (MissingFurniture(a, TileID.Chairs) && !AutoInventory.Has(ctx.Profile, ItemID.WoodenChair))
+            return !AutoInventory.HasBackpackCapacityFor(ctx.Profile, ItemID.WoodenChair);
+        if (MissingDoor(a) && !AutoInventory.Has(ctx.Profile, ItemID.WoodenDoor))
+            return !AutoInventory.HasBackpackCapacityFor(ctx.Profile, ItemID.WoodenDoor);
+        if (MissingFurniture(a, TileID.Torches) && !AutoInventory.Has(ctx.Profile, ItemID.Torch))
+            return !AutoInventory.HasBackpackCapacityFor(ctx.Profile, ItemID.Torch);
+        if (!RoomHas(a, 0, TileID.Containers) && !AutoInventory.Has(ctx.Profile, ItemID.Chest))
+        {
+            int ironBars = AutoInventory.Count(ctx.Profile, ItemID.IronBar) +
+                AutoInventory.Count(ctx.Profile, ItemID.LeadBar);
+            return ironBars < 2
+                ? !AutoInventory.HasBackpackCapacityFor(ctx.Profile, ItemID.IronOre, ItemID.LeadOre)
+                : !AutoInventory.HasBackpackCapacityFor(ctx.Profile, ItemID.Chest);
+        }
+        return false;
     }
 
     /// <summary>Final authority is Terraria's own enclosure, furniture and home-spot scoring.
@@ -161,7 +207,7 @@ public static class AutoShelterController
                 continue;
             if (!WorldGen.CanKillTile(x, y))
                 continue;
-            int tool = AutoWorldKnowledge.IsChoppableTree(new Point(x, y))
+            int tool = AutoWorldKnowledge.IsChoppableTreeTile(new Point(x, y))
                 ? AutoInventory.BestToolIndex(ctx.Me, item => item.axe)
                 : AutoInventory.BestToolIndex(ctx.Me, item => item.pick);
             if (tool < 0)
@@ -292,11 +338,17 @@ public static class AutoShelterController
         return true;
     }
 
-    private static Point? FindSite()
+    private static Point? FindSite(int variant)
     {
-        for (int distance = 0; distance <= SiteRadius; distance += 4)
-        foreach (int sign in distance == 0 ? new[] { 1 } : new[] { 1, -1 })
+        int preferredSign = variant % 2 == 0 ? 1 : -1;
+        int initialDistance = System.Math.Min(SiteRadius, (variant / 2 % 8) * 16);
+        for (int pass = 0; pass < 2; pass++)
+        for (int distance = pass == 0 ? initialDistance : 0; distance <= SiteRadius; distance += 8)
+        foreach (int sign in distance == 0 ? new[] { preferredSign } :
+            new[] { preferredSign, -preferredSign })
         {
+            if (pass == 1 && distance >= initialDistance)
+                continue;
             int center = System.Math.Clamp(Main.spawnTileX + distance * sign, 80, Main.maxTilesX - 80);
             int ground = FindGround(center);
             Point anchor = new(center - TotalWidth / 2, ground - Elevation - RoomHeight + 1);

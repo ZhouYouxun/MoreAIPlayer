@@ -6,10 +6,10 @@ using Terraria.ID;
 namespace MoreAIPlayer.Companion.Automation;
 
 /// <summary>
-/// High-level decision making for the world's automation companion. It runs in place of the
-/// ordinary <see cref="CompanionBrain"/> whenever <see cref="CompanionProfile.IsAutoRunning"/> is
-/// set, and — like the ordinary brain — only writes simulated inputs; vanilla still performs all
-/// movement physics, item animation and rendering.
+/// High-level decision making for the world's automation companion. Its live instance latches the
+/// automation identity when summoned and runs this in place of the ordinary
+/// <see cref="CompanionBrain"/> until retirement; like the ordinary brain, it only writes simulated
+/// inputs, while vanilla still performs movement physics, item animation and rendering.
 ///
 /// Death/revive timing is automation-specific (1s / 5s during a boss). Beyond that, each tick it
 /// refreshes a capability snapshot, asks the planner for the next goal, and runs the matching
@@ -29,6 +29,8 @@ public sealed class AutoCompanionBrain
     private readonly AutoCapabilities capabilities = new();
     private readonly AutoFishingController fishing = new();
     private readonly AutoEscapeController escape = new();
+    private readonly AutoSelfRescueController selfRescue = new();
+    private readonly AutoBackgroundController background = new();
     private readonly AutoTaskRuntime taskRuntime = new();
     private readonly AutoWatchdog watchdog;
     private AutoContext context;
@@ -41,6 +43,10 @@ public sealed class AutoCompanionBrain
     private int wanderDir = 1;
     private int wanderStuckTicks;
     private float lastWanderX;
+    private Vector2 wanderTarget;
+    private long wanderPlanKey;
+    private int wanderTravelTicks;
+    private bool wanderActive;
     private long lastBlockedNoticeTick = -3600;
 
     public AutoCompanionBrain()
@@ -77,6 +83,10 @@ public sealed class AutoCompanionBrain
             Main.NewText(Terraria.Localization.Language.GetTextValue(
                 "Mods.MoreAIPlayer.CompanionCommand.AutomationCompleted", profile.Name), 120, 200, 255);
             navigator.Idle(me);
+            // EndAutomation clears Running. Never leave this same live slot around for the entity
+            // system to reinterpret as an ordinary companion on the next tick; retirement is
+            // applied safely after the current slot enumeration completes.
+            instance.DismissRequested = true;
             return;
         }
 
@@ -91,8 +101,20 @@ public sealed class AutoCompanionBrain
         }
         AutoClassController.Refresh(me, profile);
         AutoCampaignController.RefreshStage(ctx);
+        // A pending recovery owns the tick before any ordinary controller can overwrite its
+        // movement/item inputs. This includes a multi-tick physical return to the checkpoint.
+        if (selfRescue.TryContinueRecovery(ctx, escape))
+        {
+            CapturePersistentMemory(profile.AutoState, instance);
+            return;
+        }
         if (escape.TryMineBodyObstruction(ctx))
         {
+            // Body-overlap handling used to return before the main plan/watchdog and could therefore
+            // mine one unbreakable tile forever. Feed that early branch into the spatial circuit
+            // breaker as an explicit EscapeTerrain task.
+            selfRescue.ObserveAndRecover(ctx,
+                AutoPlan.Simple(AutoGoalId.EscapeTerrain), AutoTaskResult.Running);
             CapturePersistentMemory(profile.AutoState, instance);
             return;
         }
@@ -107,6 +129,35 @@ public sealed class AutoCompanionBrain
         AutoStorageController.RestoreCampaignStock(ctx);
         MaintainAutomationSummons(instance, me, profile);
         capabilities.Refresh(me, profile);
+
+        // Ordinary enemies in immediate reach interrupt chopping/mining just as they would for a
+        // human player. The retained task target stays untouched, so work resumes at the same tree
+        // root, vein or structure as soon as the threat is gone.
+        if (AutoThreatController.TryDefendImmediate(ctx))
+        {
+            selfRescue.ObserveAndRecover(ctx,
+                AutoPlan.Simple(AutoGoalId.FightBoss, AutoPlanKind.Support),
+                AutoTaskResult.Running);
+            CapturePersistentMemory(profile.AutoState, instance);
+            return;
+        }
+
+        // Replanting is persistent maintenance, not a condition that may hold the wood hard gate
+        // hostage. Pay one actionable debt between safe tasks; missing seed/ground simply leaves
+        // it queued while the campaign continues.
+        if (!AutoCampaignController.HasLiveTarget() && !profile.AutoState.HasDeathReturnTarget &&
+            !AutoRecoveryController.IsOverwhelmed(ctx))
+        {
+            AutoTaskResult? replantResult = AutoResourceController.ServicePendingReplant(ctx);
+            if (replantResult is AutoTaskResult maintenanceResult)
+            {
+                selfRescue.ObserveAndRecover(ctx,
+                    AutoPlan.Simple(AutoGoalId.GatherWood, AutoPlanKind.Support),
+                    maintenanceResult);
+                CapturePersistentMemory(profile.AutoState, instance);
+                return;
+            }
+        }
 
         AutoPlan plan = AutoProgressionPlanner.Plan(ctx);
         AutoProgressReporter.ReportPlan(profile, profile.AutoState.CampaignStage, plan);
@@ -134,7 +185,8 @@ public sealed class AutoCompanionBrain
         taskRuntime.CurrentStep = plan.Goal;
         if (watchdog.OnBackoff(plan))
         {
-            navigator.Idle(me);
+            background.Maintain(ctx, plan);
+            selfRescue.ObserveAndRecover(ctx, plan, AutoTaskResult.Running);
             profile.AutoState.BossFailureCount = taskRuntime.BossFailureCount;
             CapturePersistentMemory(profile.AutoState, instance);
             return;
@@ -143,23 +195,63 @@ public sealed class AutoCompanionBrain
         AutoTaskResult result = ExecutePlan(ctx, plan);
         if (instance.WorkTile is Point targetTile)
             taskRuntime.LastTargetTile = targetTile;
+        if (selfRescue.ObserveAndRecover(ctx, plan, result))
+        {
+            profile.AutoState.BossFailureCount = taskRuntime.BossFailureCount;
+            CapturePersistentMemory(profile.AutoState, instance);
+            return;
+        }
         AutoWatchdogAction action = watchdog.Observe(ctx, plan, result);
         profile.AutoState.BossFailureCount = taskRuntime.BossFailureCount;
 
         switch (action)
         {
             case AutoWatchdogAction.Recover:
-                Wander(ctx);
+                ExecuteWatchdogRecovery(ctx, plan);
                 break;
             case AutoWatchdogAction.Wait:
-                navigator.Idle(me);
+                background.Maintain(ctx, plan);
                 break;
             case AutoWatchdogAction.Blocked:
-                navigator.Idle(me);
+                background.Maintain(ctx, plan);
                 AnnounceBlocked(plan);
+                break;
+            default:
+                background.Reset();
+                wanderActive = false;
                 break;
         }
         CapturePersistentMemory(profile.AutoState, instance);
+    }
+
+    private void ExecuteWatchdogRecovery(AutoContext ctx, AutoPlan plan)
+    {
+        if (taskRuntime.RecoveryLevel < 4)
+        {
+            if (plan.Goal is AutoGoalId.GatherWood or AutoGoalId.GatherStone or
+                AutoGoalId.GatherGel or AutoGoalId.MineOre or AutoGoalId.MineIronTierOre or
+                AutoGoalId.ExploreWorld or AutoGoalId.AcquireVitalUpgrade or
+                AutoGoalId.AcquireWeaponUpgrade)
+            {
+                AutoExplorationController.Explore(ctx);
+            }
+            else
+            {
+                Wander(ctx, plan);
+            }
+            return;
+        }
+
+        Point checkpoint = ctx.State.HomeAnchor is Point home &&
+            AutoShelterController.IsShelterComplete(home)
+            ? new Point(home.X + 6, home.Y + 6)
+            : new Point(Main.spawnTileX, Main.spawnTileY);
+        Vector2 safe = new(checkpoint.X * 16f + 8f,
+            checkpoint.Y * 16f - ctx.Me.height * 0.5f - 2f);
+        if (Vector2.DistanceSquared(ctx.Me.Center, safe) > 6f * 16f * 6f * 16f)
+            AutoWorldTravelController.TravelTo(ctx, safe, 5f);
+        else
+            background.Maintain(ctx, plan);
     }
 
     public void CapturePersistentMemory(AutoCompanionState state, CompanionInstance instance) =>
@@ -246,10 +338,20 @@ public sealed class AutoCompanionBrain
                     (AutoWeaponRouteKind)plan.Amount);
             case AutoGoalId.AcquireCombatSupplies:
                 return AutoCombatSupplyController.Acquire(ctx);
+            case AutoGoalId.EscapeTerrain:
+                return escape.TryMineBodyObstruction(ctx)
+                    ? AutoTaskResult.Running : AutoTaskResult.Succeeded;
+            case AutoGoalId.Shop:
+                // No planner currently emits the generic Shop goal; purchases are explicit in the
+                // explosive/ammunition controllers. Fail loudly if future code emits it without a
+                // concrete shopping contract instead of silently falling through to Idle.
+                return AutoTaskResult.AlternativeRequired;
             case AutoGoalId.Idle:
-            default:
                 navigator.Idle(ctx.Me);
                 return plan.IdleReason;
+            default:
+                navigator.Idle(ctx.Me);
+                return AutoTaskResult.Faulted;
         }
     }
 
@@ -268,24 +370,47 @@ public sealed class AutoCompanionBrain
         }
     }
 
-    /// <summary>Crude surface exploration: walk one way until wedged, then flip. Real cross-region
-    /// navigation and interest-point search arrive with the world-knowledge phase.</summary>
-    private void Wander(AutoContext ctx)
+    /// <summary>Bounded relocation for a non-resource recovery. The destination is absolute and
+    /// retained for the whole attempt; the old moving target (<c>me.Center + offset</c>) combined
+    /// with one-second direction flips produced visible left/right jumping around obstacles.</summary>
+    private void Wander(AutoContext ctx, AutoPlan plan)
     {
         Player me = ctx.Me;
-        if (System.Math.Abs(me.Center.X - lastWanderX) < 8f)
+        bool newAttempt = !wanderActive || wanderPlanKey != plan.StableKey ||
+            !float.IsFinite(wanderTarget.X) || !float.IsFinite(wanderTarget.Y);
+        if (newAttempt)
+        {
+            wanderActive = true;
+            wanderPlanKey = plan.StableKey;
+            wanderDir = me.direction == 0 ? 1 : me.direction;
+            wanderTarget = me.Center + new Vector2(wanderDir * 30f * 16f, 0f);
+            wanderStuckTicks = 0;
+            wanderTravelTicks = 0;
+            lastWanderX = me.Center.X;
+            navigator.Reset();
+        }
+
+        if (System.Math.Abs(me.Center.X - lastWanderX) < 4f)
             wanderStuckTicks++;
         else
             wanderStuckTicks = 0;
         lastWanderX = me.Center.X;
+        wanderTravelTicks++;
 
-        if (wanderStuckTicks > 60)
+        bool reached = Vector2.DistanceSquared(me.Center, wanderTarget) <
+            3f * 16f * 3f * 16f;
+        // A real obstacle earns one deliberate reroute after three seconds, never a direction
+        // reversal every frame. The long ceiling prevents an absolute waypoint living forever.
+        if (reached || wanderStuckTicks > 180 || wanderTravelTicks > 900)
         {
             wanderDir = -wanderDir;
+            wanderTarget = me.Center + new Vector2(wanderDir * 30f * 16f, 0f);
             wanderStuckTicks = 0;
+            wanderTravelTicks = 0;
+            navigator.Reset();
         }
 
-        navigator.Navigate(me, me.Center + new Vector2(wanderDir * 30f * 16f, 0f));
+        navigator.Navigate(me, wanderTarget);
     }
 
     private static void ResetControls(Player me)
@@ -366,10 +491,10 @@ public sealed class AutoCompanionBrain
                     state.DeathReturnTarget = me.Center;
                     state.DeathReturnAttempts++;
                 }
-                state.StageFailureCount++;
                 state.StrategyVariant++;
                 if (bossFight)
                 {
+                    state.StageFailureCount++;
                     state.BossFailureCount++;
                     taskRuntime.BossFailureCount = state.BossFailureCount;
                     state.ArenaCompleted = false;

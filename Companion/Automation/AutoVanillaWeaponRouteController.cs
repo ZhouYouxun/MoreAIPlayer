@@ -19,7 +19,8 @@ public static class AutoVanillaWeaponRouteController
             AutoWeaponRouteKind.EvilOrbGun => AutoEvilOrbWeaponController.AcquireFirstGun(ctx),
             AutoWeaponRouteKind.Fishing => ctx.Fishing.Fish(ctx),
             AutoWeaponRouteKind.HuntDrops => AutoExplorationController.Explore(ctx),
-            _ => AutoTaskResult.Succeeded
+            AutoWeaponRouteKind.None => AutoTaskResult.Succeeded,
+            _ => AutoTaskResult.Faulted
         };
     }
 }

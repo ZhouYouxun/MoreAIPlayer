@@ -10,14 +10,16 @@ public static class AutoRecoveryController
     public static bool IsOverwhelmed(AutoContext ctx)
     {
         Player me = ctx.Me;
+        AutoPhoneWorldSnapshot phone = AutoPhoneWorldService.Read(me);
         if (ctx.State.HomeAnchor is Point home && Vector2.DistanceSquared(me.Center,
             new Vector2((home.X + 6) * 16f, (home.Y + 5) * 16f)) < 12f * 16f * 12f * 16f &&
-            me.statLife * 100 / System.Math.Max(1, me.statLifeMax2) >= 40)
+            me.statLife * 100 / System.Math.Max(1, me.statLifeMax2) >= 40 &&
+            phone.NearbyHostiles == 0)
             return false;
         if (me.statLifeMax2 > 0 && me.statLife * 100 / me.statLifeMax2 < 24)
             return true;
 
-        int threat = AutoPhoneWorldService.Read(me).ThreatScore;
+        int threat = phone.ThreatScore;
         int capability = AutoWeaponEvaluator.BestUsableScore(ctx.Me, ctx.Profile) * 3 +
             me.statDefense * 8 + me.statLifeMax2;
         return threat > capability;

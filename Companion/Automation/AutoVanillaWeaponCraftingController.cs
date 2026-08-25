@@ -31,7 +31,7 @@ public static class AutoVanillaWeaponCraftingController
 
     public static AutoTaskResult CraftBestAvailable(AutoContext ctx)
     {
-        int before = AutoWeaponEvaluator.BestRegularScore(ctx.Profile);
+        int before = AutoWeaponEvaluator.BestScore(ctx.Profile);
         if (ctx.State.CampaignStage == AutoCampaignStage.MoonLord && CurrentClassFragments(ctx) >= 18)
         {
             AutoTaskResult station = EnsureAncientManipulator(ctx);
@@ -89,7 +89,7 @@ public static class AutoVanillaWeaponCraftingController
         foreach (int itemType in candidates)
         {
             Item sample = ContentSamples.ItemsByType[itemType];
-            if (AutoWeaponEvaluator.CombatScore(sample) * 100 <= currentScore * 108 ||
+            if (CandidateScore(sample) * 100 <= currentScore * 108 ||
                 AutoInventory.Has(ctx.Profile, itemType))
                 continue;
             if (AutoCraftingService.TryCraft(ctx.Instance, ctx.Profile, itemType))
@@ -112,13 +112,16 @@ public static class AutoVanillaWeaponCraftingController
 
     private static bool AnyCandidateBeats(AutoContext ctx, int[] candidates)
     {
-        int current = AutoWeaponEvaluator.BestRegularScore(ctx.Profile);
+        int current = AutoWeaponEvaluator.BestScore(ctx.Profile);
         foreach (int itemType in candidates)
             if (!AutoInventory.Has(ctx.Profile, itemType) &&
-                AutoWeaponEvaluator.CombatScore(ContentSamples.ItemsByType[itemType]) * 100 > current * 108)
+                CandidateScore(ContentSamples.ItemsByType[itemType]) * 100 > current * 108)
                 return true;
         return false;
     }
+
+    private static int CandidateScore(Item item) => System.Math.Max(
+        AutoWeaponEvaluator.CombatScore(item), AutoWeaponEvaluator.SummonScore(null, item));
 
     private static int[] LunarCandidates(AutoCombatClass cls) => cls switch
     {

@@ -59,6 +59,13 @@ public sealed class AutoTaskRuntime
     /// <summary>Current rung on the recovery ladder (0 = none). See <see cref="AutoWatchdog"/>.</summary>
     public int RecoveryLevel;
 
+    /// <summary>Independent spatial self-rescue state. This remains separate from RecoveryLevel so
+    /// the goal watchdog and the physical loop detector cannot accidentally reset one another.</summary>
+    public int SelfRescueLevel;
+    public int SelfRescueCount;
+    public AutoSelfRescueReason LastSelfRescueReason;
+    public AutoSelfRescueAction LastSelfRescueAction;
+
     public AutoTaskResult LastResult = AutoTaskResult.Running;
     public AutoBlockReason LastFailureReason = AutoBlockReason.None;
 
@@ -118,6 +125,10 @@ public sealed class AutoTaskRuntime
         CurrentPlanKey = 0;
         AttemptCount = 0;
         RecoveryLevel = 0;
+        SelfRescueLevel = 0;
+        SelfRescueCount = 0;
+        LastSelfRescueReason = AutoSelfRescueReason.Stationary;
+        LastSelfRescueAction = AutoSelfRescueAction.MineEscape;
         TicksWithoutProgress = 0;
         TicksWithoutMetricChange = 0;
         LastResult = AutoTaskResult.Running;
@@ -332,7 +343,7 @@ public sealed class AutoTaskRuntime
             case AutoGoalId.CraftConsumable:
                 return AutoInventory.Count(profile, plan.ItemType);
             case AutoGoalId.BuildShelter:
-                return (ctx.State.ShelterCompleted ? 1_000_000L : 0L) + AutoInventory.Count(profile, ItemID.Wood);
+                return ShelterProgressSignature(ctx);
             case AutoGoalId.DepositSurplus:
                 return EmptyBackpackSlots(profile);
             case AutoGoalId.LootChest:
@@ -348,9 +359,7 @@ public sealed class AutoTaskRuntime
             case AutoGoalId.ReturnToDeathSite:
                 return ctx.State.HasDeathReturnTarget ? 0L : 1L;
             case AutoGoalId.PrepareArena:
-                return (ctx.State.ArenaCompleted ? 1_000_000L : 0L) +
-                    AutoInventory.Count(profile, ItemID.WoodPlatform) +
-                    AutoExplosiveController.Count(profile) * 1000L;
+                return ArenaProgressSignature(ctx);
             case AutoGoalId.AcquireExplosives:
                 return AutoExplosiveController.Count(profile);
             case AutoGoalId.SummonBoss:
@@ -368,6 +377,11 @@ public sealed class AutoTaskRuntime
                     ctx.State.ExplorationSegments + (ctx.State.FirstEvilOrbBroken ? 1_000_000_000_000L : 0L);
             case AutoGoalId.AcquireCombatSupplies:
                 return AutoCombatSupplyController.CountAllUsefulAmmo(profile);
+            case AutoGoalId.EscapeTerrain:
+                return ctx.TaskRuntime.ProgressSerial;
+            case AutoGoalId.Shop:
+                return CoinValue(profile);
+            case AutoGoalId.Idle:
             default:
                 return 0L;
         }
@@ -385,6 +399,57 @@ public sealed class AutoTaskRuntime
         return score;
     }
 
+    private static long ShelterProgressSignature(AutoContext ctx)
+    {
+        // Every legal shelter operation changes at least one of these counts (raw wood is crafted,
+        // or a wall/platform/furniture item is placed). Hashing the vector avoids cancellation such
+        // as one wood becoming several walls, which made a large multi-room build look stalled.
+        unchecked
+        {
+            long hash = 1469598103934665603L;
+            void Mix(long value)
+            {
+                hash ^= value;
+                hash *= 1099511628211L;
+            }
+            Mix(ctx.State.ShelterCompleted ? 1 : 0);
+            Mix(ctx.State.HousingRoomsCompleted);
+            Mix(ctx.State.HomeAnchor?.X ?? -1);
+            Mix(ctx.State.HomeAnchor?.Y ?? -1);
+            Mix(AutoInventory.Count(ctx.Profile, ItemID.Wood));
+            Mix(AutoInventory.Count(ctx.Profile, ItemID.WoodPlatform));
+            Mix(AutoInventory.Count(ctx.Profile, ItemID.WoodWall));
+            Mix(AutoInventory.Count(ctx.Profile, ItemID.WoodenDoor));
+            Mix(AutoInventory.Count(ctx.Profile, ItemID.WoodenChair));
+            Mix(AutoInventory.Count(ctx.Profile, ItemID.WorkBench));
+            Mix(AutoInventory.Count(ctx.Profile, ItemID.Torch));
+            Mix(AutoInventory.Count(ctx.Profile, ItemID.Chest));
+            return hash;
+        }
+    }
+
+    private static long ArenaProgressSignature(AutoContext ctx)
+    {
+        unchecked
+        {
+            long hash = 1469598103934665603L;
+            void Mix(long value)
+            {
+                hash ^= value;
+                hash *= 1099511628211L;
+            }
+            Mix(ctx.State.ArenaCompleted ? 1 : 0);
+            Mix(ctx.State.ArenaAnchor?.X ?? -1);
+            Mix(ctx.State.ArenaAnchor?.Y ?? -1);
+            Mix(AutoInventory.Count(ctx.Profile, ItemID.Wood));
+            Mix(AutoInventory.Count(ctx.Profile, ItemID.WoodPlatform));
+            Mix(AutoInventory.Count(ctx.Profile, ItemID.Campfire));
+            Mix(AutoInventory.Count(ctx.Profile, ItemID.Torch));
+            Mix(AutoExplosiveController.Count(ctx.Profile));
+            return hash;
+        }
+    }
+
     private static bool StationExists(AutoContext ctx, int tileType) =>
         AutoWorldKnowledge.FindNearestTileOfType(ctx.Me.Center, 16, tileType) is not null;
 
@@ -395,6 +460,12 @@ public sealed class AutoTaskRuntime
             total += AutoInventory.Count(profile, type);
         return total;
     }
+
+    private static long CoinValue(CompanionProfile profile) =>
+        AutoInventory.Count(profile, ItemID.CopperCoin) +
+        AutoInventory.Count(profile, ItemID.SilverCoin) * 100L +
+        AutoInventory.Count(profile, ItemID.GoldCoin) * 10_000L +
+        AutoInventory.Count(profile, ItemID.PlatinumCoin) * 1_000_000L;
 
     private static long EmptyBackpackSlots(CompanionProfile profile)
     {

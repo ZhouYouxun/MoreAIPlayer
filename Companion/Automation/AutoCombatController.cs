@@ -22,7 +22,9 @@ public static class AutoCombatController
             return AutoTaskResult.Succeeded;
 
         // Pots are safer and also supply coins; prefer them before deliberately entering combat.
-        AutoTaskResult potResult = AutoResourceController.LootPots(ctx);
+        AutoTaskResult potResult = AutoInventory.HasBackpackCapacityFor(ctx.Profile, ItemID.Torch)
+            ? AutoResourceController.LootPots(ctx)
+            : AutoTaskResult.AlternativeRequired;
         if (potResult != AutoTaskResult.AlternativeRequired)
             return potResult;
 

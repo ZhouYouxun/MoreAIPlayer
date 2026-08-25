@@ -9,10 +9,10 @@ namespace MoreAIPlayer.Companion.Automation;
 /// explosives while lateral/upper throws prefer sticky variants.</summary>
 public static class AutoArenaController
 {
-    public const int WoodReserve = 600;
     private const int BaseWidth = 120;
     private const int RowSpacing = 11;
     private const int DefaultRows = 3;
+    private const int CampfireSpacing = 80;
     private static long nextExplosionTick;
 
     public static bool IsPrepared(AutoCompanionState state)
@@ -20,7 +20,40 @@ public static class AutoArenaController
         if (!state.ArenaCompleted || state.ArenaAnchor is not Point anchor ||
             state.ArenaStage != state.CampaignStage)
             return false;
-        return Validate(anchor, Width(state), Rows(state.CampaignStage), Underground(state.CampaignStage));
+        int width = Width(state);
+        return Validate(anchor, width, Rows(state.CampaignStage), Underground(state.CampaignStage)) &&
+            CampfiresComplete(anchor, width);
+    }
+
+    /// <summary>Platform count for the live stage/failure variant, used by the shared resource
+    /// ledger before the arena starts crafting materials.</summary>
+    public static int RequiredPlatformCount(AutoCompanionState state)
+    {
+        if (state is null)
+            return BaseWidth * DefaultRows;
+        return Width(state) * Rows(state.CampaignStage);
+    }
+
+    public static int RequiredCampfireCount(AutoCompanionState state) =>
+        System.Math.Max(1, (Width(state) - 20 + CampfireSpacing - 1) / CampfireSpacing);
+
+    public static bool NeedsDepositForNextSupply(AutoContext ctx)
+    {
+        if (AutoInventory.HasBackpackSpace(ctx.Profile) || ctx.State.ArenaAnchor is not Point anchor)
+            return false;
+        int width = Width(ctx.State);
+        int rows = Rows(ctx.State.CampaignStage);
+        if (!Validate(anchor, width, rows, Underground(ctx.State.CampaignStage)) &&
+            AutoInventory.Count(ctx.Profile, ItemID.WoodPlatform) < width * rows)
+            return !AutoInventory.HasBackpackCapacityFor(ctx.Profile, ItemID.WoodPlatform);
+        if (FindMissingCampfire(anchor, width).HasValue &&
+            !AutoInventory.Has(ctx.Profile, ItemID.Campfire))
+        {
+            if (AutoInventory.Count(ctx.Profile, ItemID.Torch) < 5)
+                return !AutoInventory.HasBackpackCapacityFor(ctx.Profile, ItemID.Torch);
+            return !AutoInventory.HasBackpackCapacityFor(ctx.Profile, ItemID.Campfire);
+        }
+        return false;
     }
 
     public static AutoTaskResult Prepare(AutoContext ctx)
@@ -44,15 +77,16 @@ public static class AutoArenaController
 
         int width = Width(state);
         int rows = Rows(state.CampaignStage);
-        if (ctx.TaskRuntime.RecoveryLevel >= 7 && ForcePrepareInsurance(ctx, anchor, width, rows))
-        {
-            state.ArenaCompleted = true;
-            return AutoTaskResult.Succeeded;
-        }
         if (Validate(anchor, width, rows, Underground(state.CampaignStage)))
         {
-            state.ArenaCompleted = true;
-            return AutoTaskResult.Succeeded;
+            AutoTaskResult buffs = PrepareCampfires(ctx, anchor, width);
+            if (buffs == AutoTaskResult.Succeeded)
+            {
+                state.ArenaCompleted = true;
+                return AutoTaskResult.Succeeded;
+            }
+            state.ArenaCompleted = false;
+            return buffs;
         }
         state.ArenaCompleted = false;
 
@@ -62,6 +96,15 @@ public static class AutoArenaController
                 return AutoTaskResult.AlternativeRequired;
             if (AutoCraftingService.TryCraft(ctx.Instance, ctx.Profile, ItemID.WoodPlatform))
                 return AutoTaskResult.Running;
+        }
+
+        // Insurance runs only after the ordinary recipe has converted the conservative raw-wood
+        // budget into the exact platform count. Running it before this point consumed one raw wood
+        // per platform and could strand a half-built long bridge despite having budgeted 2:1.
+        if (ctx.TaskRuntime.RecoveryLevel >= 7 && ForcePrepareInsurance(ctx, anchor, width, rows))
+        {
+            ctx.TaskRuntime.RecordWorldProgress();
+            return AutoTaskResult.Running;
         }
 
         Point? obstruction = FindObstruction(anchor, width, rows, Underground(state.CampaignStage));
@@ -185,8 +228,7 @@ public static class AutoArenaController
             if (!underground && !platformRow)
                 continue;
             Tile tile = Main.tile[x, y];
-            if (tile.HasTile && Main.tileSolid[tile.TileType] && !Main.tileSolidTop[tile.TileType] &&
-                !Main.tileFrameImportant[tile.TileType] && WorldGen.CanKillTile(x, y))
+            if (tile.HasTile && Main.tileSolid[tile.TileType] && !Main.tileSolidTop[tile.TileType])
                 return new Point(x, y);
         }
         return null;
@@ -227,14 +269,63 @@ public static class AutoArenaController
                     present++;
             }
         }
-        if (present < required * 9 / 10)
+        if (present < required)
             return false;
         return !underground || FindObstruction(anchor, width, rows, true) is null;
     }
 
+    private static AutoTaskResult PrepareCampfires(AutoContext ctx, Point anchor, int width)
+    {
+        Point? missing = FindMissingCampfire(anchor, width);
+        if (missing is not Point target)
+            return AutoTaskResult.Succeeded;
+
+        int slot = AutoInventory.FindInventoryIndex(ctx.Me, item => item.type == ItemID.Campfire);
+        if (slot < 0)
+        {
+            if (AutoInventory.Count(ctx.Profile, ItemID.Torch) < 5)
+            {
+                if (AutoInventory.Count(ctx.Profile, ItemID.Gel) > 0 &&
+                    AutoInventory.Count(ctx.Profile, ItemID.Wood) >
+                        AutoResourceBudget.OperationalReserve(ctx.State) &&
+                    AutoCraftingService.TryCraft(ctx.Instance, ctx.Profile, ItemID.Torch))
+                    return AutoTaskResult.Running;
+                return AutoResourceController.LootPots(ctx);
+            }
+            if (AutoInventory.Count(ctx.Profile, ItemID.Wood) < 10)
+                return AutoTaskResult.AlternativeRequired;
+            return AutoCraftingService.TryCraft(ctx.Instance, ctx.Profile, ItemID.Campfire)
+                ? AutoTaskResult.Running : AutoTaskResult.RetryLater;
+        }
+
+        ctx.Actuator.MoveAndPlace(ctx.Instance, ctx.Me, ctx.Navigator, slot, target);
+        return AutoTaskResult.Running;
+    }
+
+    private static bool CampfiresComplete(Point anchor, int width) =>
+        FindMissingCampfire(anchor, width) is null;
+
+    private static Point? FindMissingCampfire(Point anchor, int width)
+    {
+        int count = System.Math.Max(1, (width - 20 + CampfireSpacing - 1) / CampfireSpacing);
+        int left = anchor.X - width / 2 + 10;
+        int span = System.Math.Max(0, width - 20);
+        for (int i = 0; i < count; i++)
+        {
+            int x = count == 1 ? anchor.X : left + i * span / (count - 1);
+            bool present = false;
+            for (int dx = -3; dx <= 3 && !present; dx++)
+            for (int dy = -3; dy <= 1 && !present; dy++)
+                present = IsTile(x + dx, anchor.Y + dy, TileID.Campfire);
+            if (!present)
+                return new Point(x, anchor.Y - 1);
+        }
+        return null;
+    }
+
     private static int Width(AutoCompanionState state) => state.CampaignStage switch
     {
-        AutoCampaignStage.WallOfFlesh => 700 + System.Math.Min(300, state.StageFailureCount * 60),
+        AutoCampaignStage.WallOfFlesh => 1000 + System.Math.Min(600, state.StageFailureCount * 100),
         AutoCampaignStage.Golem => 60,
         _ => BaseWidth + System.Math.Min(90, state.StageFailureCount * 15)
     };
@@ -247,7 +338,7 @@ public static class AutoArenaController
     };
 
     private static bool Underground(AutoCampaignStage stage) => stage is
-        AutoCampaignStage.WallOfFlesh or AutoCampaignStage.Plantera;
+        AutoCampaignStage.WallOfFlesh or AutoCampaignStage.Plantera or AutoCampaignStage.Golem;
 
     private static bool IsPlatformRow(Point anchor, int y, int rows)
     {

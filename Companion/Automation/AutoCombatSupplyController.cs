@@ -26,6 +26,8 @@ public static class AutoCombatSupplyController
             return AutoTaskResult.Succeeded;
 
         if (ammoClass == AmmoID.Arrow &&
+            AutoInventory.Count(ctx.Profile, ItemID.Wood) >
+                AutoResourceBudget.OperationalReserve(ctx.State) &&
             AutoCraftingService.TryCraft(ctx.Instance, ctx.Profile, ItemID.WoodenArrow))
         {
             ctx.TaskRuntime.RecordWorldProgress();
@@ -112,7 +114,8 @@ public static class AutoCombatSupplyController
 
     private static bool HasAvailableSupplyRoute(CompanionProfile profile, int ammoClass)
     {
-        if (ammoClass == AmmoID.Arrow && AutoInventory.Count(profile, ItemID.Wood) > 0 &&
+        if (ammoClass == AmmoID.Arrow && AutoInventory.Count(profile, ItemID.Wood) >
+                AutoResourceBudget.OperationalReserve(profile.AutoState) &&
             AutoInventory.Count(profile, ItemID.StoneBlock) > 0)
             return true;
         int npc = ammoClass == AmmoID.Bullet ? NPCID.ArmsDealer :

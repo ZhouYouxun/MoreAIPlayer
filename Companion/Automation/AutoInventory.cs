@@ -114,6 +114,27 @@ public static class AutoInventory
         return false;
     }
 
+    /// <summary>Whether at least one item of any requested type can enter the backpack. Unlike
+    /// <see cref="HasBackpackSpace"/>, this recognises a partial matching stack, so a backpack with
+    /// no empty slots can still keep mining/chopping into an existing resource stack.</summary>
+    public static bool HasBackpackCapacityFor(CompanionProfile profile, params int[] itemTypes)
+    {
+        if (itemTypes is null || itemTypes.Length == 0)
+            return HasBackpackSpace(profile);
+
+        foreach (Item stored in profile.Backpack)
+        {
+            if (stored.IsAir)
+                return true;
+            if (stored.stack >= stored.maxStack)
+                continue;
+            foreach (int type in itemTypes)
+                if (stored.type == type)
+                    return true;
+        }
+        return false;
+    }
+
     /// <summary>Checks whether the whole incoming stack can be stored without mutating either the
     /// backpack or the source item. Crafting uses this before consuming ingredients.</summary>
     public static bool CanFit(CompanionProfile profile, Item incoming)

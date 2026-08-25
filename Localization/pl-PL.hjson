@@ -241,7 +241,7 @@ Mods: {
 					[Wyłącznie dla zabawy; ta funkcja jest nadal w fazie testów]
 					Lewy przycisk: przywołuje automatycznego towarzysza; ponowny klik odwołuje go i zapisuje pozycję, ekwipunek oraz pamięć postępu
 					Prawy przycisk: przenosi kamerę do automatycznego towarzysza; ponowny klik wraca do ciebie
-					Spróbuje samodzielnie eksplorować, zbierać, budować, walczyć i rozwijać świat; po ukończeniu stanie się zwykłym widmowym towarzyszem
+					Spróbuje samodzielnie eksplorować, zbierać, budować, walczyć i rozwijać świat; po ukończeniu zapisze postęp i zatrzyma się, nie dołączając do systemu podążania zwykłych towarzyszy
 					Nadal może się zaciąć, pomylić lub napotkać inne błędy. Najpierw wykonaj kopię świata. Tylko tryb jednoosobowy.
 					'''
 			}
@@ -488,11 +488,26 @@ Mods: {
 			AutomationCameraStarted: Kamera śledzi teraz {0}. Nadal sterujesz własnym graczem.
 			AutomationCameraStopped: Kamera wróciła do twojego gracza.
 			AutomationBlocked: Automatyczny towarzysz utknął na „{0}”: {1}. Będzie sam okresowo ponawiał próby.
-			AutomationCompleted: "{0} pokonał Władcę Księżyca. Bieg automatyczny zakończony; teraz jest zwykłym widmowym towarzyszem."
+			AutomationCompleted: "{0} pokonał Władcę Księżyca. Bieg automatyczny został zapisany i zakończony; nie stanie się zwykłym towarzyszem podążającym za graczem."
 			AutomationProgressStep: "[Automatyzacja · {0}] Etap: {1} · Krok: {2} · Klasa: {3}"
 			AutomationWeaponSelected: "[Laboratorium telefonu · {0}] Wybrano {1} · ocena {2} · teoretyczne DPS {3}"
 			AutomationDeathRecorded: "[Automatyzacja] {0} poległ; odrodzi się w podniebnej bazie i wróci do miejsca porażki."
 			AutomationReturnResumed: "[Automatyzacja] {0} dotarł do miejsca poprzedniej porażki i wznowił zapisany cel."
+			AutomationSelfRescue: "[Samoratunek · {0}] Wykryto {1} bez postępu; poziom naprawczy {2}: {3}."
+
+			AutomationSelfRescueReason: {
+				Stationary: utknięcie w miejscu
+				Oscillation: powtarzające się krążenie w małym obszarze
+				Embedded: kolizja uwięziona w blokach
+				ReturnRouteFailed: trasa powrotna także nie postępuje
+			}
+
+			AutomationSelfRescueAction: {
+				MineEscape: odkopać ciało i najbliższe przejście
+				ChangeRoute: odrzucić zły cel i zmienić trasę oraz taktykę
+				ReturnHome: fizycznie wrócić do bazy lub punktu odrodzenia
+				ForceRecall: bezpiecznie wrócić i zaplanować od nowa
+			}
 
 			AutomationStage: {
 				// Foundation: Foundation

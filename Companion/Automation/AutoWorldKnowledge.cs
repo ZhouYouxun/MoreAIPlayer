@@ -25,19 +25,87 @@ public static class AutoWorldKnowledge
         TileID.Silver, TileID.Tungsten, TileID.Gold, TileID.Platinum
     ];
 
-    /// <summary>Nearest choppable tree tile within <paramref name="radius"/> tiles, or null.</summary>
-    public static Point? FindNearestTree(Vector2 center, int radius, Func<Point, bool> accept = null)
+    /// <summary>Finds the nearest actual tree base, never the nearest branch/canopy tile. A base is
+    /// an axe tile resting directly on solid ground. Locking this coordinate makes one ordinary axe
+    /// hit fell the whole vanilla tree instead of shaving off whichever irregular branch happened
+    /// to be closest to the player's tile-reach area.</summary>
+    public static Point? FindNearestTreeBase(Vector2 center, int radius,
+        Func<Point, bool> accept = null)
     {
-        return FindNearest(center, radius, (x, y, tile) =>
-            Main.tileAxe[tile.TileType] && WorldGen.CanKillTile(x, y), accept);
+        return FindNearest(center, radius, (x, y, tile) => IsTreeBase(x, y, tile), accept);
     }
 
-    public static bool IsChoppableTree(Point point)
+    public static bool IsChoppableTreeBase(Point point)
+    {
+        if (!WorldGen.InWorld(point.X, point.Y, 4))
+            return false;
+        return IsTreeBase(point.X, point.Y, Main.tile[point.X, point.Y]);
+    }
+
+    public static bool IsChoppableTreeTile(Point point)
     {
         if (!WorldGen.InWorld(point.X, point.Y, 4))
             return false;
         Tile tile = Main.tile[point.X, point.Y];
-        return tile.HasTile && Main.tileAxe[tile.TileType] && WorldGen.CanKillTile(point.X, point.Y);
+        return tile.HasTile && !tile.IsActuated && tile.TileType < Main.tileAxe.Length &&
+            Main.tileAxe[tile.TileType] && WorldGen.CanKillTile(point.X, point.Y);
+    }
+
+    /// <summary>Returns a collision-free standing point beside a tree base. Candidates use real
+    /// ground and the live player's dimensions, so navigation aims beside the trunk rather than at
+    /// the solid tree tile itself.</summary>
+    public static Vector2? FindTreeChopPosition(Player me, Item axe, Point treeBase)
+    {
+        Vector2? best = null;
+        float bestDistance = float.MaxValue;
+        int preferredSide = me.Center.X <= treeBase.X * 16f + 8f ? -1 : 1;
+        for (int horizontal = 2; horizontal <= 4; horizontal++)
+        for (int sideIndex = 0; sideIndex < 2; sideIndex++)
+        {
+            int side = sideIndex == 0 ? preferredSide : -preferredSide;
+            int x = treeBase.X + side * horizontal;
+            for (int floorY = treeBase.Y - 3; floorY <= treeBase.Y + 5; floorY++)
+            {
+                if (!WorldGen.InWorld(x, floorY, 8))
+                    continue;
+                Tile floor = Main.tile[x, floorY];
+                bool supportsPlayer = floor.HasTile && !floor.IsActuated &&
+                    floor.TileType < Main.tileSolid.Length && Main.tileSolid[floor.TileType];
+                if (!supportsPlayer)
+                    continue;
+
+                Vector2 position = new(x * 16f + 8f - me.width * 0.5f,
+                    floorY * 16f - me.height);
+                if (Collision.SolidCollision(position, me.width, me.height) ||
+                    !TileInReachFrom(position, me.width, me.height, axe, treeBase))
+                    continue;
+                Vector2 center = position + new Vector2(me.width * 0.5f, me.height * 0.5f);
+                float distance = Vector2.DistanceSquared(me.Center, center);
+                if (distance >= bestDistance)
+                    continue;
+                bestDistance = distance;
+                best = center;
+            }
+        }
+        return best;
+    }
+
+    private static bool TileInReachFrom(Vector2 position, int width, int height, Item tool,
+        Point tile) =>
+        position.X / 16f - Player.tileRangeX - tool.tileBoost <= tile.X &&
+        (position.X + width) / 16f + Player.tileRangeX + tool.tileBoost - 1f >= tile.X &&
+        position.Y / 16f - Player.tileRangeY - tool.tileBoost <= tile.Y &&
+        (position.Y + height) / 16f + Player.tileRangeY + tool.tileBoost - 2f >= tile.Y;
+
+    private static bool IsTreeBase(int x, int y, Tile tile)
+    {
+        if (!tile.HasTile || tile.IsActuated || tile.TileType >= Main.tileAxe.Length ||
+            !Main.tileAxe[tile.TileType] || !WorldGen.CanKillTile(x, y) ||
+            !WorldGen.InWorld(x, y + 1, 4))
+            return false;
+        Tile ground = Main.tile[x, y + 1];
+        return ground.HasTile && !ground.IsActuated && ground.TileType < Main.tileSolid.Length &&
+            Main.tileSolid[ground.TileType] && !Main.tileSolidTop[ground.TileType];
     }
 
     /// <summary>Nearest tile of the given type within radius that can be legally broken, or null.</summary>

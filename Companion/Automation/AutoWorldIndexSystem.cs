@@ -13,6 +13,7 @@ public sealed class AutoWorldIndexSystem : ModSystem
     private const int TilesPerTick = 30000;
     private const int LandmarkStride = 24;
     private static readonly Dictionary<int, List<Point>> Tiles = [];
+    private static readonly List<Point> TreeBases = [];
     private static int scanIndex;
     private static long completedAtTick;
 
@@ -23,6 +24,7 @@ public sealed class AutoWorldIndexSystem : ModSystem
     public override void OnWorldUnload()
     {
         Tiles.Clear();
+        TreeBases.Clear();
         scanIndex = 0;
         ScanComplete = false;
     }
@@ -46,14 +48,20 @@ public sealed class AutoWorldIndexSystem : ModSystem
             int x = scanIndex % Main.maxTilesX;
             int y = scanIndex / Main.maxTilesX;
             Tile tile = Main.tile[x, y];
-            if (!tile.HasTile || !IsIndexed(tile.TileType, x, y))
+            if (!tile.HasTile)
+                continue;
+            Point point = new(x, y);
+            if (tile.TileType < Main.tileAxe.Length && Main.tileAxe[tile.TileType] &&
+                AutoWorldKnowledge.IsChoppableTreeBase(point))
+                TreeBases.Add(point);
+            if (!IsIndexed(tile.TileType, x, y))
                 continue;
             if (!Tiles.TryGetValue(tile.TileType, out List<Point> points))
             {
                 points = [];
                 Tiles[tile.TileType] = points;
             }
-            points.Add(new Point(x, y));
+            points.Add(point);
         }
 
         if (scanIndex >= total)
@@ -66,6 +74,7 @@ public sealed class AutoWorldIndexSystem : ModSystem
     public static void RestartScan()
     {
         Tiles.Clear();
+        TreeBases.Clear();
         scanIndex = 0;
         ScanComplete = false;
         completedAtTick = 0;
@@ -91,6 +100,28 @@ public sealed class AutoWorldIndexSystem : ModSystem
                 bestDistance = distance;
                 best = point;
             }
+        }
+        return best;
+    }
+
+    /// <summary>Nearest live tree root from the frame-sliced whole-world index. Stale roots are
+    /// rejected against live tiles, so cutting a tree immediately removes it from consideration
+    /// without waiting for the periodic rebuild.</summary>
+    public static Point? FindNearestTreeBase(Vector2 center, System.Func<Point, bool> extra = null)
+    {
+        Point? best = null;
+        float bestDistance = float.MaxValue;
+        foreach (Point point in TreeBases)
+        {
+            if (!AutoWorldKnowledge.IsChoppableTreeBase(point) ||
+                extra is not null && !extra(point))
+                continue;
+            float distance = Vector2.DistanceSquared(center,
+                new Vector2(point.X * 16f + 8f, point.Y * 16f + 8f));
+            if (distance >= bestDistance)
+                continue;
+            bestDistance = distance;
+            best = point;
         }
         return best;
     }

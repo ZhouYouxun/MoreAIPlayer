@@ -15,7 +15,7 @@ public sealed class AutoWorldBinding
     /// <summary>Profile id bound to this world's automation companion.</summary>
     public int ProfileId;
 
-    /// <summary>True once Moon Lord has been defeated here; the profile is now a normal companion
+    /// <summary>True once Moon Lord has been defeated here. The profile remains automation-owned,
     /// and the automation book must never create a second automation companion for this world.</summary>
     public bool Completed;
 

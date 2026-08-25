@@ -18,20 +18,26 @@ public enum AutoWeaponRouteKind : byte
 /// otherwise hunt drops) while the generic assessment engine remains responsible for mod weapons.</summary>
 public static class AutoVanillaWeaponStrategy
 {
-    public static AutoWeaponRouteKind ChooseUpgradeRoute(AutoContext ctx)
+    public static AutoWeaponRouteKind ChooseUpgradeRoute(AutoContext ctx,
+        System.Func<AutoWeaponRouteKind, bool> allowed = null)
     {
         if (!AutoCampaignController.NeedsLoadoutWork(ctx))
             return AutoWeaponRouteKind.None;
-        if (AutoVanillaWeaponCraftingController.HasPotentialUpgrade(ctx))
+        bool Allowed(AutoWeaponRouteKind route) => allowed is null || allowed(route);
+        if (Allowed(AutoWeaponRouteKind.CraftStageWeapon) &&
+            AutoVanillaWeaponCraftingController.HasPotentialUpgrade(ctx))
             return AutoWeaponRouteKind.CraftStageWeapon;
-        if (AutoLootController.HasWorthwhileWorldWeaponChest(ctx))
+        if (Allowed(AutoWeaponRouteKind.WorldChest) &&
+            AutoLootController.HasWorthwhileWorldWeaponChest(ctx))
             return AutoWeaponRouteKind.WorldChest;
-        if (!Main.hardMode && ctx.State.CampaignStage <= AutoCampaignStage.EvilBoss &&
+        if (Allowed(AutoWeaponRouteKind.EvilOrbGun) && !Main.hardMode &&
+            ctx.State.CampaignStage <= AutoCampaignStage.EvilBoss &&
             !ctx.State.FirstEvilOrbBroken && BestRangedScore(ctx.Profile) < 36)
             return AutoWeaponRouteKind.EvilOrbGun;
-        if (ctx.Fishing.HasOpportunity(ctx))
+        if (Allowed(AutoWeaponRouteKind.Fishing) && ctx.Fishing.HasOpportunity(ctx))
             return AutoWeaponRouteKind.Fishing;
-        return AutoWeaponRouteKind.HuntDrops;
+        return Allowed(AutoWeaponRouteKind.HuntDrops)
+            ? AutoWeaponRouteKind.HuntDrops : AutoWeaponRouteKind.None;
     }
 
     public static float TacticalMultiplier(Item item, NPC target, AutoCampaignStage stage)

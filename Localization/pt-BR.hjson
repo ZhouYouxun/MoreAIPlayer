@@ -241,7 +241,7 @@ Mods: {
 					[Apenas para entretenimento; este recurso ainda está em testes]
 					Clique esquerdo: invoca o companheiro automático; outro clique o recolhe e salva posição, inventário e memória de progresso
 					Clique direito: move a câmera para o companheiro automático; clique novamente para voltar a você
-					Ele tentará explorar, coletar, construir, lutar e avançar pelo mundo de forma independente; ao concluir, torna-se um companheiro fantasma normal
+					Ele tentará explorar, coletar, construir, lutar e avançar pelo mundo de forma independente; ao concluir, salvará o progresso e parará sem entrar no sistema de acompanhamento dos companheiros comuns
 					Ainda pode travar, errar ou encontrar outros bugs. Faça backup do mundo antes. Somente um jogador.
 					'''
 			}
@@ -488,11 +488,26 @@ Mods: {
 			AutomationCameraStarted: A câmera agora segue {0}. Você ainda controla seu próprio jogador.
 			AutomationCameraStopped: A câmera voltou para o seu jogador.
 			AutomationBlocked: O companheiro automático está preso em "{0}": {1}. Ele continuará tentando periodicamente por conta própria.
-			AutomationCompleted: "{0} derrotou o Senhor da Lua. A execução automática terminou; agora é um companheiro fantasma normal."
+			AutomationCompleted: "{0} derrotou o Senhor da Lua. A execução automática foi salva e concluída; ele não se tornará um companheiro comum que segue o jogador."
 			AutomationProgressStep: "[Automação · {0}] Etapa: {1} · Passo: {2} · Classe: {3}"
 			AutomationWeaponSelected: "[Laboratório do celular · {0}] Escolheu {1} · pontuação {2} · DPS teórico {3}"
 			AutomationDeathRecorded: "[Automação] {0} foi derrotado; renascerá na base aérea e voltará ao local da falha."
 			AutomationReturnResumed: "[Automação] {0} chegou ao local da falha anterior e retomou o objetivo salvo."
+			AutomationSelfRescue: "[Autorresgate · {0}] {1} sem progresso detectado; recuperação nível {2}: {3}."
+
+			AutomationSelfRescueReason: {
+				Stationary: travamento parado
+				Oscillation: oscilação repetida em uma área pequena
+				Embedded: caixa de colisão presa em blocos
+				ReturnRouteFailed: a rota de volta também não avançou
+			}
+
+			AutomationSelfRescueAction: {
+				MineEscape: escavar o corpo e a passagem imediata
+				ChangeRoute: rejeitar o alvo ruim e mudar rota e tática
+				ReturnHome: voltar fisicamente à base ou ao ponto inicial
+				ForceRecall: voltar com segurança e refazer o plano
+			}
 
 			AutomationStage: {
 				// Foundation: Foundation

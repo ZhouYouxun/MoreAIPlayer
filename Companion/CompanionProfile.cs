@@ -135,10 +135,14 @@ public sealed class CompanionProfile
     /// See <see cref="AutoCompanionState"/>.</summary>
     public AutoCompanionState AutoState { get; private set; }
 
-    /// <summary>True while the automation flow owns this profile. Every normal-companion system
-    /// (command book, build tactics, squad spread, rescue, manager panel) filters on this so an
-    /// automation companion never joins them until it converts after Moon Lord.</summary>
+    /// <summary>True while the automation flow is actively running. Live normal-companion systems
+    /// use the instance identity to exclude the summoned player. Persistent profile pickers must
+    /// use <see cref="IsAutomationProfile"/> so a completed run cannot be claimed later.</summary>
     public bool IsAutoRunning => AutoState is not null && AutoState.Running;
+
+    /// <summary>Permanent ownership marker for profiles created by the Automation Tome. Completion
+    /// stops the run but never turns this saved player into an ordinary following companion.</summary>
+    public bool IsAutomationProfile => Origin == CompanionOrigin.Automation;
 
     /// <summary>Turns a freshly created profile into the world's automation companion: marks the
     /// automation state active and hands it only the two starting tools the design allows.</summary>
@@ -149,12 +153,31 @@ public sealed class CompanionProfile
         GiveInitialAutomationTools();
     }
 
-    /// <summary>Clears the automation identity when the run finishes (Moon Lord). Keeps every item,
-    /// the name and the appearance so a perfectly ordinary companion profile remains.</summary>
+    /// <summary>Repairs an incomplete world's automation binding without replacing its inventory,
+    /// appearance or accumulated planner memory. This is intentionally separate from
+    /// <see cref="BeginAutomation"/>, whose fresh-run contract grants the starting tools.</summary>
+    public void EnsureAutomationRunning()
+    {
+        Origin = CompanionOrigin.Automation;
+        AutoState ??= new AutoCompanionState();
+        AutoState.Running = true;
+    }
+
+    /// <summary>Restores permanent automation ownership for a completed binding while keeping it
+    /// stopped. This protects a profile recovered from malformed metadata from becoming eligible
+    /// for the debug book or Phantom Staff.</summary>
+    public void EnsureAutomationCompleted()
+    {
+        Origin = CompanionOrigin.Automation;
+        AutoState ??= new AutoCompanionState();
+        AutoState.Running = false;
+    }
+
+    /// <summary>Stops the automation run after Moon Lord while retaining its permanent automation
+    /// profile identity, inventory, appearance and memory.</summary>
     public void EndAutomation()
     {
-        if (AutoState is not null)
-            AutoState.Running = false;
+        EnsureAutomationCompleted();
     }
 
     /// <summary>
@@ -379,6 +402,16 @@ public sealed class CompanionProfile
         visual.underShirtColor = UnderShirtColor;
         visual.pantsColor = PantsColor;
         visual.shoeColor = ShoeColor;
+    }
+
+    /// <summary>Makes this profile continuously mirror the owning player's complete dresser
+    /// appearance. Inventory, equipment, name and progression remain independent.</summary>
+    public void MirrorAppearanceFrom(Player owner)
+    {
+        if (owner is null)
+            return;
+        MirrorsOwnerAppearance = true;
+        CopyOwnerAppearance(owner);
     }
 
     /// <summary>

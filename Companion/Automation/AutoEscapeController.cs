@@ -79,6 +79,50 @@ public sealed class AutoEscapeController
         return true;
     }
 
+    /// <summary>Mines one ordinary solid tile in the immediate escape corridor. Unlike normal
+    /// resource mining this is deliberately local: it only clears enough room for the navigator
+    /// to choose a new route and never tunnels toward a distant objective on its own.</summary>
+    public bool TryMineEscapeCorridor(AutoContext ctx, int preferredDirection)
+    {
+        Player me = ctx.Me;
+        int pick = AutoInventory.BestToolIndex(me, item => item.pick);
+        if (pick < 0 || ctx.Actuator.ItemUseSpent)
+            return false;
+
+        int direction = preferredDirection < 0 ? -1 : 1;
+        Point center = me.Center.ToTileCoordinates();
+        Point? best = null;
+        float bestDistance = float.MaxValue;
+        for (int step = 0; step <= 3; step++)
+        {
+            int x = center.X + direction * step;
+            for (int y = center.Y - 2; y <= center.Y + 2; y++)
+            {
+                if (!WorldGen.InWorld(x, y, 8))
+                    continue;
+                Tile tile = Main.tile[x, y];
+                if (!tile.HasTile || tile.IsActuated || tile.TileType >= Main.tileSolid.Length ||
+                    !Main.tileSolid[tile.TileType] || Main.tileSolidTop[tile.TileType] ||
+                    Main.tileFrameImportant[tile.TileType] || !WorldGen.CanKillTile(x, y))
+                    continue;
+                Vector2 tileCenter = new(x * 16f + 8f, y * 16f + 8f);
+                float distance = Vector2.DistanceSquared(tileCenter, me.Center);
+                if (distance >= bestDistance)
+                    continue;
+                bestDistance = distance;
+                best = new Point(x, y);
+            }
+        }
+
+        if (best is not Point target)
+            return false;
+        ctx.Navigator.Idle(me);
+        ctx.TaskRuntime.LastTargetTile = target;
+        ctx.Actuator.UseItemInSlot(ctx.Instance, me, pick,
+            new Vector2(target.X * 16f + 8f, target.Y * 16f + 8f), target);
+        return true;
+    }
+
     private static bool TryMicroRelocate(AutoContext ctx)
     {
         Player me = ctx.Me;

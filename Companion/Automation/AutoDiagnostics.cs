@@ -27,6 +27,8 @@ public static class AutoDiagnostics
             $"result: {runtime.LastResult}  reason: {runtime.LastFailureReason}",
             $"noProgress: {runtime.TicksWithoutProgress}t  noMetric: {runtime.TicksWithoutMetricChange}t",
             $"attempts: {runtime.AttemptCount}  recoveryLv: {runtime.RecoveryLevel}",
+            $"self-rescue: L{runtime.SelfRescueLevel}  count: {runtime.SelfRescueCount}  " +
+                $"{runtime.LastSelfRescueReason}/{runtime.LastSelfRescueAction}",
             $"rejected targets: {runtime.RejectedTargetCount}  deferred plans: {runtime.DeferredPlanCount}",
         ];
 
@@ -46,6 +48,10 @@ public static class AutoDiagnostics
         if (state is not null)
         {
             lines.Add($"campaign: {state.CampaignStage}  class: {state.PreferredClass}");
+            int eligibleTownNpcs = AutoResourceBudget.ForecastEligibleTownNpcCount();
+            lines.Add($"housing: {state.HousingRoomsCompleted}/{AutoResourceBudget.RequiredHousingRooms()} rooms  " +
+                $"eligible NPCs: {eligibleTownNpcs}");
+            lines.Add($"replant debt: {state.PendingReplantCount}");
             lines.Add($"weapon route: {state.LastWeaponRoute}");
             if (state.LastSelectedWeaponItemType > ItemID.None)
                 lines.Add($"weapon: {Language.GetTextValue(Lang.GetItemName(state.LastSelectedWeaponItemType).Key)}  " +

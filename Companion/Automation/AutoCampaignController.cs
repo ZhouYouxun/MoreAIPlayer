@@ -152,10 +152,11 @@ public static class AutoCampaignController
     {
         int required = RequiredWeaponScore(ctx.State.CampaignStage);
         int score = AutoWeaponEvaluator.BestUsableScore(ctx.Me, ctx.Profile);
-        // Every two wipes widen the tactical fallback. This never discards preparation entirely:
-        // maximum life and the physical arena remain hard requirements.
-        int tolerance = System.Math.Min(35, ctx.State.StageFailureCount * 8);
-        return score < required - tolerance;
+        // Death raises the desired margin instead of silently accepting a weaker loadout. Upgrade
+        // routes remain bounded, so an unlucky world still proceeds to a changed arena/strategy
+        // rather than farming one prescribed drop forever.
+        int safetyMargin = System.Math.Min(36, ctx.State.StageFailureCount * 6);
+        return score < required + safetyMargin;
     }
 
     public static bool RequiresNight(AutoCampaignStage stage) => stage is

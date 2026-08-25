@@ -27,7 +27,7 @@ public static class AutoStorageController
         AutoCampaignStage stage = state?.CampaignStage ?? AutoCampaignStage.Foundation;
         return type switch
         {
-        ItemID.Wood => AutoShelterController.WoodReserve,
+        ItemID.Wood => AutoResourceBudget.StorageWoodKeep(state),
         ItemID.StoneBlock => 200,
         ItemID.CopperOre or ItemID.TinOre or ItemID.IronOre or ItemID.LeadOre or
         ItemID.SilverOre or ItemID.TungstenOre or ItemID.GoldOre or ItemID.PlatinumOre
@@ -97,12 +97,18 @@ public static class AutoStorageController
         if (st.Chest is Point recorded)
         {
             int recordedId = Chest.FindChest(recorded.X, recorded.Y);
-            if (recordedId >= 0)
+            if (recordedId >= 0 && ChestHasEmptySlot(Main.chest[recordedId]))
                 return recordedId;
-            st.Chest = null; // it was removed
+            st.Chest = null; // it was removed or is completely saturated
         }
 
-        int nearby = FindNearbyChestId(ctx.Me, ChestSearchRadius);
+        // After local storage has failed repeatedly, perfect world knowledge may adopt the nearest
+        // unlocked world chest as temporary overflow. This gives a full early-game backpack a
+        // route to recovery even before it has the iron bars and free result slot needed to craft
+        // its own chest; the completed aerial house later replaces this anchor with owned storage.
+        int searchRadius = ctx.TaskRuntime.RecoveryLevel >= 4
+            ? System.Math.Max(Main.maxTilesX, Main.maxTilesY) : ChestSearchRadius;
+        int nearby = FindNearbyChestId(ctx.Me, searchRadius);
         if (nearby >= 0)
         {
             st.Chest = new Point(Main.chest[nearby].x, Main.chest[nearby].y);
@@ -150,7 +156,7 @@ public static class AutoStorageController
         for (int i = 0; i < Main.chest.Length; i++)
         {
             Chest chest = Main.chest[i];
-            if (chest is null)
+            if (chest is null || Chest.IsLocked(chest.x, chest.y) || !ChestHasEmptySlot(chest))
                 continue;
             int distance = Math.Abs(chest.x - origin.X) + Math.Abs(chest.y - origin.Y);
             if (distance <= radiusTiles && distance < bestDistance)
@@ -160,6 +166,16 @@ public static class AutoStorageController
             }
         }
         return best;
+    }
+
+    private static bool ChestHasEmptySlot(Chest chest)
+    {
+        if (chest is null)
+            return false;
+        foreach (Item item in chest.item)
+            if (item is null || item.IsAir)
+                return true;
+        return false;
     }
 
     /// <summary>Moves surplus (non-essential material above its keep-stock) from the backpack into

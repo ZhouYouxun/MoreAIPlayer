@@ -8,8 +8,8 @@ namespace MoreAIPlayer.Companion.Automation;
 /// <summary>
 /// The persistent automation state carried by an <see cref="CompanionProfile"/> while it is the
 /// world's one automation companion. It is intentionally a separate object from the profile's
-/// cosmetic/inventory data so that finishing the run (defeating Moon Lord) can drop this whole
-/// state and leave a perfectly ordinary companion profile behind.
+/// cosmetic/inventory data so finishing the run (defeating Moon Lord) can stop the planner while
+/// preserving the automation player's complete saved record.
 ///
 /// Phase 1 only needs the identity marker (<see cref="Running"/>) and a data version so later
 /// phases can migrate saved planner state without ever wiping the profile's gear. The goal graph,
@@ -20,15 +20,15 @@ namespace MoreAIPlayer.Companion.Automation;
 public sealed class AutoCompanionState
 {
     /// <summary>Bumped whenever the saved automation layout changes shape.</summary>
-    public const int CurrentVersion = 11;
+    public const int CurrentVersion = 12;
 
     /// <summary>The version this state was written with; used for forward migration on load.</summary>
     public int Version = CurrentVersion;
 
     /// <summary>
     /// True while the automation flow is active. Cleared (not deleted) when the companion finishes
-    /// the run and converts into a normal phantom companion, so <see cref="CompanionProfile.IsAutoRunning"/>
-    /// reads false and every normal-companion system stops filtering it out.
+    /// the run. The profile's permanent automation origin remains intact, so no ordinary summon
+    /// system may claim it afterward.
     /// </summary>
     public bool Running = true;
 
@@ -37,8 +37,7 @@ public sealed class AutoCompanionState
     // instead of mirroring the owner's — otherwise an endgame owner would hand a brand-new
     // automation companion a 500 HP head start and trivialise early progression. Phase 1 leaves
     // these at zero (the empty brain collects nothing yet); later phases increment them when the
-    // companion actually consumes a crystal/fruit. After the run converts, they are dropped and the
-    // profile goes back to the owner-shared rule.
+    // companion actually consumes a crystal/fruit. These values remain part of its completed save.
 
     /// <summary>Life Crystals the companion has consumed (0–15). Each adds 20 max life up to 400.</summary>
     public int LifeCrystals;
@@ -106,6 +105,11 @@ public sealed class AutoCompanionState
     /// walls, entrance, light, comfort item, work surface and storage in the live world.</summary>
     public bool ShelterCompleted;
 
+    /// <summary>Largest number of rooms which passed Terraria's live housing validation. Keeping
+    /// this separately lets a later stage budget only the new extension while the existing tower
+    /// remains useful.</summary>
+    public int HousingRoomsCompleted;
+
     // ---- Full campaign / recovery memory ----
     public AutoCampaignStage CampaignStage = AutoCampaignStage.Foundation;
     public AutoCombatClass PreferredClass = AutoCombatClass.Flexible;
@@ -155,6 +159,55 @@ public sealed class AutoCompanionState
     public int ExplorationSegments;
     public int FishingAttemptsThisSegment;
     public int FishingSegmentMarker = -1;
+
+    private const int PendingReplantCapacity = 128;
+    private readonly List<Point> pendingReplantSites = [];
+    public int PendingReplantCount => pendingReplantSites.Count;
+
+    public void QueueReplant(Point treeBase)
+    {
+        if (!WorldGen.InWorld(treeBase.X, treeBase.Y, 5))
+            return;
+        foreach (Point site in pendingReplantSites)
+            if (site == treeBase)
+                return;
+        if (pendingReplantSites.Count >= PendingReplantCapacity)
+            pendingReplantSites.RemoveAt(0);
+        pendingReplantSites.Add(treeBase);
+    }
+
+    public bool TryPeekReplant(out Point site)
+    {
+        if (pendingReplantSites.Count > 0)
+        {
+            site = pendingReplantSites[0];
+            return true;
+        }
+        site = default;
+        return false;
+    }
+
+    public void CompleteReplant(Point site)
+    {
+        for (int i = 0; i < pendingReplantSites.Count; i++)
+        {
+            if (pendingReplantSites[i] != site)
+                continue;
+            pendingReplantSites.RemoveAt(i);
+            return;
+        }
+    }
+
+    public void RelocateReplant(Point from, Point to)
+    {
+        for (int i = 0; i < pendingReplantSites.Count; i++)
+        {
+            if (pendingReplantSites[i] != from)
+                continue;
+            pendingReplantSites[i] = to;
+            return;
+        }
+    }
 
     private const int ReviewedChestCapacity = 256;
     private readonly List<Point> reviewedChests = [];
@@ -261,6 +314,7 @@ public sealed class AutoCompanionState
             [nameof(ManaCrystals)] = ManaCrystals,
             [nameof(BossFailureCount)] = BossFailureCount,
             [nameof(ShelterCompleted)] = ShelterCompleted,
+            [nameof(HousingRoomsCompleted)] = HousingRoomsCompleted,
             [nameof(CampaignStage)] = (int)CampaignStage,
             [nameof(PreferredClass)] = (int)PreferredClass,
             [nameof(StrategyVariant)] = StrategyVariant,
@@ -316,6 +370,10 @@ public sealed class AutoCompanionState
         foreach (Point chest in reviewedChests)
             savedChests.Add(new TagCompound { ["X"] = chest.X, ["Y"] = chest.Y });
         tag["ReviewedChests"] = savedChests;
+        List<TagCompound> savedReplants = new(pendingReplantSites.Count);
+        foreach (Point site in pendingReplantSites)
+            savedReplants.Add(new TagCompound { ["X"] = site.X, ["Y"] = site.Y });
+        tag["PendingReplantSites"] = savedReplants;
         return tag;
     }
 
@@ -332,6 +390,9 @@ public sealed class AutoCompanionState
             ManaCrystals = tag.ContainsKey(nameof(ManaCrystals)) ? tag.GetInt(nameof(ManaCrystals)) : 0,
             BossFailureCount = tag.ContainsKey(nameof(BossFailureCount)) ? tag.GetInt(nameof(BossFailureCount)) : 0,
             ShelterCompleted = tag.ContainsKey(nameof(ShelterCompleted)) && tag.GetBool(nameof(ShelterCompleted)),
+            HousingRoomsCompleted = tag.ContainsKey(nameof(HousingRoomsCompleted))
+                ? System.Math.Max(0, tag.GetInt(nameof(HousingRoomsCompleted)))
+                : tag.ContainsKey(nameof(ShelterCompleted)) && tag.GetBool(nameof(ShelterCompleted)) ? 4 : 0,
             CampaignStage = ReadEnum(tag, nameof(CampaignStage), AutoCampaignStage.Foundation),
             PreferredClass = ReadEnum(tag, nameof(PreferredClass), AutoCombatClass.Flexible),
             StrategyVariant = tag.ContainsKey(nameof(StrategyVariant)) ? System.Math.Max(0, tag.GetInt(nameof(StrategyVariant))) : 0,
@@ -394,6 +455,20 @@ public sealed class AutoCompanionState
                 state.reviewedChests.Add(new Point(saved.GetInt("X"), saved.GetInt("Y")));
             }
         }
+        if (tag.ContainsKey("PendingReplantSites"))
+        {
+            foreach (TagCompound saved in tag.GetList<TagCompound>("PendingReplantSites"))
+            {
+                if (state.pendingReplantSites.Count >= PendingReplantCapacity)
+                    break;
+                Point site = new(saved.GetInt("X"), saved.GetInt("Y"));
+                // ModPlayer data can be deserialised at character selection, before a world has
+                // populated Main.maxTilesX/Y. WorldGen.InWorld would then reject every legitimate
+                // saved site. Keep the integer coordinate here; the live replant controller
+                // validates it against the bound world before acting.
+                state.pendingReplantSites.Add(site);
+            }
+        }
         return state;
     }
 
@@ -416,6 +491,12 @@ public sealed class AutoCompanionState
         if (!tag.ContainsKey(key))
             return fallback;
         int value = tag.GetInt(key);
-        return System.Enum.IsDefined(typeof(T), value) ? (T)(object)value : fallback;
+        // TagCompound stores enum values as Int32, while most compact automation enums use byte.
+        // Enum.IsDefined(Type, object) requires the boxed value to have the enum's exact underlying
+        // type, and casting a boxed Int32 directly to a byte-backed enum also throws. Convert to a
+        // real boxed enum first; malformed/out-of-range values then fall back without sacrificing
+        // the entire profile and its automation identity.
+        object candidate = System.Enum.ToObject(typeof(T), value);
+        return System.Enum.IsDefined(typeof(T), candidate) ? (T)candidate : fallback;
     }
 }
