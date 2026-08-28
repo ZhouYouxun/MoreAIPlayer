@@ -26,6 +26,8 @@ public static class AutoCampaignGearController
     private static readonly int[] ChlorophyteOre = [ItemID.ChlorophyteOre];
     private static readonly int[] ChlorophyteBars = [ItemID.ChlorophyteBar];
 
+    internal static void ResetWorldSession() => nextMechanicalRecoverySummonTick = 0;
+
     public static bool NeedsMiningUpgrade(AutoContext ctx)
     {
         if (!Main.hardMode)
@@ -122,6 +124,17 @@ public static class AutoCampaignGearController
         if (ctx.State.AltarsBroken >= 3)
             return AutoTaskResult.Succeeded;
 
+        // AltarsBroken is this profile's action journal, not the world's ore truth. Imported
+        // Hardmode saves normally already contain all three ore tiers; adopting that fact avoids
+        // searching forever for destroyed altars or needlessly altering somebody else's world.
+        if (WorldHasSeededHardmodeOre(ctx))
+        {
+            ctx.State.PendingAltar = null;
+            ctx.State.AltarsBroken = 3;
+            ctx.TaskRuntime.RecordWorldProgress();
+            return AutoTaskResult.Succeeded;
+        }
+
         if (ctx.State.PendingAltar is Point pending)
         {
             if (!WorldGen.InWorld(pending.X, pending.Y, 4) ||
@@ -154,6 +167,16 @@ public static class AutoCampaignGearController
             return AutoTaskResult.AlternativeRequired;
         }
         return AutoTaskResult.Running;
+    }
+
+    private static bool WorldHasSeededHardmodeOre(AutoContext ctx)
+    {
+        if (WorldGen.SavedOreTiers.Cobalt >= 0 && WorldGen.SavedOreTiers.Mythril >= 0 &&
+            WorldGen.SavedOreTiers.Adamantite >= 0)
+            return true;
+        return AutoWorldIndexSystem.FindNearest(ctx.Me.Center, Tier1Tiles) is not null &&
+            AutoWorldIndexSystem.FindNearest(ctx.Me.Center, Tier2Tiles) is not null &&
+            AutoWorldIndexSystem.FindNearest(ctx.Me.Center, Tier3Tiles) is not null;
     }
 
     private static AutoTaskResult BuildMoltenPick(AutoContext ctx)

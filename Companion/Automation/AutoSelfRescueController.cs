@@ -40,9 +40,11 @@ public sealed class AutoSelfRescueController
 {
     private const int SampleIntervalTicks = 15;
     private const int MaximumSamples = 32;                 // rolling eight-second trace
+    private const int MaximumMeaninglessIdleTicks = 60;    // absolute one-second ceiling
+    private const float MeaninglessIdleMovementPixels = 10f;
     private const int EmbeddedTriggerTicks = 45;
-    private const int BaseStationaryTriggerTicks = 270;    // 4.5s
-    private const int BaseOscillationTriggerTicks = 420;   // 7s
+    private const int BaseStationaryTriggerTicks = 210;    // 3.5s
+    private const int BaseOscillationTriggerTicks = 330;   // 5.5s
     private const int RecoveryCooldownTicks = 180;
     private const int ReturnNoApproachTicks = 240;
     private const int ReturnDeadlineTicks = 1800;
@@ -57,6 +59,8 @@ public sealed class AutoSelfRescueController
     private int embeddedTicks;
     private int cooldownTicks;
     private int recoveryLevel;
+    private Vector2 meaninglessIdleAnchor;
+    private int meaninglessIdleTicks;
 
     private bool recoveryPending;
     private int pendingLevel;
@@ -130,7 +134,8 @@ public sealed class AutoSelfRescueController
 
         long signature = AutoTaskRuntime.ComputeSignature(ctx, plan);
         long progressSerial = ctx.TaskRuntime.ProgressSerial;
-        if (observedPlanKey != plan.StableKey)
+        bool planChanged = observedPlanKey != plan.StableKey;
+        if (observedPlanKey == 0)
         {
             observedPlanKey = plan.StableKey;
             lastSignature = signature;
@@ -141,7 +146,11 @@ public sealed class AutoSelfRescueController
             return false;
         }
 
-        bool realProgress = signature != lastSignature || progressSerial != lastProgressSerial;
+        // A portfolio switch is not progress. The former per-plan reset let two failing routes
+        // alternate forever while clearing the stationary/oscillation trace on every switch.
+        bool realProgress = (!planChanged && signature != lastSignature) ||
+            progressSerial != lastProgressSerial;
+        observedPlanKey = plan.StableKey;
         lastSignature = signature;
         lastProgressSerial = progressSerial;
         if (realProgress || result == AutoTaskResult.Succeeded)
@@ -155,6 +164,22 @@ public sealed class AutoSelfRescueController
             ticksWithoutRealProgress = 0;
             ClearSpatialWindow(ctx.Me.Center);
             return false;
+        }
+
+        // This is deliberately stricter and faster than the longer spatial recovery ladder below.
+        // It catches the controller producing no work at all: no meaningful movement, no changing
+        // task/world fact, no real tile action, no live fight and no cast bobber. Switching between
+        // plans cannot reset it. At exactly one second the bad route is deferred and exploration is
+        // started in this same frame, so there is no extra recovery frame spent standing still.
+        if (MovedSinceMeaninglessIdleAnchor(ctx.Me.Center) || IsMeaningfulStationaryWork(ctx, plan))
+        {
+            meaninglessIdleAnchor = ctx.Me.Center;
+            meaninglessIdleTicks = 0;
+        }
+        else if (++meaninglessIdleTicks >= MaximumMeaninglessIdleTicks)
+        {
+            RecoverMeaninglessIdle(ctx, plan);
+            return true;
         }
 
         ticksWithoutRealProgress++;
@@ -201,6 +226,57 @@ public sealed class AutoSelfRescueController
         ClearCurrentAction(ctx);
         ctx.Navigator.Reset();
         ClearSpatialWindow(ctx.Me.Center);
+    }
+
+    private void RecoverMeaninglessIdle(AutoContext ctx, AutoPlan plan)
+    {
+        recoveryLevel = System.Math.Min(4, recoveryLevel + 1);
+        ClearCurrentAction(ctx);
+        ChangeRoute(ctx, plan, deferTicks: plan.Kind == AutoPlanKind.Optional ? 1800 : 300);
+        AutoExplorationController.Explore(ctx);
+
+        ctx.TaskRuntime.LastFailureReason = AutoBlockReason.NoProgress;
+        ctx.TaskRuntime.SelfRescueLevel = recoveryLevel;
+        ctx.TaskRuntime.SelfRescueCount++;
+        ctx.TaskRuntime.LastSelfRescueReason = AutoSelfRescueReason.Stationary;
+        ctx.TaskRuntime.LastSelfRescueAction = AutoSelfRescueAction.ChangeRoute;
+        ctx.TaskRuntime.Log($"one-second idle breaker {plan.Goal}/ChangeRoute");
+        AutoProgressReporter.ReportSelfRescue(ctx.Profile, AutoSelfRescueReason.Stationary,
+            recoveryLevel, AutoSelfRescueAction.ChangeRoute);
+        cooldownTicks = RecoveryCooldownTicks;
+        ClearSpatialWindow(ctx.Me.Center);
+    }
+
+    private bool MovedSinceMeaninglessIdleAnchor(Vector2 position) =>
+        Vector2.DistanceSquared(position, meaninglessIdleAnchor) >=
+        MeaninglessIdleMovementPixels * MeaninglessIdleMovementPixels;
+
+    private static bool IsMeaningfulStationaryWork(AutoContext ctx, AutoPlan plan)
+    {
+        if (ctx.Instance.WorkTile.HasValue &&
+            (ctx.Instance.WantsUseItem || ctx.Me.controlUseItem || ctx.Me.itemAnimation > 0))
+            return true;
+
+        if (plan.Goal == AutoGoalId.FishOpportunity)
+        {
+            foreach (Projectile projectile in Main.ActiveProjectiles)
+                if (projectile.owner == ctx.Me.whoAmI && projectile.bobber)
+                    return true;
+        }
+
+        if (plan.Goal == AutoGoalId.FightBoss)
+        {
+            if (AutoCampaignController.HasLiveTarget())
+                return true;
+            float radiusSquared = 12f * 16f * (12f * 16f);
+            foreach (NPC npc in Main.ActiveNPCs)
+                if (npc.active && !npc.friendly && !npc.townNPC && npc.life > 0 &&
+                    npc.damage > 0 && !npc.dontTakeDamage &&
+                    Vector2.DistanceSquared(ctx.Me.Center, npc.Center) <= radiusSquared)
+                    return true;
+        }
+
+        return false;
     }
 
     private bool ContinueReturnToCheckpoint(AutoContext ctx)
@@ -295,7 +371,10 @@ public sealed class AutoSelfRescueController
         ctx.TaskRuntime.RejectActiveTarget(8, 1800);
         ctx.TaskRuntime.Defer(plan, deferTicks);
         ctx.State.StrategyVariant++;
-        ctx.State.ExplorationDirection = ctx.State.ExplorationDirection < 0 ? 1 : -1;
+        // Preserve a healthy outward frontier on the first rescue. Only the second failed route
+        // earns one deliberate direction change; the next rungs return home rather than pacing.
+        if (recoveryLevel >= 2)
+            ctx.State.ExplorationDirection = ctx.State.ExplorationDirection < 0 ? 1 : -1;
         ctx.State.ExplorationTargetTileX = -1;
         ctx.Navigator.Reset();
     }
@@ -400,23 +479,25 @@ public sealed class AutoSelfRescueController
         samples.Clear();
         samples.Enqueue(new SpatialSample(position));
         sampleCountdown = SampleIntervalTicks - 1;
+        meaninglessIdleAnchor = position;
+        meaninglessIdleTicks = 0;
     }
 
     private static int StationaryTrigger(AutoGoalId goal) => goal switch
     {
-        AutoGoalId.FightBoss => 720,
-        AutoGoalId.FishOpportunity => 900,
+        AutoGoalId.FightBoss => 420,
+        AutoGoalId.FishOpportunity => 600,
         AutoGoalId.ReturnToDeathSite or AutoGoalId.AcquireVitalUpgrade or
-            AutoGoalId.AcquireWeaponUpgrade or AutoGoalId.UpgradeClassLoadout => 480,
+            AutoGoalId.AcquireWeaponUpgrade or AutoGoalId.UpgradeClassLoadout => 360,
         _ => BaseStationaryTriggerTicks
     };
 
     private static int OscillationTrigger(AutoGoalId goal) => goal switch
     {
-        AutoGoalId.FightBoss => 900,
-        AutoGoalId.FishOpportunity => 1200,
+        AutoGoalId.FightBoss => 540,
+        AutoGoalId.FishOpportunity => 720,
         AutoGoalId.ReturnToDeathSite or AutoGoalId.AcquireVitalUpgrade or
-            AutoGoalId.AcquireWeaponUpgrade or AutoGoalId.UpgradeClassLoadout => 600,
+            AutoGoalId.AcquireWeaponUpgrade or AutoGoalId.UpgradeClassLoadout => 480,
         _ => BaseOscillationTriggerTicks
     };
 
@@ -431,7 +512,7 @@ public sealed class AutoSelfRescueController
     private static Vector2 FindSafeCheckpoint(AutoContext ctx)
     {
         Point preferred = ctx.State?.HomeAnchor is Point home &&
-            AutoShelterController.IsShelterComplete(home)
+            AutoShelterController.IsShelterComplete(home, ctx.State)
             ? new Point(home.X + 6, home.Y + 6)
             : new Point(Main.spawnTileX, Main.spawnTileY);
         Player me = ctx.Me;
@@ -518,8 +599,17 @@ public sealed class AutoSelfRescueController
         me.controlHook = false;
         me.controlMount = false;
         me.controlThrow = false;
+        me.controlInv = false;
+        me.controlTorch = false;
+        me.controlMap = false;
+        me.controlSmart = false;
+        me.controlQuickHeal = false;
+        me.controlQuickMana = false;
+        me.controlCreativeMenu = false;
+        me.controlDownHold = false;
         me.releaseUseItem = true;
         me.releaseUseTile = true;
+        me.releaseMount = true;
     }
 
     private readonly record struct SpatialSample(Vector2 Position);

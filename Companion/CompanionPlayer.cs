@@ -212,8 +212,19 @@ public sealed class CompanionPlayer : ModPlayer
 
     // ---- Automation companion, one per (character, world), keyed by world unique id (§4.1) ----
 
-    private static string CurrentWorldKey() =>
-        Main.ActiveWorldFileData?.UniqueId.ToString() ?? string.Empty;
+    private static string CurrentWorldKey()
+    {
+        Terraria.IO.WorldFileData world = Main.ActiveWorldFileData;
+        if (world is null)
+            return string.Empty;
+        if (world.UniqueId != System.Guid.Empty)
+            return world.UniqueId.ToString(); // preserve the existing save-key format
+
+        // Very old/imported worlds can lack a usable GUID. Never collapse all of them into the same
+        // Guid.Empty binding; worldID plus the actual save path is the best stable legacy identity.
+        string path = string.IsNullOrWhiteSpace(world.Path) ? Main.worldName : world.Path;
+        return $"legacy:{Main.worldID}:{path}";
+    }
 
     /// <summary>The automation binding for the world the player is currently in, or null.</summary>
     public AutoWorldBinding CurrentWorldAutoBinding() =>
@@ -371,6 +382,21 @@ public sealed class CompanionPlayer : ModPlayer
     /// automation identity before any ordinary summon item can inspect or claim that profile.</summary>
     private void RepairAutomationBindingsAfterLoad()
     {
+        // Older builds accepted a pre-existing Moon Lord flag before checking this profile's own
+        // foundation. Such a false completion is recognizable without loading the world: it has no
+        // verified shelter/basic loadout. Reopen only those polluted bindings; real completed runs
+        // necessarily passed the same personal readiness invariant and remain immutable.
+        foreach (AutoWorldBinding binding in autoBindings.Values)
+        {
+            if (!binding.Completed)
+                continue;
+            CompanionProfile profile = GetProfile(binding.ProfileId);
+            if (profile?.AutoState?.ShelterCompleted == true &&
+                AutoGearController.HasBasicMetalLoadout(profile))
+                continue;
+            binding.Completed = false;
+        }
+
         HashSet<int> unfinishedProfileIds = [];
         foreach (AutoWorldBinding binding in autoBindings.Values)
             if (!binding.Completed)

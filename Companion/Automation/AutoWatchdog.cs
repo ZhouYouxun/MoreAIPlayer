@@ -57,6 +57,9 @@ public sealed class AutoWatchdog
     /// Called before running the plan so a repeatedly-failing goal idles instead of spinning.</summary>
     public bool OnBackoff(AutoPlan plan)
     {
+        if ((plan.Goal == AutoGoalId.FightBoss && AutoBossController.HasActiveBoss()) ||
+            plan.Goal is AutoGoalId.RiskRecovery or AutoGoalId.ReturnToDeathSite)
+            return false;
         if (runtime.IsDeferred(plan))
             return true;
         return runtime.CurrentPlanKey == plan.StableKey &&
@@ -72,6 +75,7 @@ public sealed class AutoWatchdog
         // Goal change resets the per-goal window and recovery ladder.
         if (runtime.CurrentPlanKey != plan.StableKey)
         {
+            long previousPlanKey = runtime.CurrentPlanKey;
             runtime.Log($"plan {runtime.CurrentGoal}->{plan.Goal} ({plan.ItemType}/{plan.Amount})");
             runtime.CurrentGoal = plan.Goal;
             runtime.CurrentPlanKey = plan.StableKey;
@@ -86,7 +90,10 @@ public sealed class AutoWatchdog
             runtime.WindowStartPosition = ctx.Me.Center;
             runtime.BlockedUntilTick = 0;
             runtime.LastFailureReason = AutoBlockReason.None;
-            if (runtime.ActiveTargetGoal != plan.Goal)
+            // A different concrete provider may share one high-level goal (for example chest,
+            // fishing and crafting weapon routes). Never carry its retained target into the new
+            // route merely because the enum label is the same.
+            if (previousPlanKey != 0 && previousPlanKey != plan.StableKey)
                 runtime.ClearActiveTarget();
         }
 
@@ -133,6 +140,7 @@ public sealed class AutoWatchdog
         if (metricChanged || worldChanged)
         {
             runtime.AttemptCount = 0;
+            runtime.ResetPortfolioSwitchPressure();
             runtime.TicksWithoutMetricChange = 0;
             runtime.TicksWithoutProgress = 0;
             runtime.WindowStartPosition = ctx.Me.Center;
@@ -162,6 +170,7 @@ public sealed class AutoWatchdog
         {
             case AutoTaskResult.Succeeded:
                 runtime.Log($"{plan.Goal} succeeded");
+                runtime.ResetPortfolioSwitchPressure();
                 runtime.ClearActiveTarget();
                 runtime.AttemptCount = 0;
                 runtime.RecoveryLevel = 0;
@@ -321,7 +330,8 @@ public sealed class AutoWatchdog
         Player me = ctx.Me;
         int x = Main.spawnTileX;
         int y = Main.spawnTileY;
-        if (ctx.State?.HomeAnchor is Point home && AutoShelterController.IsShelterComplete(home))
+        if (ctx.State?.HomeAnchor is Point home &&
+            AutoShelterController.IsShelterComplete(home, ctx.State))
         {
             x = home.X + 6;
             y = home.Y + 6;

@@ -5,75 +5,85 @@ using Terraria.ModLoader;
 
 namespace MoreAIPlayer.Companion.Automation;
 
-/// <summary>Real-time aerial town builder. Four individually revalidated rooms sit about twenty
-/// tiles above natural ground on climbable wooden-platform columns. Every material is crafted,
-/// placed and consumed through the companion's own inventory.</summary>
+/// <summary>Real-time aerial town builder. Individually revalidated rooms sit about twenty tiles
+/// above natural ground on climbable wooden-platform columns. An imported established world gets a
+/// compact personal foothold instead of a duplicate home for all of that world's existing NPCs.</summary>
 public static class AutoShelterController
 {
     private const int RoomWidth = 12;
     private const int RoomHeight = 7;
-    private static int RoomCount => AutoResourceBudget.RequiredHousingRooms();
-    private static int TotalWidth => (RoomWidth - 1) * RoomCount + 1;
     private const int Elevation = 20;
     private const int SiteRadius = 480;
 
+    private readonly record struct ShelterLayout(int RoomCount)
+    {
+        public int TotalWidth => (RoomWidth - 1) * RoomCount + 1;
+    }
+
+    private static ShelterLayout Layout(AutoCompanionState state) =>
+        new(AutoResourceBudget.RequiredHousingRooms(state));
+
     public static AutoTaskResult Build(AutoContext ctx)
     {
+        ShelterLayout layout = Layout(ctx.State);
         // A site which repeatedly defeats real mining/placement is abandoned after the watchdog's
         // relocation rung. The partially built shell makes InitialSiteSafe reject the same spot,
         // while StrategyVariant changes the next search direction. This closes the old permanent
         // loop on an unmineable block or a structure placed through the template mid-build.
         if (ctx.TaskRuntime.RecoveryLevel >= 3 && ctx.State.HomeAnchor.HasValue &&
-            !IsShelterComplete(ctx.State.HomeAnchor.Value))
+            !IsShelterComplete(ctx.State.HomeAnchor.Value, layout))
         {
             ctx.State.HomeAnchor = null;
             ctx.State.ShelterCompleted = false;
             ctx.State.StrategyVariant++;
             ctx.Navigator.Reset();
         }
-        if (ctx.State.HomeAnchor is not Point anchor || !AnchorUsable(anchor))
+        if (ctx.State.HomeAnchor is not Point anchor || !AnchorUsable(anchor, layout))
         {
-            ctx.State.HomeAnchor = FindSite(ctx.State.StrategyVariant);
+            ctx.State.HomeAnchor = FindSite(ctx.State.StrategyVariant, layout);
             ctx.State.ShelterCompleted = false;
             if (ctx.State.HomeAnchor is not Point selected)
                 return AutoTaskResult.AlternativeRequired;
             anchor = selected;
         }
 
-        if (IsShelterComplete(anchor))
+        if (IsShelterComplete(anchor, layout))
         {
             ctx.State.ShelterCompleted = true;
-            ctx.State.HousingRoomsCompleted = RoomCount;
-            CaptureFurnitureAnchors(ctx, anchor);
+            ctx.State.HousingRoomsCompleted = layout.RoomCount;
+            CaptureFurnitureAnchors(ctx, anchor, layout);
             return AutoTaskResult.Succeeded;
         }
         ctx.State.ShelterCompleted = false;
 
-        AutoTaskResult supplies = EnsureSupplies(ctx, anchor);
+        AutoTaskResult supplies = EnsureSupplies(ctx, anchor, layout);
         if (supplies != AutoTaskResult.Succeeded)
             return supplies;
 
-        if (TryClearTemplate(ctx, anchor) || TryPlaceSupportColumns(ctx, anchor) ||
-            TryPlaceShell(ctx, anchor) || TryPlaceWalls(ctx, anchor) ||
-            TryPlaceFurniture(ctx, anchor))
+        if (TryClearTemplate(ctx, anchor, layout) || TryPlaceSupportColumns(ctx, anchor, layout) ||
+            TryPlaceShell(ctx, anchor, layout) || TryPlaceWalls(ctx, anchor, layout) ||
+            TryPlaceFurniture(ctx, anchor, layout))
             return AutoTaskResult.Running;
         return AutoTaskResult.RetryLater;
     }
 
-    public static bool IsShelterComplete(Point a)
+    public static bool IsShelterComplete(Point a, AutoCompanionState state) =>
+        IsShelterComplete(a, Layout(state));
+
+    private static bool IsShelterComplete(Point a, ShelterLayout layout)
     {
-        if (!AnchorUsable(a))
+        if (!AnchorUsable(a, layout))
             return false;
-        if (MissingSupport(a) || !RoomHas(a, 0, TileID.Containers))
+        if (MissingSupport(a, layout) || !RoomHas(a, 0, TileID.Containers))
             return false;
         int floorY = a.Y + RoomHeight - 1;
-        for (int x = a.X; x < a.X + TotalWidth; x++)
+        for (int x = a.X; x < a.X + layout.TotalWidth; x++)
         {
             if (!IsTile(x, a.Y, TileID.WoodBlock) || !IsTile(x, floorY, TileID.WoodBlock))
                 return false;
         }
 
-        for (int room = 0; room < RoomCount; room++)
+        for (int room = 0; room < layout.RoomCount; room++)
         {
             int left = a.X + room * (RoomWidth - 1);
             int right = left + RoomWidth - 1;
@@ -102,23 +112,24 @@ public static class AutoShelterController
     /// stacks remain legal and must not be interrupted by storage.</summary>
     public static bool NeedsDepositForNextSupply(AutoContext ctx)
     {
+        ShelterLayout layout = Layout(ctx.State);
         if (AutoInventory.HasBackpackSpace(ctx.Profile) ||
-            ctx.State.HomeAnchor is not Point a || !AnchorUsable(a))
+            ctx.State.HomeAnchor is not Point a || !AnchorUsable(a, layout))
             return false;
-        if (MissingSupport(a) && !AutoInventory.Has(ctx.Profile, ItemID.WoodPlatform))
+        if (MissingSupport(a, layout) && !AutoInventory.Has(ctx.Profile, ItemID.WoodPlatform))
             return !AutoInventory.HasBackpackCapacityFor(ctx.Profile, ItemID.WoodPlatform);
-        if (MissingWall(a) && !AutoInventory.Has(ctx.Profile, ItemID.WoodWall))
+        if (MissingWall(a, layout) && !AutoInventory.Has(ctx.Profile, ItemID.WoodWall))
             return !AutoInventory.HasBackpackCapacityFor(ctx.Profile, ItemID.WoodWall);
-        if (HasForeignWall(a) && AutoInventory.BestHammer(ctx.Profile).hammer <= 0 &&
+        if (HasForeignWall(a, layout) && AutoInventory.BestHammer(ctx.Profile).hammer <= 0 &&
             !AutoInventory.Has(ctx.Profile, ItemID.WoodenHammer))
             return !AutoInventory.HasBackpackCapacityFor(ctx.Profile, ItemID.WoodenHammer);
-        if (MissingFurniture(a, TileID.WorkBenches) && !AutoInventory.Has(ctx.Profile, ItemID.WorkBench))
+        if (MissingFurniture(a, TileID.WorkBenches, layout) && !AutoInventory.Has(ctx.Profile, ItemID.WorkBench))
             return !AutoInventory.HasBackpackCapacityFor(ctx.Profile, ItemID.WorkBench);
-        if (MissingFurniture(a, TileID.Chairs) && !AutoInventory.Has(ctx.Profile, ItemID.WoodenChair))
+        if (MissingFurniture(a, TileID.Chairs, layout) && !AutoInventory.Has(ctx.Profile, ItemID.WoodenChair))
             return !AutoInventory.HasBackpackCapacityFor(ctx.Profile, ItemID.WoodenChair);
-        if (MissingDoor(a) && !AutoInventory.Has(ctx.Profile, ItemID.WoodenDoor))
+        if (MissingDoor(a, layout) && !AutoInventory.Has(ctx.Profile, ItemID.WoodenDoor))
             return !AutoInventory.HasBackpackCapacityFor(ctx.Profile, ItemID.WoodenDoor);
-        if (MissingFurniture(a, TileID.Torches) && !AutoInventory.Has(ctx.Profile, ItemID.Torch))
+        if (MissingFurniture(a, TileID.Torches, layout) && !AutoInventory.Has(ctx.Profile, ItemID.Torch))
             return !AutoInventory.HasBackpackCapacityFor(ctx.Profile, ItemID.Torch);
         if (!RoomHas(a, 0, TileID.Containers) && !AutoInventory.Has(ctx.Profile, ItemID.Chest))
         {
@@ -155,22 +166,22 @@ public static class AutoShelterController
         return WorldGen.canSpawn && WorldGen.hiScore > 0;
     }
 
-    private static AutoTaskResult EnsureSupplies(AutoContext ctx, Point a)
+    private static AutoTaskResult EnsureSupplies(AutoContext ctx, Point a, ShelterLayout layout)
     {
-        if (MissingSupport(a) && !AutoInventory.Has(ctx.Profile, ItemID.WoodPlatform))
+        if (MissingSupport(a, layout) && !AutoInventory.Has(ctx.Profile, ItemID.WoodPlatform))
             return Craft(ctx, ItemID.WoodPlatform);
-        if (MissingWall(a) && !AutoInventory.Has(ctx.Profile, ItemID.WoodWall))
+        if (MissingWall(a, layout) && !AutoInventory.Has(ctx.Profile, ItemID.WoodWall))
             return Craft(ctx, ItemID.WoodWall);
-        if (HasForeignWall(a) && AutoInventory.BestHammer(ctx.Profile).hammer <= 0 &&
+        if (HasForeignWall(a, layout) && AutoInventory.BestHammer(ctx.Profile).hammer <= 0 &&
             !AutoInventory.Has(ctx.Profile, ItemID.WoodenHammer))
             return Craft(ctx, ItemID.WoodenHammer);
-        if (MissingFurniture(a, TileID.WorkBenches) && !AutoInventory.Has(ctx.Profile, ItemID.WorkBench))
+        if (MissingFurniture(a, TileID.WorkBenches, layout) && !AutoInventory.Has(ctx.Profile, ItemID.WorkBench))
             return Craft(ctx, ItemID.WorkBench);
-        if (MissingFurniture(a, TileID.Chairs) && !AutoInventory.Has(ctx.Profile, ItemID.WoodenChair))
+        if (MissingFurniture(a, TileID.Chairs, layout) && !AutoInventory.Has(ctx.Profile, ItemID.WoodenChair))
             return Craft(ctx, ItemID.WoodenChair);
-        if (MissingDoor(a) && !AutoInventory.Has(ctx.Profile, ItemID.WoodenDoor))
+        if (MissingDoor(a, layout) && !AutoInventory.Has(ctx.Profile, ItemID.WoodenDoor))
             return Craft(ctx, ItemID.WoodenDoor);
-        if (MissingFurniture(a, TileID.Torches) && !AutoInventory.Has(ctx.Profile, ItemID.Torch))
+        if (MissingFurniture(a, TileID.Torches, layout) && !AutoInventory.Has(ctx.Profile, ItemID.Torch))
         {
             if (!AutoInventory.Has(ctx.Profile, ItemID.Gel))
                 return AutoResourceController.LootPots(ctx);
@@ -195,10 +206,10 @@ public static class AutoShelterController
             AutoCraftingService.IsAvailable ? AutoTaskResult.RetryLater : AutoTaskResult.Faulted;
     }
 
-    private static bool TryClearTemplate(AutoContext ctx, Point a)
+    private static bool TryClearTemplate(AutoContext ctx, Point a, ShelterLayout layout)
     {
         int floor = a.Y + RoomHeight - 1;
-        for (int x = a.X; x < a.X + TotalWidth; x++)
+        for (int x = a.X; x < a.X + layout.TotalWidth; x++)
         for (int y = a.Y; y <= floor; y++)
         {
             bool shell = y == a.Y || y == floor || (x - a.X) % (RoomWidth - 1) == 0;
@@ -233,10 +244,10 @@ public static class AutoShelterController
             TileID.Containers or TileID.Containers2;
     }
 
-    private static bool TryPlaceSupportColumns(AutoContext ctx, Point a)
+    private static bool TryPlaceSupportColumns(AutoContext ctx, Point a, ShelterLayout layout)
     {
         int floor = a.Y + RoomHeight - 1;
-        for (int room = 0; room <= RoomCount; room++)
+        for (int room = 0; room <= layout.RoomCount; room++)
         {
             int x = a.X + room * (RoomWidth - 1);
             int ground = FindGround(x);
@@ -252,17 +263,17 @@ public static class AutoShelterController
         return false;
     }
 
-    private static bool TryPlaceShell(AutoContext ctx, Point a)
+    private static bool TryPlaceShell(AutoContext ctx, Point a, ShelterLayout layout)
     {
         int floor = a.Y + RoomHeight - 1;
-        for (int x = a.X; x < a.X + TotalWidth; x++)
+        for (int x = a.X; x < a.X + layout.TotalWidth; x++)
         {
             if (!IsTile(x, floor, TileID.WoodBlock) && !Main.tile[x, floor].HasTile)
                 return Place(ctx, ItemID.Wood, new Point(x, floor));
             if (!IsTile(x, a.Y, TileID.WoodBlock) && !Main.tile[x, a.Y].HasTile)
                 return Place(ctx, ItemID.Wood, new Point(x, a.Y));
         }
-        for (int room = 0; room <= RoomCount; room++)
+        for (int room = 0; room <= layout.RoomCount; room++)
         {
             int x = a.X + room * (RoomWidth - 1);
             int startY = room == 0 ? floor - 1 : floor - 4;
@@ -273,13 +284,13 @@ public static class AutoShelterController
         return false;
     }
 
-    private static bool TryPlaceWalls(AutoContext ctx, Point a)
+    private static bool TryPlaceWalls(AutoContext ctx, Point a, ShelterLayout layout)
     {
         int slot = AutoInventory.FindInventoryIndex(ctx.Me, item => item.type == ItemID.WoodWall);
         if (slot < 0)
             return false;
         int floor = a.Y + RoomHeight - 1;
-        for (int room = 0; room < RoomCount; room++)
+        for (int room = 0; room < layout.RoomCount; room++)
         {
             int left = a.X + room * (RoomWidth - 1);
             for (int x = left + 1; x < left + RoomWidth - 1; x++)
@@ -303,10 +314,10 @@ public static class AutoShelterController
         return false;
     }
 
-    private static bool TryPlaceFurniture(AutoContext ctx, Point a)
+    private static bool TryPlaceFurniture(AutoContext ctx, Point a, ShelterLayout layout)
     {
         int floor = a.Y + RoomHeight - 1;
-        for (int room = 0; room < RoomCount; room++)
+        for (int room = 0; room < layout.RoomCount; room++)
         {
             int left = a.X + room * (RoomWidth - 1);
             int right = left + RoomWidth - 1;
@@ -338,7 +349,7 @@ public static class AutoShelterController
         return true;
     }
 
-    private static Point? FindSite(int variant)
+    private static Point? FindSite(int variant, ShelterLayout layout)
     {
         int preferredSign = variant % 2 == 0 ? 1 : -1;
         int initialDistance = System.Math.Min(SiteRadius, (variant / 2 % 8) * 16);
@@ -351,8 +362,8 @@ public static class AutoShelterController
                 continue;
             int center = System.Math.Clamp(Main.spawnTileX + distance * sign, 80, Main.maxTilesX - 80);
             int ground = FindGround(center);
-            Point anchor = new(center - TotalWidth / 2, ground - Elevation - RoomHeight + 1);
-            if (AnchorUsable(anchor) && InitialSiteSafe(anchor))
+            Point anchor = new(center - layout.TotalWidth / 2, ground - Elevation - RoomHeight + 1);
+            if (AnchorUsable(anchor, layout) && InitialSiteSafe(anchor, layout))
                 return anchor;
         }
         return null;
@@ -371,13 +382,14 @@ public static class AutoShelterController
         return Main.spawnTileY;
     }
 
-    private static bool AnchorUsable(Point a) => WorldGen.InWorld(a.X, a.Y, 70) &&
-        WorldGen.InWorld(a.X + TotalWidth - 1, a.Y + RoomHeight - 1, 70);
+    private static bool AnchorUsable(Point a, ShelterLayout layout) =>
+        WorldGen.InWorld(a.X, a.Y, 70) &&
+        WorldGen.InWorld(a.X + layout.TotalWidth - 1, a.Y + RoomHeight - 1, 70);
 
-    private static bool MissingSupport(Point a)
+    private static bool MissingSupport(Point a, ShelterLayout layout)
     {
         int floor = a.Y + RoomHeight - 1;
-        for (int room = 0; room <= RoomCount; room++)
+        for (int room = 0; room <= layout.RoomCount; room++)
         {
             int x = a.X + room * (RoomWidth - 1);
             int ground = FindGround(x);
@@ -388,10 +400,10 @@ public static class AutoShelterController
         return false;
     }
 
-    private static bool HasForeignWall(Point a)
+    private static bool HasForeignWall(Point a, ShelterLayout layout)
     {
         int floor = a.Y + RoomHeight - 1;
-        for (int x = a.X + 1; x < a.X + TotalWidth - 1; x++)
+        for (int x = a.X + 1; x < a.X + layout.TotalWidth - 1; x++)
         for (int y = a.Y + 1; y < floor; y++)
             if (Main.tile[x, y].WallType is not WallID.None and not WallID.Wood)
                 return true;
@@ -401,10 +413,10 @@ public static class AutoShelterController
     /// <summary>A new tower never overwrites an existing player structure. Natural foreground
     /// terrain can be excavated, but placed walls, containers and frame-important objects select
     /// a different site; every support also needs actual space below the raised floor.</summary>
-    private static bool InitialSiteSafe(Point a)
+    private static bool InitialSiteSafe(Point a, ShelterLayout layout)
     {
         int floor = a.Y + RoomHeight - 1;
-        for (int room = 0; room <= RoomCount; room++)
+        for (int room = 0; room <= layout.RoomCount; room++)
         {
             int x = a.X + room * (RoomWidth - 1);
             int ground = FindGround(x);
@@ -415,7 +427,7 @@ public static class AutoShelterController
                     Main.tile[x, y].HasTile && Main.tileFrameImportant[Main.tile[x, y].TileType])
                     return false;
         }
-        for (int x = a.X; x < a.X + TotalWidth; x++)
+        for (int x = a.X; x < a.X + layout.TotalWidth; x++)
         for (int y = a.Y; y <= floor; y++)
         {
             Tile tile = Main.tile[x, y];
@@ -426,10 +438,10 @@ public static class AutoShelterController
         return true;
     }
 
-    private static bool MissingWall(Point a)
+    private static bool MissingWall(Point a, ShelterLayout layout)
     {
         int floor = a.Y + RoomHeight - 1;
-        for (int room = 0; room < RoomCount; room++)
+        for (int room = 0; room < layout.RoomCount; room++)
         {
             int left = a.X + room * (RoomWidth - 1);
             for (int x = left + 1; x < left + RoomWidth - 1; x++)
@@ -440,18 +452,18 @@ public static class AutoShelterController
         return false;
     }
 
-    private static bool MissingFurniture(Point a, int tileType)
+    private static bool MissingFurniture(Point a, int tileType, ShelterLayout layout)
     {
-        for (int room = 0; room < RoomCount; room++)
+        for (int room = 0; room < layout.RoomCount; room++)
             if (!RoomHas(a, room, tileType))
                 return true;
         return false;
     }
 
-    private static bool MissingDoor(Point a)
+    private static bool MissingDoor(Point a, ShelterLayout layout)
     {
         int floor = a.Y + RoomHeight - 1;
-        for (int room = 0; room < RoomCount; room++)
+        for (int room = 0; room < layout.RoomCount; room++)
             if (!HasDoorAt(a.X + (room + 1) * (RoomWidth - 1), floor))
                 return true;
         return false;
@@ -481,16 +493,16 @@ public static class AutoShelterController
         return false;
     }
 
-    private static void CaptureFurnitureAnchors(AutoContext ctx, Point a)
+    private static void CaptureFurnitureAnchors(AutoContext ctx, Point a, ShelterLayout layout)
     {
         int floor = a.Y + RoomHeight - 1;
-        Point? bench = FindTile(a, TileID.WorkBenches);
+        Point? bench = FindTile(a, TileID.WorkBenches, layout);
         if (bench.HasValue)
             ctx.State.WorkBench = bench;
         for (int i = 0; i < Main.maxChests; i++)
         {
             Chest chest = Main.chest[i];
-            if (chest is null || chest.x < a.X || chest.x >= a.X + TotalWidth ||
+            if (chest is null || chest.x < a.X || chest.x >= a.X + layout.TotalWidth ||
                 chest.y < a.Y || chest.y > floor)
                 continue;
             ctx.State.Chest = new Point(chest.x, chest.y);
@@ -498,9 +510,9 @@ public static class AutoShelterController
         }
     }
 
-    private static Point? FindTile(Point a, int type)
+    private static Point? FindTile(Point a, int type, ShelterLayout layout)
     {
-        for (int x = a.X; x < a.X + TotalWidth; x++)
+        for (int x = a.X; x < a.X + layout.TotalWidth; x++)
         for (int y = a.Y; y < a.Y + RoomHeight; y++)
             if (IsTile(x, y, type))
                 return new Point(x, y);

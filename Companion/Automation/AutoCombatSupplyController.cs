@@ -28,7 +28,8 @@ public static class AutoCombatSupplyController
         if (ammoClass == AmmoID.Arrow &&
             AutoInventory.Count(ctx.Profile, ItemID.Wood) >
                 AutoResourceBudget.OperationalReserve(ctx.State) &&
-            AutoCraftingService.TryCraft(ctx.Instance, ctx.Profile, ItemID.WoodenArrow))
+            AutoCraftingService.TryCraftUntil(ctx.Instance, ctx.Profile,
+                ItemID.WoodenArrow, DesiredStock))
         {
             ctx.TaskRuntime.RecordWorldProgress();
             return AutoTaskResult.Running;

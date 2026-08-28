@@ -13,8 +13,39 @@ public static class AutoCampaignController
 
     public static AutoCampaignStage DetermineStage(AutoContext ctx)
     {
-        if (!ctx.State.ShelterCompleted || !AutoGearController.HasBasicMetalLoadout(ctx.Profile))
+        AutoCampaignStage worldStage = DetermineWorldStage(ctx.State.PreferredClass);
+
+        // A pristine world still gets the ordinary personal bootstrap before the Eye. Once the
+        // world itself has advanced, never lie about that fact merely because this independent
+        // player arrived with weak gear: the parallel planner can pursue foundation capabilities
+        // and the real current-world campaign opportunities at the same time.
+        if (worldStage == AutoCampaignStage.EyeOfCthulhu && NeedsPersonalFoundation(ctx))
             return AutoCampaignStage.Foundation;
+        return worldStage;
+    }
+
+    public static bool NeedsPersonalFoundation(AutoContext ctx) =>
+        !ctx.State.ShelterCompleted || !AutoGearController.HasBasicMetalLoadout(ctx.Profile);
+
+    /// <summary>An imported world's completion flag only becomes this new profile's finish signal
+    /// after it has established its own shelter and basic metal loadout. World progress remains
+    /// usable immediately, but can no longer dismiss a zero-inventory player on its first tick.</summary>
+    public static bool CanCompleteAutomation(AutoContext ctx) =>
+        NPC.downedMoonlord && !NeedsPersonalFoundation(ctx);
+
+    public static bool HasEstablishedWorldProgress() =>
+        Main.hardMode || NPC.downedBoss1 || NPC.downedBoss2 || NPC.downedBoss3 ||
+        NPC.downedQueenBee || NPC.downedMechBossAny || NPC.downedPlantBoss ||
+        NPC.downedGolemBoss || NPC.downedAncientCultist || NPC.downedMoonlord;
+
+    internal static void ResetWorldSession()
+    {
+        nextSummonTick = 0;
+        lastIndexedStage = AutoCampaignStage.Foundation;
+    }
+
+    private static AutoCampaignStage DetermineWorldStage(AutoCombatClass preferredClass)
+    {
         if (!NPC.downedBoss1)
             return AutoCampaignStage.EyeOfCthulhu;
         if (!NPC.downedBoss2)
@@ -32,7 +63,7 @@ public static class AutoCampaignController
         if (!NPC.downedAncientCultist)
             return AutoCampaignStage.LunaticCultist;
 
-        AutoCampaignStage preferredPillar = ctx.State.PreferredClass switch
+        AutoCampaignStage preferredPillar = preferredClass switch
         {
             AutoCombatClass.Ranged => AutoCampaignStage.VortexPillar,
             AutoCombatClass.Magic => AutoCampaignStage.NebulaPillar,

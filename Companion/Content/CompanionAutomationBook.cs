@@ -94,10 +94,12 @@ public sealed class CompanionAutomationBook : ModItem
         // Running; repair that state in place so the book can never summon an ordinary follower.
         profile.EnsureAutomationRunning();
 
-        Vector2 spawn = profile.AutoState?.TryGetResumePosition(out Vector2 remembered) == true
-            ? remembered
-            : Main.MouseWorld;
-        if (CompanionEntitySystem.Summon(player, profile, ClampToWorld(spawn)))
+        // The observer's cursor is not an automation command. Older builds spawned a fresh run at
+        // Main.MouseWorld, so an innocent left click could put the synthetic player inside a wall
+        // in an established base. Resume near its own saved position when possible; otherwise use
+        // a collision-checked standing point near the real player.
+        Vector2 spawn = AutoSpawnResolver.Resolve(player, profile.AutoState);
+        if (CompanionEntitySystem.Summon(player, profile, spawn))
             Message("AutomationSummoned", InfoColor, profile.Name);
         else
             Message("AutomationNoFreeSlot", WarnColor);
@@ -130,13 +132,6 @@ public sealed class CompanionAutomationBook : ModItem
             CompanionAutomationCameraSystem.Follow(player.whoAmI, profile.Id, active.Entity.Center);
             Message("AutomationCameraStarted", InfoColor, profile.Name);
         }
-    }
-
-    private static Vector2 ClampToWorld(Vector2 position)
-    {
-        float x = MathHelper.Clamp(position.X, 16f * 10f, 16f * (Main.maxTilesX - 10));
-        float y = MathHelper.Clamp(position.Y, 16f * 10f, 16f * (Main.maxTilesY - 10));
-        return new Vector2(x, y);
     }
 
     private static void Message(string key, Color color, params object[] args) =>

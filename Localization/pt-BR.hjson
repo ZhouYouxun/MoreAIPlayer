@@ -488,7 +488,7 @@ Mods: {
 			AutomationCameraStarted: A câmera agora segue {0}. Você ainda controla seu próprio jogador.
 			AutomationCameraStopped: A câmera voltou para o seu jogador.
 			AutomationBlocked: O companheiro automático está preso em "{0}": {1}. Ele continuará tentando periodicamente por conta própria.
-			AutomationCompleted: "{0} derrotou o Senhor da Lua. A execução automática foi salva e concluída; ele não se tornará um companheiro comum que segue o jogador."
+			AutomationCompleted: "{0} concluiu sua base pessoal e confirmou o progresso do Senhor da Lua deste mundo. A execução automática foi salva e concluída; ele não se tornará um companheiro comum que segue o jogador."
 			AutomationProgressStep: "[Automação · {0}] Etapa: {1} · Passo: {2} · Classe: {3}"
 			AutomationWeaponSelected: "[Laboratório do celular · {0}] Escolheu {1} · pontuação {2} · DPS teórico {3}"
 			AutomationDeathRecorded: "[Automação] {0} foi derrotado; renascerá na base aérea e voltará ao local da falha."

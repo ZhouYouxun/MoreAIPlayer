@@ -488,7 +488,7 @@ Mods: {
 			AutomationCameraStarted: Kamera śledzi teraz {0}. Nadal sterujesz własnym graczem.
 			AutomationCameraStopped: Kamera wróciła do twojego gracza.
 			AutomationBlocked: Automatyczny towarzysz utknął na „{0}”: {1}. Będzie sam okresowo ponawiał próby.
-			AutomationCompleted: "{0} pokonał Władcę Księżyca. Bieg automatyczny został zapisany i zakończony; nie stanie się zwykłym towarzyszem podążającym za graczem."
+			AutomationCompleted: "{0} ukończył własne podstawy i potwierdził postęp Władcy Księżyca w tym świecie. Bieg automatyczny został zapisany i zakończony; nie stanie się zwykłym towarzyszem podążającym za graczem."
 			AutomationProgressStep: "[Automatyzacja · {0}] Etap: {1} · Krok: {2} · Klasa: {3}"
 			AutomationWeaponSelected: "[Laboratorium telefonu · {0}] Wybrano {1} · ocena {2} · teoretyczne DPS {3}"
 			AutomationDeathRecorded: "[Automatyzacja] {0} poległ; odrodzi się w podniebnej bazie i wróci do miejsca porażki."

@@ -14,6 +14,10 @@ public static class AutoResourceController
 {
     private const int ScanRadiusTiles = 46;
     private const float PickupRangeTiles = 7f;
+    private const int SpawnReplantExclusionTiles = 100;
+    private const int MinimumTreeSpacingTiles = 5;
+    private const int MaximumReplantUseAttempts = 3;
+    private const int FailedReplantCooldownTicks = 3600;
 
     public static readonly int[] BasicOreItems =
     [
@@ -30,27 +34,15 @@ public static class AutoResourceController
             ctx.TaskRuntime.ActiveTargetTile is Point previousRoot &&
             !AutoWorldKnowledge.IsChoppableTreeBase(previousRoot))
         {
-            ctx.State.QueueReplant(previousRoot);
+            if (OutsideSpawnReplantExclusion(previousRoot))
+                ctx.State.QueueReplant(previousRoot);
             ctx.TaskRuntime.ClearActiveTarget();
         }
 
         CollectWanted(ctx, item => item.type == ItemID.Wood || item.type == ItemID.Acorn);
         bool targetMet = AutoInventory.Count(ctx.Profile, ItemID.Wood) >= target;
         if (targetMet)
-        {
-            AutoTaskResult? replant = ServicePendingReplant(ctx, allowLongTravel: true);
-            if (replant.HasValue)
-                return replant.Value;
-            if (ctx.State.PendingReplantCount == 0)
-                return AutoTaskResult.Succeeded;
-
-            // The starter plan explicitly restores the forest before mining. If a felled site is
-            // still waiting only because no acorn is held, keep gathering until one is obtained;
-            // a replantable site with an acorn would have been handled above, so a remaining debt
-            // at this point is an actual alternate-route problem rather than a silent success.
-            if (AutoInventory.Count(ctx.Profile, ItemID.Acorn) > 0)
-                return AutoTaskResult.AlternativeRequired;
-        }
+            return AutoTaskResult.Succeeded;
 
         if (!AutoInventory.HasBackpackCapacityFor(ctx.Profile, ItemID.Wood))
             return AutoTaskResult.RetryLater; // full: let a deposit/tidy goal run first
@@ -61,13 +53,6 @@ public static class AutoResourceController
                 AutoWorldIndexSystem.FindNearestTreeBase(ctx.Me.Center, accept));
         if (tree is not Point treeTile)
         {
-            AutoTaskResult? replant = ServicePendingReplant(ctx);
-            if (replant.HasValue)
-                return replant.Value;
-            // Replant only after the local stand has been processed. Planting before every axe
-            // swing spent the single item-use budget and delayed the resource job itself.
-            if (ctx.State.PendingReplantCount == 0 && TryReplant(ctx))
-                return AutoTaskResult.Running;
             // The frame-sliced index needs a few seconds on a large world. Productively scout in
             // one stable direction while it finishes instead of declaring failure and entering a
             // left/right watchdog oscillation. A completed empty index is an honest world-resource
@@ -282,51 +267,31 @@ public static class AutoResourceController
     private static void CollectWanted(AutoContext ctx, System.Func<Item, bool> wanted) =>
         AutoInventory.TryCollectNearby(ctx.Instance, ctx.Profile, PickupRangeTiles, wanted);
 
-    /// <summary>
-    /// Best-effort replanting (§7.2, §17.4): if the companion is holding an acorn and there is bare
-    /// plantable grass with headroom right next to it, plant one so the forest is not stripped bare.
-    /// </summary>
-    private static bool TryReplant(AutoContext ctx)
-    {
-        if (ctx.Actuator.ItemUseSpent || AutoInventory.Count(ctx.Profile, ItemID.Acorn) <= 0)
-            return false;
-
-        int acorn = AutoInventory.FindInventoryIndex(ctx.Me, item => item.type == ItemID.Acorn);
-        if (acorn < 0)
-            return false;
-
-        Point feet = new((int)(ctx.Me.Bottom.X / 16f), (int)(ctx.Me.Bottom.Y / 16f));
-        for (int dx = -2; dx <= 2; dx++)
-        {
-            int x = feet.X + dx;
-            int groundY = feet.Y;
-            if (!WorldGen.InWorld(x, groundY, 5))
-                continue;
-
-            Tile ground = Main.tile[x, groundY];
-            Tile above = Main.tile[x, groundY - 1];
-            bool grass = ground.HasTile && IsTreePlantingGround(ground.TileType);
-            bool clearAbove = !above.HasTile;
-            if (grass && clearAbove && AutoActuator.IsTileInReach(ctx.Me, ctx.Me.inventory[acorn], x, groundY - 1))
-            {
-                return ctx.Actuator.UseItemInSlot(ctx.Instance, ctx.Me, acorn,
-                    new Vector2(x * 16f + 8f, (groundY - 1) * 16f + 8f), new Point(x, groundY - 1));
-            }
-        }
-        return false;
-    }
-
     /// <summary>Restores one recorded felled-tree site. A nullable result distinguishes “nothing
     /// actionable this tick” from active travel/item use; the caller may then chop another tree to
     /// obtain a missing acorn without forgetting the old site.</summary>
-    public static AutoTaskResult? ServicePendingReplant(AutoContext ctx, bool allowLongTravel = false)
+    public static AutoTaskResult? ServicePendingReplant(AutoContext ctx)
     {
+        long now = (long)Main.GameUpdateCount;
+        if (ctx.State.ReplantDeferredUntilTick > now)
+            return null;
         if (!ctx.State.TryPeekReplant(out Point recorded))
             return null;
+
+        // The spawn core is deliberately kept open for construction and early travel. Old saves
+        // may already contain debts there, so discard those notes instead of trying to relocate a
+        // seed around the edge forever.
+        if (!OutsideSpawnReplantExclusion(recorded))
+        {
+            ctx.State.CompleteReplant(recorded);
+            ResetReplantAttempt(ctx.State);
+            return null;
+        }
 
         if (TreeOrSaplingAt(recorded))
         {
             ctx.State.CompleteReplant(recorded);
+            ResetReplantAttempt(ctx.State);
             ctx.TaskRuntime.RecordWorldProgress();
             return AutoTaskResult.Running;
         }
@@ -334,8 +299,7 @@ public static class AutoResourceController
         Point? plant = FindPlantableTreeSite(recorded);
         if (plant is not Point site)
         {
-            // New player construction or transformed terrain can make the exact site impossible.
-            // Keep the debt queued: a later world change or seed source may make it plantable.
+            DeferReplant(ctx, recorded, now);
             return null;
         }
         if (site != recorded)
@@ -350,21 +314,40 @@ public static class AutoResourceController
 
         Vector2 target = new(site.X * 16f + 8f, site.Y * 16f + 8f);
         float distance = Vector2.Distance(ctx.Me.Center, target);
-        // Opportunistic maintenance called outside the watched GatherWood plan must stay local.
-        // Otherwise one old planting debt can silently own movement forever with no watchdog.
-        if (!allowLongTravel && distance > 12f * 16f)
+        // This side task never owns a journey. It may spend one nearby item-use opportunity, then
+        // the main scheduler immediately continues with resource/crafting/progression work.
+        if (distance > 6f * 16f ||
+            !AutoActuator.IsTileInReach(ctx.Me, ctx.Me.inventory[acorn], site.X, site.Y))
             return null;
-        if (distance > 6f * 16f)
-            return AutoWorldTravelController.TravelTo(ctx, target, 4f);
-        if (!AutoActuator.IsTileInReach(ctx.Me, ctx.Me.inventory[acorn], site.X, site.Y))
+
+        if (ctx.State.ReplantAttemptSite != site)
         {
-            ctx.Navigator.Navigate(ctx.Me, target);
-            return AutoTaskResult.Running;
+            ctx.State.ReplantAttemptSite = site;
+            ctx.State.ReplantUseAttempts = 0;
+        }
+        if (ctx.State.ReplantUseAttempts >= MaximumReplantUseAttempts)
+        {
+            DeferReplant(ctx, recorded, now);
+            return null;
         }
 
-        ctx.Navigator.Idle(ctx.Me);
-        ctx.Actuator.UseItemInSlot(ctx.Instance, ctx.Me, acorn, target, site);
+        if (!ctx.Actuator.UseItemInSlot(ctx.Instance, ctx.Me, acorn, target, site))
+            return null;
+        ctx.State.ReplantUseAttempts++;
         return AutoTaskResult.Running;
+    }
+
+    private static void DeferReplant(AutoContext ctx, Point site, long now)
+    {
+        ctx.State.ReplantDeferredUntilTick = now + FailedReplantCooldownTicks;
+        ResetReplantAttempt(ctx.State);
+        ctx.TaskRuntime.Log($"replant deferred {site.X},{site.Y} +{FailedReplantCooldownTicks}t");
+    }
+
+    private static void ResetReplantAttempt(AutoCompanionState state)
+    {
+        state.ReplantAttemptSite = null;
+        state.ReplantUseAttempts = 0;
     }
 
     private static Point? FindPlantableTreeSite(Point root)
@@ -391,14 +374,16 @@ public static class AutoResourceController
     {
         if (!WorldGen.InWorld(site.X, site.Y, 5))
             return false;
+        if (!OutsideSpawnReplantExclusion(site))
+            return false;
         Tile ground = Main.tile[site.X, site.Y + 1];
         if (!ground.HasTile || ground.IsActuated || !IsTreePlantingGround(ground.TileType))
             return false;
         for (int y = site.Y - 2; y <= site.Y; y++)
             if (Main.tile[site.X, y].HasTile)
                 return false;
-        for (int x = site.X - 3; x <= site.X + 3; x++)
-        for (int y = site.Y - 3; y <= site.Y + 1; y++)
+        for (int x = site.X - MinimumTreeSpacingTiles; x <= site.X + MinimumTreeSpacingTiles; x++)
+        for (int y = site.Y - 6; y <= site.Y + 2; y++)
         {
             if (!WorldGen.InWorld(x, y, 5))
                 continue;
@@ -409,6 +394,9 @@ public static class AutoResourceController
         }
         return true;
     }
+
+    private static bool OutsideSpawnReplantExclusion(Point site) =>
+        System.Math.Abs(site.X - Main.spawnTileX) > SpawnReplantExclusionTiles;
 
     private static bool TreeOrSaplingAt(Point site)
     {

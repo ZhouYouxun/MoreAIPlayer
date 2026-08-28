@@ -581,12 +581,28 @@ public sealed class CompanionEntitySystem : ModSystem
 
     private static void HaltSyntheticInput(Player player)
     {
+        player.controlLeft = false;
+        player.controlRight = false;
+        player.controlUp = false;
+        player.controlDown = false;
+        player.controlJump = false;
         player.controlUseItem = false;
         player.controlUseTile = false;
         player.controlHook = false;
+        player.controlMount = false;
+        player.controlThrow = false;
+        player.controlInv = false;
+        player.controlTorch = false;
+        player.controlMap = false;
+        player.controlSmart = false;
+        player.controlQuickHeal = false;
+        player.controlQuickMana = false;
+        player.controlCreativeMenu = false;
+        player.controlDownHold = false;
         player.channel = false;
         player.releaseUseItem = true;
         player.releaseUseTile = true;
+        player.releaseMount = true;
     }
 
     public override void PostUpdatePlayers()

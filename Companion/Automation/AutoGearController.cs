@@ -182,7 +182,6 @@ public static class AutoGearController
         MoveBestBackpackItemToArray(profile, CompanionSlotRules.IsMount,
             profile.Mount, item => item.rare * 1000 + item.value);
         OptimizeCombatSlots(me, profile);
-        DiscardOneObsoleteWeapon(profile);
 
         for (int slot = 0; slot < 3; slot++)
         {
@@ -302,28 +301,6 @@ public static class AutoGearController
                 bestBackpack = backpack;
             }
         }
-    }
-
-    /// <summary>The automation profile has finite long-run storage. Once the three combat slots
-    /// contain the best owned options, remove one clearly dominated, unfavourited backpack weapon
-    /// per tick instead of allowing decades of obsolete drops to deadlock progression.</summary>
-    private static void DiscardOneObsoleteWeapon(CompanionProfile profile)
-    {
-        int discard = -1;
-        int weakest = int.MaxValue;
-        for (int i = 0; i < profile.Backpack.Length; i++)
-        {
-            Item item = profile.Backpack[i];
-            if (!AutoWeaponEvaluator.IsObsolete(profile, item))
-                continue;
-            int score = AutoWeaponEvaluator.CombatScore(item);
-            if (score >= weakest)
-                continue;
-            weakest = score;
-            discard = i;
-        }
-        if (discard >= 0)
-            profile.Backpack[discard].TurnToAir();
     }
 
     private static void MoveBestBackpackItem(CompanionProfile profile, System.Func<Item, bool> match,

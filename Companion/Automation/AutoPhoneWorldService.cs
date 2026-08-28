@@ -20,6 +20,8 @@ public static class AutoPhoneWorldService
 {
     private static long nextEmergencyRecallTick;
 
+    internal static void ResetWorldSession() => nextEmergencyRecallTick = 0;
+
     public static AutoPhoneWorldSnapshot Read(Player me)
     {
         Point tile = me.Center.ToTileCoordinates();
@@ -45,7 +47,7 @@ public static class AutoPhoneWorldService
             (long)Main.GameUpdateCount < nextEmergencyRecallTick)
             return false;
         Point home = ctx.State.HomeAnchor is Point built &&
-            AutoShelterController.IsShelterComplete(built)
+            AutoShelterController.IsShelterComplete(built, ctx.State)
             ? built : new Point(Main.spawnTileX - 6, Main.spawnTileY - 5);
         Vector2 destination = new((home.X + 6) * 16f + 8f,
             (home.Y + 5) * 16f - ctx.Me.height * 0.5f);

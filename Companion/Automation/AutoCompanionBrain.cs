@@ -12,10 +12,10 @@ namespace MoreAIPlayer.Companion.Automation;
 /// inputs, while vanilla still performs movement physics, item animation and rendering.
 ///
 /// Death/revive timing is automation-specific (1s / 5s during a boss). Beyond that, each tick it
-/// refreshes a capability snapshot, asks the planner for the next goal, and runs the matching
-/// controller through the shared navigator/actuator. The deterministic early resource loop is
-/// augmented by bounded chest, fishing and exploration opportunities; later progression stages
-/// still extend the same capability scheduler rather than replacing it with a fixed walkthrough.
+/// refreshes a capability snapshot, asks the parallel portfolio for the most valuable live route,
+/// and runs the matching controller through the shared navigator/actuator. Equivalent chest,
+/// fishing, crafting, mining and combat results retire redundant routes automatically; the body
+/// still executes one committed action at a time so competing destinations cannot cause jitter.
 /// </summary>
 public sealed class AutoCompanionBrain
 {
@@ -35,18 +35,11 @@ public sealed class AutoCompanionBrain
     private readonly AutoWatchdog watchdog;
     private AutoContext context;
     private bool runtimeInitialized;
+    private bool bootstrapReconciled;
     private bool restoredPersistentMemory;
     private long nextMinionSummonTick;
     private long nextSentrySummonTick;
 
-    // Simple surface wander used when the local area holds no more of what the current goal needs.
-    private int wanderDir = 1;
-    private int wanderStuckTicks;
-    private float lastWanderX;
-    private Vector2 wanderTarget;
-    private long wanderPlanKey;
-    private int wanderTravelTicks;
-    private bool wanderActive;
     private long lastBlockedNoticeTick = -3600;
 
     public AutoCompanionBrain()
@@ -74,10 +67,33 @@ public sealed class AutoCompanionBrain
         if (profile.AutoState is null)
             return; // defensive: only runs while auto identity is live
 
-        // NPC.downedMoonlord is the report's sole completion predicate. Conversion is deliberately
-        // observed here rather than attached to one summon item or one NPC instance, so a victory
-        // remains recognized after save/reload and when another legal source dealt the final hit.
-        if (NPC.downedMoonlord)
+        AutoContext ctx = BuildContext(instance, owner, profile);
+        if (!runtimeInitialized)
+        {
+            taskRuntime.BossFailureCount = profile.AutoState.BossFailureCount;
+            profile.AutoState.RestoreMemory(taskRuntime);
+            taskRuntime.BossFailureCount = profile.AutoState.BossFailureCount;
+            runtimeInitialized = true;
+            restoredPersistentMemory = true;
+        }
+
+        // Rebuild live facts before consulting either the saved plan or the campaign stage. This
+        // is especially important when the profile is first introduced into an already-progressed
+        // world: stale anchors are rejected, nearby infrastructure/chests become candidates, and
+        // items already in the profile are equipped before readiness is measured.
+        if (!bootstrapReconciled)
+        {
+            AutoWorldBootstrapController.Reconcile(ctx);
+            bootstrapReconciled = true;
+        }
+        AutoGearController.ConsumePermanentUpgrade(me, profile);
+        AutoGearController.OrganizeOwnedGear(me, profile);
+        AutoClassController.Refresh(me, profile);
+        AutoCampaignController.RefreshStage(ctx);
+        // Moon Lord remains the real world finish flag, but an imported completed save is not a
+        // completed personal run. First reconcile that world and require this zero-start profile to
+        // establish its own shelter/basic metal loadout; then the already-open world gate may count.
+        if (AutoCampaignController.CanCompleteAutomation(ctx))
         {
             owner.GetModPlayer<CompanionPlayer>().MarkAutomationCompletedForCurrentWorld();
             Main.NewText(Terraria.Localization.Language.GetTextValue(
@@ -89,18 +105,6 @@ public sealed class AutoCompanionBrain
             instance.DismissRequested = true;
             return;
         }
-
-        AutoContext ctx = BuildContext(instance, owner, profile);
-        if (!runtimeInitialized)
-        {
-            taskRuntime.BossFailureCount = profile.AutoState.BossFailureCount;
-            profile.AutoState.RestoreMemory(taskRuntime);
-            taskRuntime.BossFailureCount = profile.AutoState.BossFailureCount;
-            runtimeInitialized = true;
-            restoredPersistentMemory = true;
-        }
-        AutoClassController.Refresh(me, profile);
-        AutoCampaignController.RefreshStage(ctx);
         // A pending recovery owns the tick before any ordinary controller can overwrite its
         // movement/item inputs. This includes a multi-tick physical return to the checkpoint.
         if (selfRescue.TryContinueRecovery(ctx, escape))
@@ -127,6 +131,10 @@ public sealed class AutoCompanionBrain
         // The companion's own chest is extended campaign memory, not a one-way trash sink. When
         // it is physically back at that chest, restore one stage-relevant stack before planning.
         AutoStorageController.RestoreCampaignStock(ctx);
+        // Full inventory relief is immediate and local. A clearly obsolete/junk stack becomes a
+        // real ground item with pickup delay; if no safe discard exists, the ordinary chest route
+        // remains available and no valuable or unknown mod item is sacrificed.
+        AutoStorageController.TryDropJunkWhenFull(ctx);
         MaintainAutomationSummons(instance, me, profile);
         capabilities.Refresh(me, profile);
 
@@ -217,8 +225,6 @@ public sealed class AutoCompanionBrain
                 AnnounceBlocked(plan);
                 break;
             default:
-                background.Reset();
-                wanderActive = false;
                 break;
         }
         CapturePersistentMemory(profile.AutoState, instance);
@@ -228,22 +234,15 @@ public sealed class AutoCompanionBrain
     {
         if (taskRuntime.RecoveryLevel < 4)
         {
-            if (plan.Goal is AutoGoalId.GatherWood or AutoGoalId.GatherStone or
-                AutoGoalId.GatherGel or AutoGoalId.MineOre or AutoGoalId.MineIronTierOre or
-                AutoGoalId.ExploreWorld or AutoGoalId.AcquireVitalUpgrade or
-                AutoGoalId.AcquireWeaponUpgrade)
-            {
-                AutoExplorationController.Explore(ctx);
-            }
-            else
-            {
-                Wander(ctx, plan);
-            }
+            // Every route failure advances a persistent world frontier. The former local Wander
+            // bounced between two points near the failure and could look active forever without
+            // producing a capability, item or world change.
+            AutoExplorationController.Explore(ctx);
             return;
         }
 
         Point checkpoint = ctx.State.HomeAnchor is Point home &&
-            AutoShelterController.IsShelterComplete(home)
+            AutoShelterController.IsShelterComplete(home, ctx.State)
             ? new Point(home.X + 6, home.Y + 6)
             : new Point(Main.spawnTileX, Main.spawnTileY);
         Vector2 safe = new(checkpoint.X * 16f + 8f,
@@ -304,8 +303,12 @@ public sealed class AutoCompanionBrain
             case AutoGoalId.CraftConsumable:
                 if (!AutoCraftingService.IsAvailable)
                     return AutoTaskResult.Faulted;
-                bool crafted = AutoCraftingService.TryCraft(ctx.Instance, ctx.Profile, plan.ItemType);
-                return crafted ? AutoTaskResult.Running :
+                if (AutoInventory.Count(ctx.Profile, plan.ItemType) >= plan.Amount)
+                    return AutoTaskResult.Succeeded;
+                bool crafted = AutoCraftingService.TryCraftUntil(
+                    ctx.Instance, ctx.Profile, plan.ItemType, plan.Amount);
+                return AutoInventory.Count(ctx.Profile, plan.ItemType) >= plan.Amount
+                    ? AutoTaskResult.Succeeded : crafted ? AutoTaskResult.Running :
                     AutoCraftingService.IsAvailable ? AutoTaskResult.RetryLater : AutoTaskResult.Faulted;
             case AutoGoalId.BuildShelter:
                 return AutoShelterController.Build(ctx);
@@ -370,49 +373,6 @@ public sealed class AutoCompanionBrain
         }
     }
 
-    /// <summary>Bounded relocation for a non-resource recovery. The destination is absolute and
-    /// retained for the whole attempt; the old moving target (<c>me.Center + offset</c>) combined
-    /// with one-second direction flips produced visible left/right jumping around obstacles.</summary>
-    private void Wander(AutoContext ctx, AutoPlan plan)
-    {
-        Player me = ctx.Me;
-        bool newAttempt = !wanderActive || wanderPlanKey != plan.StableKey ||
-            !float.IsFinite(wanderTarget.X) || !float.IsFinite(wanderTarget.Y);
-        if (newAttempt)
-        {
-            wanderActive = true;
-            wanderPlanKey = plan.StableKey;
-            wanderDir = me.direction == 0 ? 1 : me.direction;
-            wanderTarget = me.Center + new Vector2(wanderDir * 30f * 16f, 0f);
-            wanderStuckTicks = 0;
-            wanderTravelTicks = 0;
-            lastWanderX = me.Center.X;
-            navigator.Reset();
-        }
-
-        if (System.Math.Abs(me.Center.X - lastWanderX) < 4f)
-            wanderStuckTicks++;
-        else
-            wanderStuckTicks = 0;
-        lastWanderX = me.Center.X;
-        wanderTravelTicks++;
-
-        bool reached = Vector2.DistanceSquared(me.Center, wanderTarget) <
-            3f * 16f * 3f * 16f;
-        // A real obstacle earns one deliberate reroute after three seconds, never a direction
-        // reversal every frame. The long ceiling prevents an absolute waypoint living forever.
-        if (reached || wanderStuckTicks > 180 || wanderTravelTicks > 900)
-        {
-            wanderDir = -wanderDir;
-            wanderTarget = me.Center + new Vector2(wanderDir * 30f * 16f, 0f);
-            wanderStuckTicks = 0;
-            wanderTravelTicks = 0;
-            navigator.Reset();
-        }
-
-        navigator.Navigate(me, wanderTarget);
-    }
-
     private static void ResetControls(Player me)
     {
         me.controlLeft = false;
@@ -425,8 +385,17 @@ public sealed class AutoCompanionBrain
         me.controlHook = false;
         me.controlMount = false;
         me.controlThrow = false;
+        me.controlInv = false;
+        me.controlTorch = false;
+        me.controlMap = false;
+        me.controlSmart = false;
+        me.controlQuickHeal = false;
+        me.controlQuickMana = false;
+        me.controlCreativeMenu = false;
+        me.controlDownHold = false;
         me.releaseUseItem = true;
         me.releaseUseTile = true;
+        me.releaseMount = true;
     }
 
     /// <summary>Keeps legally owned minion and sentry staffs active without letting a broken
@@ -540,7 +509,7 @@ public sealed class AutoCompanionBrain
     {
         int spawnX = Main.spawnTileX;
         int floorY = Main.spawnTileY;
-        if (state?.HomeAnchor is Point home && AutoShelterController.IsShelterComplete(home))
+        if (state?.HomeAnchor is Point home && AutoShelterController.IsShelterComplete(home, state))
         {
             spawnX = home.X + 6;
             floorY = home.Y + 6;

@@ -1,6 +1,7 @@
 using System;
 using Microsoft.Xna.Framework;
 using Terraria;
+using Terraria.DataStructures;
 using Terraria.ID;
 
 namespace MoreAIPlayer.Companion.Automation;
@@ -17,6 +18,8 @@ namespace MoreAIPlayer.Companion.Automation;
 /// </summary>
 public static class AutoStorageController
 {
+    private const string AutomationJunkDropContext = "MoreAIPlayer_AutomationJunkDrop";
+    private const int DroppedJunkPickupDelayTicks = 3600;
     private const int ChestSearchRadius = 16;
     private const float NearChestTiles = 2.5f;
 
@@ -88,6 +91,106 @@ public static class AutoStorageController
         // storage cannot help here. RetryLater lets the watchdog surface it honestly instead of
         // looping. A full deposit that still did not free a slot means the same.
         return moved ? AutoTaskResult.Running : AutoTaskResult.AlternativeRequired;
+    }
+
+    /// <summary>When every backpack slot is occupied, drops one whole stack of clearly disposable
+    /// junk at the companion's feet. This is deliberately more conservative than chest storage:
+    /// progression materials, useful equipment, favourited items and the last keep-stock are never
+    /// thrown away. The source slot is cleared only after the world item was created successfully.</summary>
+    public static bool TryDropJunkWhenFull(AutoContext ctx)
+    {
+        if (AutoInventory.HasBackpackSpace(ctx.Profile) ||
+            Main.netMode == NetmodeID.MultiplayerClient || CountActiveWorldItems() >= Main.maxItems)
+            return false;
+
+        int candidate = -1;
+        int bestPriority = int.MinValue;
+        for (int i = 0; i < ctx.Profile.Backpack.Length; i++)
+        {
+            Item item = ctx.Profile.Backpack[i];
+            int priority = JunkDropPriority(ctx.Profile, ctx.State, item);
+            if (priority <= bestPriority)
+                continue;
+            bestPriority = priority;
+            candidate = priority >= 0 ? i : candidate;
+        }
+        if (candidate < 0)
+            return false;
+
+        bool dropped = false;
+        CompanionFaultGuard.RunCritical(CompanionFaultGuard.BackpackDropLane, () =>
+        {
+            Item source = ctx.Profile.Backpack[candidate];
+            int worldItemIndex = Item.NewItem(
+                new EntitySource_Misc(AutomationJunkDropContext),
+                ctx.Me.Hitbox,
+                source.Clone(),
+                noBroadcast: false,
+                noGrabDelay: true);
+            if (worldItemIndex < 0 || worldItemIndex >= Main.maxItems)
+                return;
+            Main.item[worldItemIndex].noGrabDelay = System.Math.Max(
+                Main.item[worldItemIndex].noGrabDelay, DroppedJunkPickupDelayTicks);
+            source.TurnToAir();
+            dropped = true;
+        });
+
+        if (dropped)
+        {
+            ctx.TaskRuntime.RecordWorldProgress();
+            ctx.TaskRuntime.Log("full backpack dropped one junk stack");
+        }
+        return dropped;
+    }
+
+    private static int JunkDropPriority(CompanionProfile profile, AutoCompanionState state, Item item)
+    {
+        if (item is null || item.IsAir || item.favorited || item.questItem)
+            return -1;
+
+        // Old weapons and strictly dominated duplicate tools are the safest first choices.
+        if (AutoWeaponEvaluator.IsObsolete(profile, item))
+            return 400_000 - System.Math.Min(399_999, item.value);
+        if (IsStrictlyDominatedTool(profile, item))
+            return 350_000 - System.Math.Min(349_999, item.value);
+        if (IsEssential(item, profile))
+            return -1;
+
+        // A whole duplicate stack may be dropped only when the remaining stacks still satisfy the
+        // explicit campaign keep budget. This frees a slot without sacrificing the planned supply.
+        int keep = KeepThreshold(item.type, state);
+        if (keep > 0 && AutoInventory.Count(profile, item.type) - item.stack >= keep)
+            return 250_000 - System.Math.Min(249_999, item.value);
+
+        // Unknown mod materials and placeables may become progression inputs later. Only ordinary,
+        // low-rarity, non-material items with zero measured opportunity value count as plain junk.
+        if (item.material || item.createTile >= TileID.Dirt || item.createWall > WallID.None ||
+            item.rare > ItemRarityID.White || AutoLootController.OpportunityValue(profile, item) > 0)
+            return -1;
+        return 100_000 - System.Math.Min(99_999, item.value);
+    }
+
+    private static bool IsStrictlyDominatedTool(CompanionProfile profile, Item item)
+    {
+        bool tool = item.pick > 0 || item.axe > 0 || item.hammer > 0;
+        if (!tool)
+            return false;
+        if (item.pick > 0 && item.pick >= AutoInventory.BestPickaxe(profile).pick)
+            return false;
+        if (item.axe > 0 && item.axe >= AutoInventory.BestAxe(profile).axe)
+            return false;
+        if (item.hammer > 0 && item.hammer >= AutoInventory.BestHammer(profile).hammer)
+            return false;
+        return true;
+    }
+
+    private static int CountActiveWorldItems()
+    {
+        int active = 0;
+        for (int i = 0; i < Main.maxItems; i++)
+            if (Main.item[i].active && !Main.item[i].IsAir)
+                active++;
+        return active;
     }
 
     /// <summary>Returns a valid chest id (recorded or freshly adopted), or -1 if none is in range.</summary>

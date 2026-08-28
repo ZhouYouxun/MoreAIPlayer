@@ -25,20 +25,40 @@ public static class AutoVanillaWeaponStrategy
             return AutoWeaponRouteKind.None;
         bool Allowed(AutoWeaponRouteKind route) => allowed is null || allowed(route);
         if (Allowed(AutoWeaponRouteKind.CraftStageWeapon) &&
-            AutoVanillaWeaponCraftingController.HasPotentialUpgrade(ctx))
+            IsUpgradeRouteAvailableCore(ctx, AutoWeaponRouteKind.CraftStageWeapon))
             return AutoWeaponRouteKind.CraftStageWeapon;
         if (Allowed(AutoWeaponRouteKind.WorldChest) &&
-            AutoLootController.HasWorthwhileWorldWeaponChest(ctx))
+            IsUpgradeRouteAvailableCore(ctx, AutoWeaponRouteKind.WorldChest))
             return AutoWeaponRouteKind.WorldChest;
-        if (Allowed(AutoWeaponRouteKind.EvilOrbGun) && !Main.hardMode &&
-            ctx.State.CampaignStage <= AutoCampaignStage.EvilBoss &&
-            !ctx.State.FirstEvilOrbBroken && BestRangedScore(ctx.Profile) < 36)
+        if (Allowed(AutoWeaponRouteKind.EvilOrbGun) &&
+            IsUpgradeRouteAvailableCore(ctx, AutoWeaponRouteKind.EvilOrbGun))
             return AutoWeaponRouteKind.EvilOrbGun;
-        if (Allowed(AutoWeaponRouteKind.Fishing) && ctx.Fishing.HasOpportunity(ctx))
+        if (Allowed(AutoWeaponRouteKind.Fishing) &&
+            IsUpgradeRouteAvailableCore(ctx, AutoWeaponRouteKind.Fishing))
             return AutoWeaponRouteKind.Fishing;
-        return Allowed(AutoWeaponRouteKind.HuntDrops)
+        return Allowed(AutoWeaponRouteKind.HuntDrops) &&
+            IsUpgradeRouteAvailableCore(ctx, AutoWeaponRouteKind.HuntDrops)
             ? AutoWeaponRouteKind.HuntDrops : AutoWeaponRouteKind.None;
     }
+
+    /// <summary>Provider-level availability used by the parallel portfolio. It answers whether one
+    /// route is actionable now without letting an earlier route hide later alternatives.</summary>
+    public static bool IsUpgradeRouteAvailable(AutoContext ctx, AutoWeaponRouteKind route) =>
+        AutoCampaignController.NeedsLoadoutWork(ctx) && IsUpgradeRouteAvailableCore(ctx, route);
+
+    private static bool IsUpgradeRouteAvailableCore(AutoContext ctx,
+        AutoWeaponRouteKind route) => route switch
+    {
+        AutoWeaponRouteKind.CraftStageWeapon =>
+            AutoVanillaWeaponCraftingController.HasPotentialUpgrade(ctx),
+        AutoWeaponRouteKind.WorldChest => AutoLootController.HasWorthwhileWorldWeaponChest(ctx),
+        AutoWeaponRouteKind.EvilOrbGun => !Main.hardMode &&
+            ctx.State.CampaignStage <= AutoCampaignStage.EvilBoss &&
+            !ctx.State.FirstEvilOrbBroken && BestRangedScore(ctx.Profile) < 36,
+        AutoWeaponRouteKind.Fishing => ctx.Fishing.HasOpportunity(ctx),
+        AutoWeaponRouteKind.HuntDrops => true,
+        _ => false
+    };
 
     public static float TacticalMultiplier(Item item, NPC target, AutoCampaignStage stage)
     {

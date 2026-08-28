@@ -20,7 +20,7 @@ namespace MoreAIPlayer.Companion.Automation;
 public sealed class AutoCompanionState
 {
     /// <summary>Bumped whenever the saved automation layout changes shape.</summary>
-    public const int CurrentVersion = 12;
+    public const int CurrentVersion = 13;
 
     /// <summary>The version this state was written with; used for forward migration on load.</summary>
     public int Version = CurrentVersion;
@@ -110,6 +110,13 @@ public sealed class AutoCompanionState
     /// remains useful.</summary>
     public int HousingRoomsCompleted;
 
+    /// <summary>Frozen first-entry classification for this profile/world pair. An automation player
+    /// entering somebody else's established save still begins with its own empty inventory, but its
+    /// personal base must not expand into replacement housing for every NPC already living there.</summary>
+    public bool WorldAdaptationInitialized;
+    public bool StartedInEstablishedWorld;
+    public int HousingRoomTarget;
+
     // ---- Full campaign / recovery memory ----
     public AutoCampaignStage CampaignStage = AutoCampaignStage.Foundation;
     public AutoCombatClass PreferredClass = AutoCombatClass.Flexible;
@@ -163,6 +170,13 @@ public sealed class AutoCompanionState
     private const int PendingReplantCapacity = 128;
     private readonly List<Point> pendingReplantSites = [];
     public int PendingReplantCount => pendingReplantSites.Count;
+
+    // Replanting is intentionally transient, low-priority maintenance. These attempt/cooldown
+    // fields are not persisted: a reload may allow one fresh bounded attempt, but an old ecological
+    // note can never resume as a saved main-task lock.
+    public long ReplantDeferredUntilTick;
+    public Point? ReplantAttemptSite;
+    public int ReplantUseAttempts;
 
     public void QueueReplant(Point treeBase)
     {
@@ -228,6 +242,25 @@ public sealed class AutoCompanionState
         if (reviewedChests.Count >= ReviewedChestCapacity)
             reviewedChests.RemoveAt(0);
         reviewedChests.Add(chest);
+    }
+
+    /// <summary>
+    /// Rechecks the local base neighbourhood when a live automation player is summoned. Player
+    /// chests can be restocked while the automation player is recalled, so a permanent "reviewed"
+    /// mark would make newly useful contents invisible forever. Far-away exploration memory stays
+    /// intact and the companion's own storage remains excluded by the loot controller.
+    /// </summary>
+    public void ForgetReviewedChestsNear(Vector2 center, int radiusTiles)
+    {
+        Point origin = center.ToTileCoordinates();
+        long radiusSquared = (long)radiusTiles * radiusTiles;
+        for (int i = reviewedChests.Count - 1; i >= 0; i--)
+        {
+            long dx = reviewedChests[i].X - origin.X;
+            long dy = reviewedChests[i].Y - origin.Y;
+            if (dx * dx + dy * dy <= radiusSquared)
+                reviewedChests.RemoveAt(i);
+        }
     }
 
     public void CaptureMemory(AutoTaskRuntime runtime, Player player, int reviveTicksLeft)
@@ -315,6 +348,9 @@ public sealed class AutoCompanionState
             [nameof(BossFailureCount)] = BossFailureCount,
             [nameof(ShelterCompleted)] = ShelterCompleted,
             [nameof(HousingRoomsCompleted)] = HousingRoomsCompleted,
+            [nameof(WorldAdaptationInitialized)] = WorldAdaptationInitialized,
+            [nameof(StartedInEstablishedWorld)] = StartedInEstablishedWorld,
+            [nameof(HousingRoomTarget)] = HousingRoomTarget,
             [nameof(CampaignStage)] = (int)CampaignStage,
             [nameof(PreferredClass)] = (int)PreferredClass,
             [nameof(StrategyVariant)] = StrategyVariant,
@@ -393,6 +429,12 @@ public sealed class AutoCompanionState
             HousingRoomsCompleted = tag.ContainsKey(nameof(HousingRoomsCompleted))
                 ? System.Math.Max(0, tag.GetInt(nameof(HousingRoomsCompleted)))
                 : tag.ContainsKey(nameof(ShelterCompleted)) && tag.GetBool(nameof(ShelterCompleted)) ? 4 : 0,
+            WorldAdaptationInitialized = tag.ContainsKey(nameof(WorldAdaptationInitialized)) &&
+                tag.GetBool(nameof(WorldAdaptationInitialized)),
+            StartedInEstablishedWorld = tag.ContainsKey(nameof(StartedInEstablishedWorld)) &&
+                tag.GetBool(nameof(StartedInEstablishedWorld)),
+            HousingRoomTarget = tag.ContainsKey(nameof(HousingRoomTarget))
+                ? System.Math.Max(0, tag.GetInt(nameof(HousingRoomTarget))) : 0,
             CampaignStage = ReadEnum(tag, nameof(CampaignStage), AutoCampaignStage.Foundation),
             PreferredClass = ReadEnum(tag, nameof(PreferredClass), AutoCombatClass.Flexible),
             StrategyVariant = tag.ContainsKey(nameof(StrategyVariant)) ? System.Math.Max(0, tag.GetInt(nameof(StrategyVariant))) : 0,

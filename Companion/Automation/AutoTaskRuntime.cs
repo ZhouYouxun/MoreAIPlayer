@@ -111,6 +111,15 @@ public sealed class AutoTaskRuntime
     public int RejectedTargetCount => rejectedTargets.Count;
     public int DeferredPlanCount => deferredPlans.Count;
 
+    /// <summary>Latest parallel-portfolio decision for diagnostics. These values are transient and
+    /// rebuilt from live facts; the concrete task/world progress remains the persistent memory.</summary>
+    public int PortfolioCandidateCount;
+    public int PortfolioAvailableCount;
+    public int PortfolioSelectedScore;
+    public AutoNeed PortfolioSelectedCoverage;
+    public int PortfolioSwitchesWithoutProgress;
+    private long lastPortfolioDecisionKey;
+
     // Ring log of the most recent state transitions (design §4.3). Transient; write-on-transition
     // only, so it never spams per frame.
     private const int LogCapacity = 12;
@@ -141,6 +150,12 @@ public sealed class AutoTaskRuntime
         rejectedTargets.Clear();
         deferredPlans.Clear();
         planRecoveryLevels.Clear();
+        PortfolioCandidateCount = 0;
+        PortfolioAvailableCount = 0;
+        PortfolioSelectedScore = 0;
+        PortfolioSelectedCoverage = AutoNeed.None;
+        PortfolioSwitchesWithoutProgress = 0;
+        lastPortfolioDecisionKey = 0;
     }
 
     public bool TryGetActiveTarget(AutoGoalId goal, System.Func<Point, bool> valid, out Point target)
@@ -238,6 +253,39 @@ public sealed class AutoTaskRuntime
             return true;
         deferredPlans.Remove(plan.StableKey);
         return false;
+    }
+
+    /// <summary>A candidate on either a route deferral or this plan's short RetryLater backoff is
+    /// temporarily unavailable to the portfolio. Other parallel routes remain eligible.</summary>
+    public bool IsPlanCoolingDown(AutoPlan plan)
+    {
+        if (IsDeferred(plan))
+            return true;
+        return CurrentPlanKey == plan.StableKey &&
+            BlockedUntilTick > (long)Main.GameUpdateCount;
+    }
+
+    public void RecordPortfolioDecision(long selectedKey, int total, int available, int score,
+        AutoNeed coverage)
+    {
+        PortfolioCandidateCount = System.Math.Max(0, total);
+        PortfolioAvailableCount = System.Math.Max(0, available);
+        PortfolioSelectedScore = score;
+        PortfolioSelectedCoverage = coverage;
+        if (selectedKey == 0)
+            return;
+        if (selectedKey == lastPortfolioDecisionKey)
+            return;
+        if (selectedKey != 0 && lastPortfolioDecisionKey != 0)
+            PortfolioSwitchesWithoutProgress++;
+        lastPortfolioDecisionKey = selectedKey;
+        Log($"portfolio {available}/{total} score={score} coverage={coverage} switches={PortfolioSwitchesWithoutProgress}");
+    }
+
+    public void ResetPortfolioSwitchPressure()
+    {
+        PortfolioSwitchesWithoutProgress = 0;
+        lastPortfolioDecisionKey = 0;
     }
 
     /// <summary>Support detours must not erase how far the blocked parent route had already

@@ -488,7 +488,7 @@ Mods: {
 			AutomationCameraStarted: Die Kamera folgt jetzt {0}. Du steuerst weiterhin deinen eigenen Spieler.
 			AutomationCameraStopped: Die Kamera ist zu deinem Spieler zurückgekehrt.
 			AutomationBlocked: Der automatische Begleiter hängt bei „{0}“ fest: {1}. Er versucht es von selbst regelmäßig erneut.
-			AutomationCompleted: "{0} hat den Mondherrn besiegt. Der Automatiklauf ist gespeichert und beendet; es wird kein normaler folgender Begleiter."
+			AutomationCompleted: "{0} hat seine persönliche Grundlage abgeschlossen und den Mondherrn-Fortschritt dieser Welt bestätigt. Der Automatiklauf ist gespeichert und beendet; es wird kein normaler folgender Begleiter."
 			AutomationProgressStep: "[Automatik · {0}] Phase: {1} · Schritt: {2} · Klasse: {3}"
 			AutomationWeaponSelected: "[Handy-Kampflabor · {0}] {1} gewählt · Kampfwert {2} · theoretische DPS {3}"
 			AutomationDeathRecorded: "[Automatik] {0} wurde besiegt, erscheint an der Himmelsbasis wieder und kehrt zum Fehlerort zurück."

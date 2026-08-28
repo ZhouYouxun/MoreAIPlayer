@@ -15,6 +15,8 @@ public static class AutoArenaController
     private const int CampfireSpacing = 80;
     private static long nextExplosionTick;
 
+    internal static void ResetWorldSession() => nextExplosionTick = 0;
+
     public static bool IsPrepared(AutoCompanionState state)
     {
         if (!state.ArenaCompleted || state.ArenaAnchor is not Point anchor ||
@@ -94,7 +96,8 @@ public static class AutoArenaController
         {
             if (AutoInventory.Count(ctx.Profile, ItemID.Wood) < 2)
                 return AutoTaskResult.AlternativeRequired;
-            if (AutoCraftingService.TryCraft(ctx.Instance, ctx.Profile, ItemID.WoodPlatform))
+            if (AutoCraftingService.TryCraftUntil(ctx.Instance, ctx.Profile,
+                ItemID.WoodPlatform, width * rows))
                 return AutoTaskResult.Running;
         }
 
@@ -288,7 +291,7 @@ public static class AutoArenaController
                 if (AutoInventory.Count(ctx.Profile, ItemID.Gel) > 0 &&
                     AutoInventory.Count(ctx.Profile, ItemID.Wood) >
                         AutoResourceBudget.OperationalReserve(ctx.State) &&
-                    AutoCraftingService.TryCraft(ctx.Instance, ctx.Profile, ItemID.Torch))
+                    AutoCraftingService.TryCraftUntil(ctx.Instance, ctx.Profile, ItemID.Torch, 5))
                     return AutoTaskResult.Running;
                 return AutoResourceController.LootPots(ctx);
             }

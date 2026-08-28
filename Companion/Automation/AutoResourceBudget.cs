@@ -14,7 +14,7 @@ namespace MoreAIPlayer.Companion.Automation;
 public static class AutoResourceBudget
 {
     public const float SafetyMultiplier = 1.5f;
-    private const int MinimumRooms = 4;
+    internal const int MinimumRooms = 4;
     private const int SpareRooms = 1;
     private const int ForecastCacheTicks = 300;
     private static long lastForecastTick = -ForecastCacheTicks;
@@ -45,29 +45,57 @@ public static class AutoResourceBudget
     {
         AutoCompanionState state = ctx.State;
         int eligible = ForecastEligibleTownNpcCount();
-        int rooms = System.Math.Max(MinimumRooms, eligible + SpareRooms);
+        int rooms = RequiredHousingRooms(state);
         int completedRooms = System.Math.Clamp(state?.HousingRoomsCompleted ?? 0, 0, rooms);
         int housing = System.Math.Max(0,
             EstimateHousingWood(rooms) - EstimateHousingWood(completedRooms));
 
-        int arenaPlatforms = state is null || state.ArenaCompleted && state.ArenaStage == state.CampaignStage
+        bool campaignFinished = state?.CampaignStage == AutoCampaignStage.Completed;
+        int arenaPlatforms = state is null || campaignFinished ||
+            state.ArenaCompleted && state.ArenaStage == state.CampaignStage
             ? 0 : AutoArenaController.RequiredPlatformCount(state);
         int heldPlatforms = AutoInventory.Count(ctx.Profile, ItemID.WoodPlatform);
-        int campfires = state is null || state.ArenaCompleted && state.ArenaStage == state.CampaignStage
+        int campfires = state is null || campaignFinished ||
+            state.ArenaCompleted && state.ArenaStage == state.CampaignStage
             ? 0 : AutoArenaController.RequiredCampfireCount(state);
         int heldCampfires = AutoInventory.Count(ctx.Profile, ItemID.Campfire);
         int arena = (System.Math.Max(0, arenaPlatforms - heldPlatforms) + 1) / 2 +
             System.Math.Max(0, campfires - heldCampfires) * 12;
 
-        (int exploration, int defense, int maintenance) = OperationalNeeds(state?.CampaignStage ??
-            AutoCampaignStage.Foundation);
+        AutoCampaignStage effectiveStage = campaignFinished ? AutoCampaignStage.Foundation :
+            state?.CampaignStage ?? AutoCampaignStage.Foundation;
+        (int exploration, int defense, int maintenance) = OperationalNeeds(effectiveStage);
         int rawTarget = ApplySafety(housing + arena + exploration + defense + maintenance);
         return new WoodBudget(eligible, rooms, housing, arena, exploration, defense, maintenance,
             System.Math.Max(50, rawTarget));
     }
 
-    public static int RequiredHousingRooms() =>
-        System.Math.Max(MinimumRooms, ForecastEligibleTownNpcCount() + SpareRooms);
+    public static void InitializeHousingPlan(AutoCompanionState state, bool establishedWorld)
+    {
+        if (state is null || state.WorldAdaptationInitialized)
+            return;
+        state.WorldAdaptationInitialized = true;
+        state.StartedInEstablishedWorld = establishedWorld;
+        state.HousingRoomTarget = establishedWorld ? MinimumRooms :
+            System.Math.Max(MinimumRooms, ForecastEligibleTownNpcCount() + SpareRooms);
+    }
+
+    public static int RequiredHousingRooms(AutoCompanionState state)
+    {
+        int forecast = System.Math.Max(MinimumRooms,
+            ForecastEligibleTownNpcCount() + SpareRooms);
+        if (state is null)
+            return forecast;
+
+        int target = System.Math.Max(MinimumRooms, state.HousingRoomTarget);
+        // A fresh-world run may extend its own village as new residents become eligible. An
+        // established imported world keeps the compact personal foothold selected on first entry;
+        // its already-housed population is context, not construction debt for this new profile.
+        if (!state.WorldAdaptationInitialized || !state.StartedInEstablishedWorld)
+            target = System.Math.Max(target, forecast);
+        state.HousingRoomTarget = target;
+        return target;
+    }
 
     /// <summary>Reserve which discretionary wood consumers may never cross.</summary>
     public static int OperationalReserve(AutoCompanionState state)
@@ -81,11 +109,12 @@ public static class AutoResourceBudget
     /// backpack. This deliberately keeps enough raw wood to rebuild after arena or housing damage.</summary>
     public static int StorageWoodKeep(AutoCompanionState state)
     {
-        int rooms = RequiredHousingRooms();
+        int rooms = RequiredHousingRooms(state);
         int completed = System.Math.Clamp(state?.HousingRoomsCompleted ?? 0, 0, rooms);
         int housing = System.Math.Max(0,
             EstimateHousingWood(rooms) - EstimateHousingWood(completed));
-        int arena = state is null || state.ArenaCompleted && state.ArenaStage == state.CampaignStage
+        int arena = state is null || state.CampaignStage == AutoCampaignStage.Completed ||
+            state.ArenaCompleted && state.ArenaStage == state.CampaignStage
             ? 0 : (AutoArenaController.RequiredPlatformCount(state) + 1) / 2 +
                 AutoArenaController.RequiredCampfireCount(state) * 12;
         return System.Math.Max(50, ApplySafety(housing + arena) + OperationalReserve(state));
@@ -169,6 +198,12 @@ public static class AutoResourceBudget
         lastForecastTick = now;
         cachedEligibleTownNpcCount = eligible.Count;
         return cachedEligibleTownNpcCount;
+    }
+
+    internal static void ResetWorldSession()
+    {
+        lastForecastTick = -ForecastCacheTicks;
+        cachedEligibleTownNpcCount = 1;
     }
 
     private static void Add(HashSet<int> set, int type, bool condition)

@@ -488,7 +488,7 @@ Mods: {
 			AutomationCameraStarted: La cámara ahora sigue a {0}. Sigues controlando a tu propio jugador.
 			AutomationCameraStopped: La cámara ha vuelto a tu jugador.
 			AutomationBlocked: El compañero automático está atascado en «{0}»: {1}. Seguirá reintentándolo por su cuenta.
-			AutomationCompleted: "{0} ha derrotado al Señor de la Luna. La ejecución automática se guardó y terminó; no se convertirá en un compañero normal que siga al jugador."
+			AutomationCompleted: "{0} ha completado su base personal y confirmado el progreso del Señor de la Luna de este mundo. La ejecución automática se guardó y terminó; no se convertirá en un compañero normal que siga al jugador."
 			AutomationProgressStep: "[Automatización · {0}] Etapa: {1} · Paso: {2} · Clase: {3}"
 			AutomationWeaponSelected: "[Laboratorio móvil · {0}] Eligió {1} · puntuación {2} · DPS teórico {3}"
 			AutomationDeathRecorded: "[Automatización] {0} cayó; reaparecerá en la base aérea y volverá al lugar del fallo."

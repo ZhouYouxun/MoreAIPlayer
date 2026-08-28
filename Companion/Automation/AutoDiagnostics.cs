@@ -29,6 +29,9 @@ public static class AutoDiagnostics
             $"attempts: {runtime.AttemptCount}  recoveryLv: {runtime.RecoveryLevel}",
             $"self-rescue: L{runtime.SelfRescueLevel}  count: {runtime.SelfRescueCount}  " +
                 $"{runtime.LastSelfRescueReason}/{runtime.LastSelfRescueAction}",
+            $"portfolio: {runtime.PortfolioAvailableCount}/{runtime.PortfolioCandidateCount}  " +
+                $"score: {runtime.PortfolioSelectedScore}  covers: {runtime.PortfolioSelectedCoverage}",
+            $"switch pressure: {runtime.PortfolioSwitchesWithoutProgress}",
             $"rejected targets: {runtime.RejectedTargetCount}  deferred plans: {runtime.DeferredPlanCount}",
         ];
 
@@ -49,7 +52,7 @@ public static class AutoDiagnostics
         {
             lines.Add($"campaign: {state.CampaignStage}  class: {state.PreferredClass}");
             int eligibleTownNpcs = AutoResourceBudget.ForecastEligibleTownNpcCount();
-            lines.Add($"housing: {state.HousingRoomsCompleted}/{AutoResourceBudget.RequiredHousingRooms()} rooms  " +
+            lines.Add($"housing: {state.HousingRoomsCompleted}/{AutoResourceBudget.RequiredHousingRooms(state)} rooms  " +
                 $"eligible NPCs: {eligibleTownNpcs}");
             lines.Add($"replant debt: {state.PendingReplantCount}");
             lines.Add($"weapon route: {state.LastWeaponRoute}");

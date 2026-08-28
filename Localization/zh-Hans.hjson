@@ -494,7 +494,7 @@ Mods: {
 			AutomationCameraStarted: 摄像机已转到 {0}。你仍然控制自己的玩家。
 			AutomationCameraStopped: 摄像机已回到你的玩家。
 			AutomationBlocked: 自动伙伴卡在了“{0}”：{1}。它会自己定期重试。
-			AutomationCompleted: "{0} 已经击败月亮领主。自动流程结束并已保存；它不会转为普通跟随伙伴。"
+			AutomationCompleted: "{0} 已完成自己的开局基础，并确认这个世界已经完成月亮领主进度。自动流程结束并已保存；它不会转为普通跟随伙伴。"
 			AutomationProgressStep: 【自动推进·{0}】阶段：{1} · 步骤：{2} · 职业：{3}
 			AutomationWeaponSelected: 【手机战斗实验室·{0}】选择 {1} · 实战分 {2} · 理论DPS {3}
 			AutomationDeathRecorded: 【自动推进】{0} 已阵亡；它会从空中基地复活，并重新赶往失败地点。

@@ -11,6 +11,7 @@ namespace MoreAIPlayer.Companion.Automation;
 public static class AutoLootController
 {
     private const int SearchRadiusTiles = 90;
+    private const int BootstrapSearchRadiusTiles = 140;
     private const float InteractRangeTiles = 3.5f;
 
     public static bool HasWorthwhileNearbyChest(AutoContext ctx, out int utility) =>
@@ -131,7 +132,9 @@ public static class AutoLootController
         best = default;
         bestUtility = 0;
         Point origin = ctx.Me.Center.ToTileCoordinates();
-        int radiusSquared = SearchRadiusTiles * SearchRadiusTiles;
+        bool bootstrapSurvey = !global && AutoCampaignController.NeedsPersonalFoundation(ctx);
+        int radius = bootstrapSurvey ? BootstrapSearchRadiusTiles : SearchRadiusTiles;
+        int radiusSquared = radius * radius;
         for (int i = 0; i < Main.chest.Length; i++)
         {
             Chest chest = Main.chest[i];
@@ -146,7 +149,7 @@ public static class AutoLootController
                 continue;
             int utility = ChestUtility(ctx.Profile, chest, desired);
             if (!global)
-                utility -= (int)System.MathF.Sqrt(distanceSquared) / 3;
+                utility -= (int)System.MathF.Sqrt(distanceSquared) / (bootstrapSurvey ? 6 : 3);
             if (utility <= bestUtility)
                 continue;
             bestUtility = utility;

@@ -80,9 +80,10 @@ public readonly struct AutoPlan
         AutoPlanKind kind = AutoPlanKind.HardGate, int failureBudget = 3) =>
         new(AutoGoalId.CraftStation, itemType, tileType, 0, AutoTaskResult.Running, kind, failureBudget);
 
-    public static AutoPlan Product(int itemType,
+    public static AutoPlan Product(int itemType, int target = 1,
         AutoPlanKind kind = AutoPlanKind.HardGate, int failureBudget = 3) =>
-        new(AutoGoalId.CraftConsumable, itemType, 0, 0, AutoTaskResult.Running, kind, failureBudget);
+        new(AutoGoalId.CraftConsumable, itemType, 0, System.Math.Max(1, target),
+            AutoTaskResult.Running, kind, failureBudget);
 
     public static AutoPlan Simple(AutoGoalId goal,
         AutoPlanKind kind = AutoPlanKind.HardGate, int failureBudget = 3) =>
@@ -91,6 +92,13 @@ public readonly struct AutoPlan
     public static AutoPlan WeaponRoute(AutoWeaponRouteKind route,
         AutoPlanKind kind = AutoPlanKind.Capability, int failureBudget = 5) =>
         new(AutoGoalId.AcquireWeaponUpgrade, 0, 0, (int)route,
+            AutoTaskResult.Running, kind, failureBudget);
+
+    /// <summary>Exploration lanes share one executor but keep different stable keys after a route
+    /// has been rejected. The lane is a deterministic strategy generation, not a moving target.</summary>
+    public static AutoPlan Explore(int lane,
+        AutoPlanKind kind = AutoPlanKind.Support, int failureBudget = 3) =>
+        new(AutoGoalId.ExploreWorld, 0, 0, System.Math.Max(0, lane),
             AutoTaskResult.Running, kind, failureBudget);
 
     public static AutoPlan Idle(AutoTaskResult reason) =>

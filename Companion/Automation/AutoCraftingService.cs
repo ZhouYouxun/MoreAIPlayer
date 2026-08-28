@@ -16,6 +16,10 @@ namespace MoreAIPlayer.Companion.Automation;
 /// </summary>
 public static class AutoCraftingService
 {
+    // One automation decision may finish its entire requested craft immediately, but a malformed
+    // zero-cost/modded recipe must never monopolise the main thread forever.
+    private const int MaximumCraftsPerTransaction = 999;
+
     public static bool IsAvailable =>
         CompanionFaultGuard.IsAvailable(CompanionFaultGuard.AutomationCraftingLane);
 
@@ -26,17 +30,33 @@ public static class AutoCraftingService
     /// </summary>
     public static bool TryCraft(CompanionInstance instance, CompanionProfile profile, int targetItemType)
     {
+        int target = AutoInventory.Count(profile, targetItemType) + 1;
+        return TryCraftUntil(instance, profile, targetItemType, target);
+    }
+
+    /// <summary>Completes as many recipe batches as are needed to reach <paramref name="targetTotal"/>
+    /// in one non-blocking transaction. It claims no movement or item-use input, so a companion may
+    /// keep its current velocity while recipe hooks and legal material consumption run immediately.</summary>
+    public static bool TryCraftUntil(CompanionInstance instance, CompanionProfile profile,
+        int targetItemType, int targetTotal)
+    {
+        if (AutoInventory.Count(profile, targetItemType) >= targetTotal)
+            return false;
+
         bool crafted = false;
-        // Crafting consumes real materials and invokes arbitrary RecipeLoader hooks. A fault must
-        // trip only this lane for the session; repeatedly re-entering the same half-mutating hook is
-        // riskier than cooling the plan down and surfacing a blocked reason.
         CompanionFaultGuard.RunCritical(CompanionFaultGuard.AutomationCraftingLane,
-            () => crafted = TryCraftCore(instance.Entity, profile, targetItemType));
+            () => crafted = TryCraftCore(instance.Entity, profile, targetItemType, targetTotal));
         return crafted;
     }
 
-    private static bool TryCraftCore(Player me, CompanionProfile profile, int targetItemType)
+    /// <summary>Converts every currently craftable batch of one result type in this same tick.</summary>
+    public static bool TryCraftAllAvailable(CompanionInstance instance, CompanionProfile profile,
+        int targetItemType) => TryCraftUntil(instance, profile, targetItemType, int.MaxValue);
+
+    private static bool TryCraftCore(Player me, CompanionProfile profile, int targetItemType,
+        int targetTotal)
     {
+        bool crafted = false;
         // Snapshot the local player's available-recipe listing so the crafting UI is untouched.
         int savedNum = Main.numAvailableRecipes;
         int[] savedList = null;
@@ -51,32 +71,42 @@ public static class AutoCraftingService
             using VirtualPlayerExecutionContext.Scope scope =
                 VirtualPlayerExecutionContext.Enter(me, me.Center, false, false);
 
-            // FindRecipes reads Main.LocalPlayer (== the companion in scope): its inventory, its
-            // adjacent stations and the world conditions. That is the authoritative "can I craft
-            // this here, right now" test.
-            me.AdjTiles();
-            Recipe.FindRecipes();
-
-            for (int i = 0; i < Main.numAvailableRecipes; i++)
+            for (int operation = 0; operation < MaximumCraftsPerTransaction &&
+                AutoInventory.Count(profile, targetItemType) < targetTotal; operation++)
             {
-                Recipe recipe = Main.recipe[Main.availableRecipe[i]];
-                if (recipe.createItem.type != targetItemType)
-                    continue;
+                // Refresh after every batch because ingredients, recipe groups and hook-controlled
+                // availability may have changed. Main.LocalPlayer is still the companion in scope.
+                me.AdjTiles();
+                Recipe.FindRecipes();
+
+                Recipe recipe = null;
+                for (int i = 0; i < Main.numAvailableRecipes; i++)
+                {
+                    Recipe candidate = Main.recipe[Main.availableRecipe[i]];
+                    if (candidate.createItem.type == targetItemType)
+                    {
+                        recipe = candidate;
+                        break;
+                    }
+                }
+                if (recipe is null)
+                    break;
 
                 Item result = recipe.createItem.Clone();
                 result.Prefix(-1);
                 // Never consume ingredients unless the complete result has a legal destination.
-                // The old path could report success after TryAddToBackpack failed and silently lose
-                // the crafted item — exactly the kind of partial transition hardening must forbid.
                 if (!AutoInventory.CanFit(profile, result))
-                    return false;
-                recipe.Create();                            // consume ingredients + ConsumeItem hooks
-                RecipeLoader.OnCraft(result, recipe, result); // OnCraft hooks (mod effects)
+                    break;
 
-                return AutoInventory.Give(profile, result);
+                int before = AutoInventory.Count(profile, targetItemType);
+                recipe.Create();                              // ConsumeItem and recipe-group rules
+                RecipeLoader.OnCraft(result, recipe, result); // mod OnCraft hooks
+                if (!AutoInventory.Give(profile, result) ||
+                    AutoInventory.Count(profile, targetItemType) <= before)
+                    break;
+                crafted = true;
             }
-
-            return false;
+            return crafted;
         }
         finally
         {

@@ -87,11 +87,14 @@ public static class AutoStationController
             }
         }
 
-        return CraftResult(AutoCraftingService.TryCraft(ctx.Instance, ctx.Profile, productType));
+        bool crafted = AutoCraftingService.TryCraftUntil(
+            ctx.Instance, ctx.Profile, productType, target);
+        return AutoInventory.Count(ctx.Profile, productType) >= target
+            ? AutoTaskResult.Succeeded : CraftResult(crafted);
     }
 
     /// <summary>
-    /// Smelts any caller-supplied bar family at its required furnace, one real recipe per tick.
+    /// Smelts every currently craftable batch in the caller-supplied bar family immediately.
     /// Recipe.FindRecipes is the authority: this method must not inspect only the starter copper-
     /// through-platinum ores because it is also used by Hellstone and every Hardmode ore tier.
     /// </summary>
@@ -108,13 +111,15 @@ public static class AutoStationController
             }
         }
 
+        bool crafted = false;
         foreach (int bar in barTypes)
         {
-            if (AutoCraftingService.TryCraft(ctx.Instance, ctx.Profile, bar))
-                return AutoTaskResult.Running;
+            crafted |= AutoCraftingService.TryCraftAllAvailable(ctx.Instance, ctx.Profile, bar);
             if (!AutoCraftingService.IsAvailable)
                 return AutoTaskResult.Faulted;
         }
+        if (crafted)
+            return AutoTaskResult.Running;
         return AutoTaskResult.RetryLater;
     }
 

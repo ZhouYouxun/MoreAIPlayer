@@ -338,7 +338,12 @@ public sealed class CompanionInstance
         me.immuneAlpha = 0;
         me.outOfRange = false;
 
-        MirrorOwnerBeneficialBuffs(owner, me);
+        // Ordinary companions intentionally share the owner's temporary combat/food support.
+        // Automation is a different player: copying the observer's buffs made a mount buff call
+        // Mount.SetMount for the synthetic Player and let flight/cheat buffs rewrite its movement
+        // state. Its buffs must come only from items it owns and uses itself.
+        if (!IsAutoIdentity)
+            MirrorOwnerBeneficialBuffs(owner, me);
 
         profile.ApplyAppearanceTo(me, owner);
 

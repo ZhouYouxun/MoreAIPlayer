@@ -494,7 +494,7 @@ Mods: {
 			AutomationCameraStarted: The camera is now following {0}. You still control your own player.
 			AutomationCameraStopped: The camera has returned to your player.
 			AutomationBlocked: The automation companion is stuck on "{0}": {1}. It will keep retrying on its own.
-			AutomationCompleted: "{0} has defeated the Moon Lord. The automation run is saved and complete; it will not become an ordinary following companion."
+			AutomationCompleted: "{0} has completed its personal foundation and confirmed this world's Moon Lord progression. The automation run is saved and complete; it will not become an ordinary following companion."
 			AutomationProgressStep: "[Automation · {0}] Stage: {1} · Step: {2} · Class: {3}"
 			AutomationWeaponSelected: "[Phone combat lab · {0}] Selected {1} · combat score {2} · theoretical DPS {3}"
 			AutomationDeathRecorded: "[Automation] {0} was defeated. It will revive at the sky base and return to the failed location."
