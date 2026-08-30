@@ -97,6 +97,13 @@ public static class AutoGearController
         if (HasBasicMetalLoadout(ctx.Profile))
             return AutoTaskResult.Succeeded;
 
+        // The opening weapon pair is a hard safety floor, not something to postpone until after
+        // smelting and armour. This controller is also the executor for CraftGear, so keeping the
+        // gate here makes every planner route honour it, including an imported progressed world.
+        AutoTaskResult starter = AutoStarterArsenalController.Ensure(ctx);
+        if (starter != AutoTaskResult.Succeeded)
+            return starter;
+
         // Smelt every real ore stack before deciding that another mining trip is necessary.
         if (AutoResourceController.CountBasicOre(ctx.Profile) > 0)
         {

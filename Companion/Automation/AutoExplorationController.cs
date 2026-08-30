@@ -47,25 +47,8 @@ public static class AutoExplorationController
         }
 
         Vector2 target = new(state.ExplorationTargetTileX * 16f + 8f,
-            FindSurfaceCenterY(state.ExplorationTargetTileX, ctx.Me));
+            AutoWorldTopology.TraversalCenterY(state.ExplorationTargetTileX, ctx.Me));
         ctx.Navigator.Navigate(ctx.Me, target);
         return AutoTaskResult.Running;
     }
-
-    private static float FindSurfaceCenterY(int x, Player me)
-    {
-        int start = System.Math.Max(10, (int)Main.worldSurface - 180);
-        int end = System.Math.Min(Main.maxTilesY - 10, (int)Main.rockLayer + 120);
-        for (int y = start; y <= end; y++)
-        {
-            if (!WorldGen.SolidTile(x, y))
-                continue;
-            bool headroom = !WorldGen.SolidTile(x, y - 1) && !WorldGen.SolidTile(x, y - 2) &&
-                !WorldGen.SolidTile(x, y - 3);
-            if (headroom)
-                return y * 16f - me.height * 0.5f - 2f;
-        }
-        return me.Center.Y;
-    }
-
 }

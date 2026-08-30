@@ -47,9 +47,13 @@ public static class AutoWorldBootstrapController
             state.ShelterCompleted = false;
         }
 
-        if (state.Chest is Point chest &&
-            (Chest.FindChest(chest.X, chest.Y) < 0 || Chest.IsLocked(chest.X, chest.Y)))
-            state.Chest = null;
+        if (state.Chest is Point chest)
+        {
+            int chestIndex = Chest.FindChest(chest.X, chest.Y);
+            if (chestIndex < 0 || Chest.IsLocked(chest.X, chest.Y) ||
+                !AutoChestProvenanceSystem.IsAutomationOwnedChest(Main.chest[chestIndex]))
+                state.Chest = null;
+        }
 
         RevalidateStation(ref state.PendingAltar, TileID.DemonAltar);
         RevalidateStation(ref state.PendingEvilOrb, TileID.ShadowOrbs);

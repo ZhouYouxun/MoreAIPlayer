@@ -20,4 +20,5 @@ public sealed class AutoContext
     public AutoCapabilities Capabilities;
     public AutoTaskRuntime TaskRuntime;
     public AutoFishingController Fishing;
+    public AutoExpeditionFieldcraftController Fieldcraft;
 }

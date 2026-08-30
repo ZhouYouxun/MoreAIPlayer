@@ -295,8 +295,13 @@ public sealed class CompanionInventoryUI : UIState, ICompanionPanelState
         dumpButton.Top.Set(actionTopY, 0f);
         dumpButton.OnLeftClick += (_, _) =>
         {
-            if (CompanionLootSystem.DumpBackpack(companionSlot, Main.LocalPlayer) > 0)
+            long before = BackpackContentSignature();
+            CompanionLootSystem.DumpBackpack(companionSlot, Main.LocalPlayer);
+            if (BackpackContentSignature() != before)
+            {
+                NotifyInventoryEdited();
                 SoundEngine.PlaySound(SoundID.Grab);
+            }
         };
         panel.Append(dumpButton);
 
@@ -316,8 +321,17 @@ public sealed class CompanionInventoryUI : UIState, ICompanionPanelState
         transferButton.Top.Set(actionTopY, 0f);
         transferButton.OnLeftClick += (_, _) =>
         {
-            if (CompanionLootSystem.TransferBackpack(companionSlot, Main.LocalPlayer) > 0)
+            // A nearly-full player inventory can accept only part of one stack. In that case the
+            // transfer service quite correctly leaves a smaller remainder in the same slot, but
+            // its completed-slot count is still zero. Compare the live backpack instead of using
+            // that count so taking even one required item immediately invalidates the auto plan.
+            long before = BackpackContentSignature();
+            CompanionLootSystem.TransferBackpack(companionSlot, Main.LocalPlayer);
+            if (BackpackContentSignature() != before)
+            {
+                NotifyInventoryEdited();
                 SoundEngine.PlaySound(SoundID.Grab);
+            }
         };
         panel.Append(transferButton);
     }
@@ -478,24 +492,50 @@ public sealed class CompanionInventoryUI : UIState, ICompanionPanelState
     private static string T(string key, params object[] args) =>
         Language.GetTextValue($"Mods.MoreAIPlayer.CompanionUI.{key}", args);
 
-    private static CompanionItemSlot CreateSlot(Item[] items, int index, System.Func<Item, bool> rule, string rejectionText, float left, float top,
+    private CompanionItemSlot CreateSlot(Item[] items, int index, System.Func<Item, bool> rule, string rejectionText, float left, float top,
         System.Func<bool> isHighlighted = null, Color? accentColor = null, System.Func<bool> isLocked = null, string lockedText = null,
         int drawContext = ItemSlot.Context.BankItem, int emptyItemGhostType = ItemID.None, int emptySilhouetteIndex = -1,
         System.Func<bool> isVisible = null)
     {
         CompanionItemSlot slot = new(items, index, rule, rejectionText, isHighlighted, accentColor, isLocked, lockedText,
-            drawContext, emptyItemGhostType, emptySilhouetteIndex, isVisible);
+            drawContext, emptyItemGhostType, emptySilhouetteIndex, isVisible, NotifyInventoryEdited);
         slot.Left.Set(left, 0f);
         slot.Top.Set(top, 0f);
         return slot;
     }
 
-    private static void AddVerticalSlots(UIElement panel, Item[] items, float left, float top, int drawContext,
+    private void AddVerticalSlots(UIElement panel, Item[] items, float left, float top, int drawContext,
         params (System.Func<Item, bool> Rule, string Rejection)[] rules)
     {
         for (int i = 0; i < items.Length; i++)
             panel.Append(CreateSlot(items, i, rules[i].Rule, rules[i].Rejection, left, top + i * SlotStep,
                 drawContext: drawContext));
+    }
+
+    private void NotifyInventoryEdited()
+    {
+        CompanionInstance companion = CompanionEntitySystem.GetBySlot(companionSlot);
+        if (companion?.IsAutoIdentity == true)
+            companion.AutoBrain.NotifyExternalInventoryEdit();
+    }
+
+    private long BackpackContentSignature()
+    {
+        // This deliberately fingerprints only the container changed by the two bulk buttons.
+        // Slot widgets report their own before/after mutation directly; hashing the entire profile
+        // here would make unrelated live automation pickups look like player interference.
+        unchecked
+        {
+            long hash = 1469598103934665603L;
+            foreach (Item item in data.Backpack)
+            {
+                hash = (hash ^ item.type) * 1099511628211L;
+                hash = (hash ^ item.stack) * 1099511628211L;
+                hash = (hash ^ item.prefix) * 1099511628211L;
+                hash = (hash ^ (item.favorited ? 1 : 0)) * 1099511628211L;
+            }
+            return hash;
+        }
     }
 
     private static void AddLabel(UIElement panel, string text, float left, float top)

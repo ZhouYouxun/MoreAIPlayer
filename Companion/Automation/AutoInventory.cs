@@ -53,6 +53,27 @@ public static class AutoInventory
         return -1;
     }
 
+    /// <summary>Finds a live inventory slot and, when same-frame crafting replaced an empty
+    /// backpack Item reference, immediately rebinds that one profile slot into the synthetic
+    /// Player. This removes the otherwise unnecessary next-tick bind before physical placement.</summary>
+    public static int FindAndBindInventoryIndex(Player me, CompanionProfile profile,
+        Func<Item, bool> predicate)
+    {
+        int existing = FindInventoryIndex(me, predicate);
+        if (existing >= 0)
+            return existing;
+        for (int backpackSlot = 0; backpackSlot < profile.Backpack.Length; backpackSlot++)
+        {
+            Item item = profile.Backpack[backpackSlot];
+            if (item.IsAir || !predicate(item))
+                continue;
+            int inventoryIndex = CompanionInstance.BackpackToInventoryIndex(backpackSlot);
+            me.inventory[inventoryIndex] = item;
+            return inventoryIndex;
+        }
+        return -1;
+    }
+
     /// <summary>Adds an item to the companion's backpack (stacking first). Returns false if full.</summary>
     public static bool Give(CompanionProfile profile, Item item) => profile.TryAddToBackpack(item);
 

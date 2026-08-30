@@ -242,6 +242,7 @@ Mods: {
 					Clique esquerdo: invoca o companheiro automático; outro clique o recolhe e salva posição, inventário e memória de progresso
 					Clique direito: move a câmera para o companheiro automático; clique novamente para voltar a você
 					Ele tentará explorar, coletar, construir, lutar e avançar pelo mundo de forma independente; ao concluir, salvará o progresso e parará sem entrar no sistema de acompanhamento dos companheiros comuns
+					[c/FF4040:Atenção: o companheiro automático não segue seus comandos. Ele toma suas próprias decisões e continua o processo; você pode recolhê-lo com clique esquerdo para pausá-lo, mas não pode alterar suas decisões.]
 					Ainda pode travar, errar ou encontrar outros bugs. Faça backup do mundo antes. Somente um jogador.
 					'''
 			}

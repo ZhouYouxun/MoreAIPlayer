@@ -18,8 +18,9 @@ public static class AutoStationController
     /// Drives one station from "not built" to "built and recorded". Order of operations per tick:
     /// return success if the recorded tile is still there; otherwise re-find one nearby (covers the
     /// tick right after placing); otherwise place the crafted item; otherwise walk to the
-    /// prerequisite station and craft the item. <paramref name="recorded"/> is the state slot for
-    /// this station and is updated in place.
+    /// prerequisite station, craft the item and immediately feed that new item into placement in
+    /// this same update. <paramref name="recorded"/> is the state slot for this station and is
+    /// updated in place.
     /// </summary>
     public static AutoTaskResult EnsureStation(AutoContext ctx, int itemType, int tileType, int width,
         Point? prerequisite, ref Point? recorded)
@@ -62,7 +63,20 @@ public static class AutoStationController
             }
         }
 
-        return CraftResult(AutoCraftingService.TryCraft(ctx.Instance, ctx.Profile, itemType));
+        if (!AutoCraftingService.TryCraft(ctx.Instance, ctx.Profile, itemType))
+            return CraftResult(false);
+
+        // Crafting does not claim item-use or movement input. A newly crafted station can therefore
+        // be placed or start walking toward its placement spot immediately, without a presentation
+        // frame that exists only to imitate a human crafting UI.
+        itemIndex = AutoInventory.FindAndBindInventoryIndex(me, ctx.Profile,
+            item => item.type == itemType);
+        if (itemIndex < 0)
+            return AutoTaskResult.Faulted;
+        if (AutoWorldKnowledge.FindStationSpot(me, width) is not Point craftedSpot)
+            return AutoTaskResult.AlternativeRequired;
+        ctx.Actuator.MoveAndPlace(ctx.Instance, me, ctx.Navigator, itemIndex, craftedSpot);
+        return AutoTaskResult.Running;
     }
 
     /// <summary>

@@ -1,4 +1,3 @@
-using Microsoft.Xna.Framework;
 using Terraria;
 using Terraria.ID;
 
@@ -8,7 +7,6 @@ namespace MoreAIPlayer.Companion.Automation;
 /// save/reload, external boss kill, or repeated death can never move the campaign backwards.</summary>
 public static class AutoCampaignController
 {
-    private static long nextSummonTick;
     private static AutoCampaignStage lastIndexedStage = AutoCampaignStage.Foundation;
 
     public static AutoCampaignStage DetermineStage(AutoContext ctx)
@@ -27,11 +25,11 @@ public static class AutoCampaignController
     public static bool NeedsPersonalFoundation(AutoContext ctx) =>
         !ctx.State.ShelterCompleted || !AutoGearController.HasBasicMetalLoadout(ctx.Profile);
 
-    /// <summary>An imported world's completion flag only becomes this new profile's finish signal
-    /// after it has established its own shelter and basic metal loadout. World progress remains
-    /// usable immediately, but can no longer dismiss a zero-inventory player on its first tick.</summary>
+    /// <summary>An imported world's completion flag is only a world fact. This independent player
+    /// is finished after it has proved the same durable capabilities expected at the end of a
+    /// campaign; entering somebody else's completed save with an empty inventory is not a win.</summary>
     public static bool CanCompleteAutomation(AutoContext ctx) =>
-        NPC.downedMoonlord && !NeedsPersonalFoundation(ctx);
+        NPC.downedMoonlord && AutoEncounterReadiness.TerminalWorldCapabilityReady(ctx);
 
     public static bool HasEstablishedWorldProgress() =>
         Main.hardMode || NPC.downedBoss1 || NPC.downedBoss2 || NPC.downedBoss3 ||
@@ -40,7 +38,6 @@ public static class AutoCampaignController
 
     internal static void ResetWorldSession()
     {
-        nextSummonTick = 0;
         lastIndexedStage = AutoCampaignStage.Foundation;
     }
 
@@ -176,6 +173,7 @@ public static class AutoCampaignController
         AutoCampaignStage.SolarPillar or AutoCampaignStage.VortexPillar or
             AutoCampaignStage.NebulaPillar or AutoCampaignStage.StardustPillar => 210,
         AutoCampaignStage.MoonLord => 240,
+        AutoCampaignStage.Completed => 240,
         _ => 24
     };
 
@@ -199,70 +197,14 @@ public static class AutoCampaignController
         AutoCampaignStage stage = ctx.State.CampaignStage;
         if (HasLiveTarget())
             return AutoTaskResult.Succeeded;
-        if (RequiresNight(stage) && Main.dayTime)
-            return AutoTaskResult.RetryLater;
-        if ((long)Main.GameUpdateCount < nextSummonTick)
-            return AutoTaskResult.Running;
 
-        Point anchor = ctx.State.ArenaAnchor ?? ctx.Me.Center.ToTileCoordinates();
-        Vector2 arena = new(anchor.X * 16f + 8f, anchor.Y * 16f + 8f);
-        AutoTaskResult travel = AutoWorldTravelController.TravelTo(ctx, arena, 10f);
-        if (travel != AutoTaskResult.Succeeded)
-            return travel;
+        AutoEncounterReadiness readiness = AutoEncounterReadiness.Evaluate(ctx);
+        if (!readiness.ReadyExceptTiming)
+            return AutoTaskResult.AlternativeRequired;
+        if (!readiness.TimingReady)
+            return AutoEncounterTriggerController.Prepare(ctx);
         if (AutoCombatPreparationController.TryUseNextOwnedBuff(ctx))
             return AutoTaskResult.Running;
-
-        int npcType = TargetNpcType(stage);
-        if (npcType <= NPCID.None)
-            return stage == AutoCampaignStage.Completed
-                ? AutoTaskResult.Succeeded : AutoTaskResult.AlternativeRequired;
-
-        AutoTaskResult spawned = SpawnStageTarget(ctx, stage, npcType);
-        nextSummonTick = (long)Main.GameUpdateCount + 600;
-        return spawned;
+        return AutoEncounterTriggerController.Start(ctx);
     }
-
-    /// <summary>Uses the vanilla special entry points for composite/event bosses. A generic
-    /// SpawnOnPlayer call is insufficient for Wall of Flesh, the second Twin, and a missing lunar
-    /// apocalypse, even though all three compile and may appear to create one visible NPC.</summary>
-    private static AutoTaskResult SpawnStageTarget(AutoContext ctx, AutoCampaignStage stage,
-        int npcType)
-    {
-        if (Main.netMode != NetmodeID.SinglePlayer)
-            return AutoTaskResult.BlockedUnsupportedWorld;
-
-        if (stage == AutoCampaignStage.WallOfFlesh)
-        {
-            NPC.SpawnWOF(ctx.Me.Center);
-            return AutoTaskResult.Running;
-        }
-
-        if (stage == AutoCampaignStage.MechanicalBosses && !NPC.downedMechBoss2 &&
-            npcType == NPCID.Retinazer)
-        {
-            NPC.SpawnOnPlayer(ctx.Me.whoAmI, NPCID.Retinazer);
-            NPC.SpawnOnPlayer(ctx.Me.whoAmI, NPCID.Spazmatism);
-            return AutoTaskResult.Running;
-        }
-
-        if (IsPillarStage(stage))
-        {
-            if (!NPC.LunarApocalypseIsUp)
-            {
-                WorldGen.TriggerLunarApocalypse();
-                return AutoTaskResult.Running;
-            }
-            // Normally TriggerLunarApocalypse owns all four towers. Only the last watchdog rung
-            // repairs a missing live tower whose downed flag is still false.
-            if (ctx.TaskRuntime.RecoveryLevel < 7)
-                return AutoTaskResult.Running;
-        }
-
-        NPC.SpawnOnPlayer(ctx.Me.whoAmI, npcType);
-        return AutoTaskResult.Running;
-    }
-
-    private static bool IsPillarStage(AutoCampaignStage stage) => stage is
-        AutoCampaignStage.SolarPillar or AutoCampaignStage.VortexPillar or
-        AutoCampaignStage.NebulaPillar or AutoCampaignStage.StardustPillar;
 }

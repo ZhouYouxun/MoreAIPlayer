@@ -242,6 +242,7 @@ Mods: {
 					Lewy przycisk: przywołuje automatycznego towarzysza; ponowny klik odwołuje go i zapisuje pozycję, ekwipunek oraz pamięć postępu
 					Prawy przycisk: przenosi kamerę do automatycznego towarzysza; ponowny klik wraca do ciebie
 					Spróbuje samodzielnie eksplorować, zbierać, budować, walczyć i rozwijać świat; po ukończeniu zapisze postęp i zatrzyma się, nie dołączając do systemu podążania zwykłych towarzyszy
+					[c/FF4040:Ostrzeżenie: automatyczny towarzysz nie wykonuje twoich poleceń. Sam podejmuje decyzje i kontynuuje proces; możesz przywołać go lewym przyciskiem, aby go wstrzymać, ale nie możesz zmieniać jego decyzji.]
 					Nadal może się zaciąć, pomylić lub napotkać inne błędy. Najpierw wykonaj kopię świata. Tylko tryb jednoosobowy.
 					'''
 			}

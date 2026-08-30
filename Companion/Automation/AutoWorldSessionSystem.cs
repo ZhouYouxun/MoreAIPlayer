@@ -16,8 +16,8 @@ public sealed class AutoWorldSessionSystem : ModSystem
     private static void ResetWorldSession()
     {
         AutoCampaignController.ResetWorldSession();
+        AutoEncounterTriggerController.ResetWorldSession();
         AutoArenaController.ResetWorldSession();
-        AutoCampaignGearController.ResetWorldSession();
         AutoPhoneWorldService.ResetWorldSession();
         AutoResourceBudget.ResetWorldSession();
     }

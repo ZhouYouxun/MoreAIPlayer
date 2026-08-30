@@ -27,6 +27,32 @@ public sealed class AutoActuator
     /// <summary>True once an item use has been claimed this tick.</summary>
     public bool ItemUseSpent => itemUseClaimedThisTick;
 
+    /// <summary>Performs one real tile interaction as the synthetic player. This is the automation
+    /// counterpart of a human right-clicking an altar or another interactive tile: Terraria's own
+    /// <see cref="Player.TileInteractionsCheck(int, int)"/> remains the authority for range,
+    /// inventory consumption, world flags and the resulting event. The observer's cursor and
+    /// right-click state are scoped out and restored before returning.</summary>
+    public bool UseTile(CompanionInstance instance, Player me, Point tile)
+    {
+        if (itemUseClaimedThisTick || !WorldGen.InWorld(tile.X, tile.Y, 4))
+            return false;
+
+        Vector2 center = new(tile.X * 16f + 8f, tile.Y * 16f + 8f);
+        if (Vector2.DistanceSquared(me.Center, center) > 7f * 16f * (7f * 16f))
+            return false;
+
+        itemUseClaimedThisTick = true;
+        instance.AimWorld = center;
+        instance.WorkTile = tile;
+        me.controlUseTile = true;
+        me.releaseUseTile = true;
+        using VirtualPlayerExecutionContext.Scope scope =
+            VirtualPlayerExecutionContext.Enter(me, center, false, false, tile);
+        me.TileInteractionsCheck(tile.X, tile.Y);
+        me.releaseUseTile = false;
+        return true;
+    }
+
     /// <summary>
     /// Selects the item in <paramref name="slot"/> and presses the virtual use button, aiming at
     /// <paramref name="aimWorld"/>. For mining/chopping/placing, pass the target tile in
@@ -86,6 +112,9 @@ public sealed class AutoActuator
         Item tool = me.inventory[slot];
         if (!IsTileInReach(me, tool, tile.X, tile.Y))
         {
+            if (center.Y < me.Center.Y - 5f * 16f &&
+                instance.AutoBrain.TryBuildVerticalAccess(center))
+                return true;
             navigator.Navigate(me, center);
             return true;
         }

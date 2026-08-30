@@ -242,6 +242,7 @@ Mods: {
 					Left click: summon the automation companion; left-click again to recall it and save its position, inventory, and progression memory
 					Right click: move the camera to the automation companion; right-click again to return to yourself
 					It will try to explore, gather, build, fight, and progress the world independently; after finishing, it stops and keeps its save, never joining the ordinary companion follow system
+					[c/FF4040:Warning: the automation companion does not follow your commands. It makes its own decisions and continues its run; you may left-click to recall it and pause the process, but cannot override those decisions.]
 					It may still get stuck, make mistakes, or encounter other bugs. Back up your world first. Single-player only.
 					'''
 			}

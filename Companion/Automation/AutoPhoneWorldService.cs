@@ -14,8 +14,8 @@ public readonly record struct AutoPhoneWorldSnapshot(
     bool IsRaining);
 
 /// <summary>Intrinsic location/radar/recall side of the automation phone. The ordinary Cell Phone
-/// exposes coordinates, depth, time, weather, nearby enemies and home teleport; code can consume
-/// those facts directly without occupying an inventory or accessory slot.</summary>
+/// exposes coordinates, depth, time, weather and nearby enemies. Code consumes those knowledge
+/// facts directly; recall itself still requires and uses a real owned recall item.</summary>
 public static class AutoPhoneWorldService
 {
     private static long nextEmergencyRecallTick;
@@ -43,8 +43,7 @@ public static class AutoPhoneWorldService
 
     public static bool TryEmergencyRecall(AutoContext ctx)
     {
-        if (Main.netMode != NetmodeID.SinglePlayer ||
-            (long)Main.GameUpdateCount < nextEmergencyRecallTick)
+        if ((long)Main.GameUpdateCount < nextEmergencyRecallTick)
             return false;
         Point home = ctx.State.HomeAnchor is Point built &&
             AutoShelterController.IsShelterComplete(built, ctx.State)
@@ -54,9 +53,8 @@ public static class AutoPhoneWorldService
         if (Vector2.DistanceSquared(ctx.Me.Center, destination) < 24f * 16f * 24f * 16f)
             return false;
 
-        ctx.Me.Center = destination;
-        ctx.Me.velocity = Vector2.Zero;
-        ctx.Me.fallStart = (int)(ctx.Me.position.Y / 16f);
+        if (!AutoRecallController.TryUseOwnedRecall(ctx))
+            return false;
         nextEmergencyRecallTick = (long)Main.GameUpdateCount + 120;
         return true;
     }

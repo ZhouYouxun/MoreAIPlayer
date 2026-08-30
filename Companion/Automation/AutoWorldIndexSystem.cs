@@ -135,6 +135,9 @@ public sealed class AutoWorldIndexSystem : ModSystem
     public static Point? FindEvilLandmark(Vector2 center) =>
         FindNearest(center, WorldGen.crimson ? [TileID.CrimsonGrass] : [TileID.CorruptGrass]);
 
+    public static Point? FindHallowLandmark(Vector2 center) =>
+        FindNearest(center, [TileID.HallowedGrass, TileID.Pearlstone, TileID.Pearlsand]);
+
     private static bool LiveType(Point point, int type) =>
         WorldGen.InWorld(point.X, point.Y, 4) && Main.tile[point.X, point.Y].HasTile &&
         Main.tile[point.X, point.Y].TileType == type;
@@ -143,7 +146,8 @@ public sealed class AutoWorldIndexSystem : ModSystem
     {
         if (type is TileID.Heart or TileID.LifeFruit or TileID.Hellstone or TileID.Obsidian or
             TileID.Hellforge or
-            TileID.LihzahrdAltar or
+            TileID.LihzahrdAltar or TileID.PlanteraBulb or
+            TileID.CorruptPlants or TileID.CrimsonPlants or
             TileID.DemonAltar or
             TileID.ShadowOrbs or
             TileID.Cobalt or TileID.Palladium or TileID.Mythril or TileID.Orichalcum or
@@ -153,7 +157,8 @@ public sealed class AutoWorldIndexSystem : ModSystem
 
         // Jungle/temple tiles are landmarks, not mining targets. Sampling retains complete biome
         // coverage while avoiding millions of redundant points.
-        if (type is TileID.JungleGrass or TileID.LihzahrdBrick or TileID.CorruptGrass or TileID.CrimsonGrass)
+        if (type is TileID.JungleGrass or TileID.LihzahrdBrick or TileID.CorruptGrass or
+            TileID.CrimsonGrass or TileID.HallowedGrass or TileID.Pearlstone or TileID.Pearlsand)
             return (x + y) % LandmarkStride == 0;
         return false;
     }

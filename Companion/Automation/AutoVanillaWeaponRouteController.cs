@@ -18,7 +18,7 @@ public static class AutoVanillaWeaponRouteController
             AutoWeaponRouteKind.WorldChest => AutoLootController.LootBestWorldWeaponChest(ctx),
             AutoWeaponRouteKind.EvilOrbGun => AutoEvilOrbWeaponController.AcquireFirstGun(ctx),
             AutoWeaponRouteKind.Fishing => ctx.Fishing.Fish(ctx),
-            AutoWeaponRouteKind.HuntDrops => AutoExplorationController.Explore(ctx),
+            AutoWeaponRouteKind.HuntDrops => AutoWeaponDropHuntController.Hunt(ctx),
             AutoWeaponRouteKind.None => AutoTaskResult.Succeeded,
             _ => AutoTaskResult.Faulted
         };
@@ -68,11 +68,6 @@ public static class AutoEvilOrbWeaponController
                 ? AutoTaskResult.AlternativeRequired : AutoExplorationController.Explore(ctx);
 
         int hammerSlot = AutoInventory.BestToolIndex(ctx.Me, item => item.hammer);
-        if (ctx.TaskRuntime.RecoveryLevel >= 7 && ForceExposeOrb(ctx, target))
-        {
-            ctx.TaskRuntime.RecordWorldProgress();
-            return AutoTaskResult.Running;
-        }
         Vector2 targetWorld = new(target.X * 16f + 8f, target.Y * 16f + 8f);
         bool inHammerReach = hammerSlot >= 0 && AutoActuator.IsTileInReach(ctx.Me,
             ctx.Me.inventory[hammerSlot], target.X, target.Y);
@@ -147,32 +142,6 @@ public static class AutoEvilOrbWeaponController
 
     private static bool IsGun(Item item) => item is not null && !item.IsAir &&
         item.useAmmo == AmmoID.Bullet && item.damage > 0;
-
-    /// <summary>Absolute single-player insurance after every physical route has failed. It opens
-    /// only the small ordinary-tile pocket around the retained orb, leaving the orb itself for the
-    /// real hammer action and never touching chests or other frame-important structures.</summary>
-    private static bool ForceExposeOrb(AutoContext ctx, Point target)
-    {
-        bool singlePlayerAuthority = Main.netMode == NetmodeID.SinglePlayer;
-        if (!singlePlayerAuthority || !LiveOrb(target))
-            return false;
-        bool changed = false;
-        for (int x = target.X - 4; x <= target.X + 4; x++)
-        for (int y = target.Y - 4; y <= target.Y + 4; y++)
-        {
-            if (!WorldGen.InWorld(x, y, 8) || x == target.X && y == target.Y)
-                continue;
-            Tile tile = Main.tile[x, y];
-            if (!tile.HasTile || tile.TileType == TileID.ShadowOrbs ||
-                Main.tileFrameImportant[tile.TileType])
-                continue;
-            WorldGen.KillTile(x, y, false, false, true);
-            if (Main.tile[x, y].HasTile)
-                Main.tile[x, y].ClearTile();
-            changed = true;
-        }
-        return changed;
-    }
 
     private static bool LiveOrb(Point point) => WorldGen.InWorld(point.X, point.Y, 5) &&
         Main.tile[point.X, point.Y].HasTile && Main.tile[point.X, point.Y].TileType == TileID.ShadowOrbs;

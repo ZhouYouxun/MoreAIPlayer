@@ -8,7 +8,6 @@ namespace MoreAIPlayer.Companion.Automation;
 /// pick/station chain, then crafts the head variant matching the strongest owned weapon.</summary>
 public static class AutoCampaignGearController
 {
-    private static long nextMechanicalRecoverySummonTick;
     private static readonly int[] HellstoneTiles = [TileID.Hellstone];
     private static readonly int[] HellstoneItems = [ItemID.Hellstone];
     private static readonly int[] ObsidianTiles = [TileID.Obsidian];
@@ -25,8 +24,6 @@ public static class AutoCampaignGearController
     private static readonly int[] ChlorophyteTiles = [TileID.Chlorophyte];
     private static readonly int[] ChlorophyteOre = [ItemID.ChlorophyteOre];
     private static readonly int[] ChlorophyteBars = [ItemID.ChlorophyteBar];
-
-    internal static void ResetWorldSession() => nextMechanicalRecoverySummonTick = 0;
 
     public static bool NeedsMiningUpgrade(AutoContext ctx)
     {
@@ -330,24 +327,7 @@ public static class AutoCampaignGearController
         int missingBoss = MissingMechanicalMaterialBoss(ctx.Profile);
         if (missingBoss == NPCID.None)
             return AutoTaskResult.RetryLater;
-        if (AutoCampaignController.HasLiveTarget())
-            return AutoTaskResult.Running;
-        if (Main.dayTime)
-            return AutoExplorationController.Explore(ctx);
-        if ((long)Main.GameUpdateCount < nextMechanicalRecoverySummonTick)
-            return AutoTaskResult.Running;
-        if (Main.netMode != NetmodeID.SinglePlayer)
-            return AutoTaskResult.BlockedUnsupportedWorld;
-
-        if (missingBoss == NPCID.Retinazer)
-        {
-            NPC.SpawnOnPlayer(ctx.Me.whoAmI, NPCID.Retinazer);
-            NPC.SpawnOnPlayer(ctx.Me.whoAmI, NPCID.Spazmatism);
-        }
-        else
-            NPC.SpawnOnPlayer(ctx.Me.whoAmI, missingBoss);
-        nextMechanicalRecoverySummonTick = (long)Main.GameUpdateCount + 600;
-        return AutoTaskResult.Running;
+        return AutoEncounterTriggerController.StartMechanicalRecovery(ctx, missingBoss);
     }
 
     private static int MissingMechanicalMaterialBoss(CompanionProfile profile)

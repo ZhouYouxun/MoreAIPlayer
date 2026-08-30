@@ -273,7 +273,8 @@ public sealed class AutoCompanionState
             MemoryLife = player.statLife;
             MemoryMana = player.statMana;
             MemoryWasDead = player.dead || player.statLife <= 0;
-            MemoryReviveTicks = System.Math.Max(0, reviveTicksLeft);
+            // Kept in the save schema for backward compatibility; automation revives immediately.
+            MemoryReviveTicks = 0;
         }
 
         if (runtime is null)
@@ -296,7 +297,7 @@ public sealed class AutoCompanionState
         {
             player.statLife = 0;
             player.dead = true;
-            instance.ReviveTicksLeft = System.Math.Max(0, MemoryReviveTicks);
+            instance.ReviveTicksLeft = 0;
         }
         else
         {

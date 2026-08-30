@@ -69,6 +69,11 @@ public sealed class CompanionNavigator
     /// anywhere (see its stuck-teleport policy). Idling clears it.</summary>
     public bool IsTryingToMove { get; private set; }
 
+    /// <summary>The destination currently being approached. Automation watchdogs use this as a
+    /// purpose signal: walking only counts when it produces net approach, so ten-pixel pacing can
+    /// no longer reset an idle timer forever.</summary>
+    public Vector2? CurrentGoalWorld { get; private set; }
+
     /// <summary>True while the navigator is driving a rope climb this tick. The brain must not let
     /// ordinary combat positioning fight the climb for vertical control (see doc §2.3).</summary>
     public bool IsClimbing { get; private set; }
@@ -84,8 +89,10 @@ public sealed class CompanionNavigator
         lastGoalTile = new Point(-1, -1);
         stuckTicks = 0;
         LastPathFailed = false;
+        IsTryingToMove = false;
         jumpHeldLastTick = false;
         IsClimbing = false;
+        CurrentGoalWorld = null;
         platformDropCooldown = 0;
         dropCommitmentSourceRow = -1;
         openedDoors.Clear();
@@ -155,11 +162,21 @@ public sealed class CompanionNavigator
     /// </summary>
     public void Navigate(Player me, Vector2 goalWorld) => Navigate(me, NavigationRequest.Safe(goalWorld));
 
+    /// <summary>Steers through a short safe waypoint while exposing the real final destination to
+    /// progress observers. Without this distinction, a waypoint kept eighteen tiles ahead appears
+    /// to stay at constant distance even while a long journey is succeeding.</summary>
+    public void NavigateToward(Player me, Vector2 waypointWorld, Vector2 purposeWorld)
+    {
+        Navigate(me, NavigationRequest.Safe(waypointWorld));
+        CurrentGoalWorld = purposeWorld;
+    }
+
     /// <summary>Writes movement controls onto the player to travel toward the request's goal,
     /// honouring its intent and platform-drop permission.</summary>
     public void Navigate(Player me, in NavigationRequest request)
     {
         currentRequest = request;
+        CurrentGoalWorld = request.GoalWorld;
         IsClimbing = false;
         if (platformDropCooldown > 0)
             platformDropCooldown--;
@@ -226,6 +243,7 @@ public sealed class CompanionNavigator
         jumpHeldLastTick = false;
         IsTryingToMove = false;
         IsClimbing = false;
+        CurrentGoalWorld = null;
         dropCommitmentSourceRow = -1;
     }
 

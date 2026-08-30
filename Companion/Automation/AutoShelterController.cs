@@ -202,8 +202,14 @@ public static class AutoShelterController
             Center(bench)) > 5f * 16f * 5f * 16f)
             return AutoWorldTravelController.TravelTo(ctx, Center(bench), 4f);
         bool made = AutoCraftingService.TryCraft(ctx.Instance, ctx.Profile, itemType);
-        return made ? AutoTaskResult.Running :
-            AutoCraftingService.IsAvailable ? AutoTaskResult.RetryLater : AutoTaskResult.Faulted;
+        // Succeeded deliberately falls through to the physical build operation in this same
+        // update. Crafting itself consumes no controls, so a separate "thinking" frame is noise.
+        if (!made)
+            return AutoCraftingService.IsAvailable
+                ? AutoTaskResult.RetryLater : AutoTaskResult.Faulted;
+        return AutoInventory.FindAndBindInventoryIndex(ctx.Me, ctx.Profile,
+            item => item.type == itemType) >= 0
+            ? AutoTaskResult.Succeeded : AutoTaskResult.Faulted;
     }
 
     private static bool TryClearTemplate(AutoContext ctx, Point a, ShelterLayout layout)
@@ -371,15 +377,9 @@ public static class AutoShelterController
 
     private static int FindGround(int x)
     {
-        int start = System.Math.Max(70, (int)Main.worldSurface - 180);
-        int end = System.Math.Min(Main.maxTilesY - 250, (int)Main.worldSurface + 220);
-        for (int y = start; y <= end; y++)
-        {
-            Tile tile = Main.tile[x, y];
-            if (tile.HasTile && Main.tileSolid[tile.TileType] && !Main.tileSolidTop[tile.TileType])
-                return y;
-        }
-        return Main.spawnTileY;
+        int radius = AutoWorldTopology.UsesInvertedProgression ? 360 : 400;
+        return AutoWorldTopology.FindStandingFloorRow(x,
+            AutoWorldTopology.PreferredHabitableRow, radius) ?? Main.spawnTileY;
     }
 
     private static bool AnchorUsable(Point a, ShelterLayout layout) =>
@@ -503,7 +503,8 @@ public static class AutoShelterController
         {
             Chest chest = Main.chest[i];
             if (chest is null || chest.x < a.X || chest.x >= a.X + layout.TotalWidth ||
-                chest.y < a.Y || chest.y > floor)
+                chest.y < a.Y || chest.y > floor ||
+                !AutoChestProvenanceSystem.IsAutomationOwnedChest(chest))
                 continue;
             ctx.State.Chest = new Point(chest.x, chest.y);
             break;

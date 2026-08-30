@@ -242,6 +242,7 @@ Mods: {
 					Clic gauche : invoque le compagnon automatique ; un autre clic gauche le rappelle et mémorise position, inventaire et progression
 					Clic droit : déplace la caméra sur le compagnon automatique ; recliquez pour revenir à vous
 					Il tentera d'explorer, récolter, construire, combattre et progresser de manière autonome ; une fois terminé, sa sauvegarde sera conservée et il s'arrêtera sans rejoindre le système de suivi des compagnons ordinaires
+					[c/FF4040:Avertissement : le compagnon automatique ne suit pas vos ordres. Il prend ses propres décisions et poursuit le processus ; vous pouvez le rappeler par clic gauche pour le suspendre, sans pouvoir modifier ses décisions.]
 					Il peut encore se bloquer, se tromper ou rencontrer d'autres bugs. Sauvegardez le monde d'abord. Solo uniquement.
 					'''
 			}

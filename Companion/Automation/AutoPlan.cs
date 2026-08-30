@@ -23,6 +23,7 @@ public enum AutoPlanKind : byte
 /// </summary>
 public readonly struct AutoPlan
 {
+    internal const int FoodRouteItemMarker = -1;
     public readonly AutoGoalId Goal;
 
     /// <summary>Item to craft/place (station or product), when relevant.</summary>
@@ -66,7 +67,12 @@ public readonly struct AutoPlan
                 long key = (int)Goal + 17;
                 key = key * 397 ^ ItemType;
                 key = key * 397 ^ TileType;
-                key = key * 397 ^ Amount;
+                // Amount is a live target for gathering/crafting and changes as budgets are
+                // recalculated. It is route identity only for exploration generations and weapon
+                // providers; otherwise including it wipes the same task's failure history.
+                int identityParameter = Goal is AutoGoalId.ExploreWorld or
+                    AutoGoalId.AcquireWeaponUpgrade ? Amount : 0;
+                key = key * 397 ^ identityParameter;
                 return key;
             }
         }
@@ -88,6 +94,9 @@ public readonly struct AutoPlan
     public static AutoPlan Simple(AutoGoalId goal,
         AutoPlanKind kind = AutoPlanKind.HardGate, int failureBudget = 3) =>
         new(goal, 0, 0, 0, AutoTaskResult.Running, kind, failureBudget);
+
+    public static AutoPlan FoodRoute() => new(AutoGoalId.LootChest,
+        FoodRouteItemMarker, 0, 0, AutoTaskResult.Running, AutoPlanKind.HardGate, 6);
 
     public static AutoPlan WeaponRoute(AutoWeaponRouteKind route,
         AutoPlanKind kind = AutoPlanKind.Capability, int failureBudget = 5) =>

@@ -45,20 +45,15 @@ public static class AutoRecoveryController
             return AutoTaskResult.Succeeded;
         }
 
-        // Absolute recovery insurance: only after the watchdog has exhausted several physical
-        // route variants do we use perfect world information to select an open landing cell near
-        // the saved location. This prevents an unbreakable mod tile enclosure from ending a run.
-        if (ctx.TaskRuntime.RecoveryLevel >= 7 && TryFindSafeLanding(target, out Vector2 landing))
-        {
-            ctx.Me.Center = landing;
-            ctx.Me.velocity = Vector2.Zero;
-            ctx.Me.fallStart = (int)(ctx.Me.position.Y / 16f);
-        }
+        // Perfect information may select an open approach cell, but never moves the player there.
+        // The final distance is still crossed through ordinary navigation/mining.
+        Vector2 routeTarget = ctx.TaskRuntime.RecoveryLevel >= 7 &&
+            TryFindSafeLanding(target, out Vector2 landing) ? landing : target;
 
         // Each failed route approaches from a different side/height instead of repeating the same
         // tunnel into the same enemy pack or lava pocket.
         int variant = ctx.State.StrategyVariant % 5;
-        Vector2 approach = target + variant switch
+        Vector2 approach = routeTarget + variant switch
         {
             1 => new Vector2(-12f * 16f, -8f * 16f),
             2 => new Vector2(12f * 16f, -8f * 16f),
@@ -103,14 +98,13 @@ public static class AutoRecoveryController
 
     public static AutoTaskResult RecoverRisk(AutoContext ctx)
     {
-        AutoPhoneWorldService.TryEmergencyRecall(ctx);
+        if (AutoPhoneWorldService.TryEmergencyRecall(ctx))
+            return AutoTaskResult.Running;
         Point home = ctx.State.HomeAnchor ?? new Point(Main.spawnTileX, Main.spawnTileY);
         Vector2 safe = new((home.X + 6) * 16f + 8f, (home.Y + 5) * 16f + 8f);
         AutoTaskResult travel = AutoWorldTravelController.TravelTo(ctx, safe, 6f);
         if (travel != AutoTaskResult.Succeeded)
             return travel;
-
-        ctx.Me.lifeRegen += 12;
 
         int heal = CompanionProfile.HealingPotionSlot;
         if (heal >= 0 && heal < ctx.Me.inventory.Length && !ctx.Me.inventory[heal].IsAir &&

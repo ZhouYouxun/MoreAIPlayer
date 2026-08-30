@@ -11,7 +11,8 @@ namespace MoreAIPlayer.Companion.Automation;
 /// <see cref="CompanionBrain"/> until retirement; like the ordinary brain, it only writes simulated
 /// inputs, while vanilla still performs movement physics, item animation and rendering.
 ///
-/// Death/revive timing is automation-specific (1s / 5s during a boss). Beyond that, each tick it
+/// Death handling is automation-specific: a lethal hit is real and recorded, then the body is
+/// restored immediately with no respawn wait. Beyond that, each tick it
 /// refreshes a capability snapshot, asks the parallel portfolio for the most valuable live route,
 /// and runs the matching controller through the shared navigator/actuator. Equivalent chest,
 /// fishing, crafting, mining and combat results retire redundant routes automatically; the body
@@ -19,11 +20,6 @@ namespace MoreAIPlayer.Companion.Automation;
 /// </summary>
 public sealed class AutoCompanionBrain
 {
-    // Automation-only revive delays (design §1.4). These must not touch the ordinary companion's
-    // NormalReviveTicks/BossReviveTicks constants.
-    private const int NormalReviveTicks = 60;  // 1s
-    private const int BossReviveTicks = 300;   // 5s while a boss is on the field
-
     private readonly CompanionNavigator navigator = new();
     private readonly AutoActuator actuator = new();
     private readonly AutoCapabilities capabilities = new();
@@ -31,6 +27,7 @@ public sealed class AutoCompanionBrain
     private readonly AutoEscapeController escape = new();
     private readonly AutoSelfRescueController selfRescue = new();
     private readonly AutoBackgroundController background = new();
+    private readonly AutoExpeditionFieldcraftController fieldcraft = new();
     private readonly AutoTaskRuntime taskRuntime = new();
     private readonly AutoWatchdog watchdog;
     private AutoContext context;
@@ -48,6 +45,20 @@ public sealed class AutoCompanionBrain
     }
 
     public AutoTaskRuntime TaskRuntime => taskRuntime;
+
+    /// <summary>Called by the live loadout UI after the observer actually inserts, removes or
+    /// transfers an item. The next automation tick must trust the edited inventory over its old
+    /// retained goal.</summary>
+    public void NotifyExternalInventoryEdit()
+    {
+        taskRuntime.NotifyExternalInventoryEdit();
+        selfRescue.NotifyExternalInventoryEdit(context?.Me?.Center ?? Vector2.Zero);
+        fieldcraft.NotifyExternalInventoryEdit();
+        navigator.Reset();
+    }
+
+    public bool TryBuildVerticalAccess(Vector2 destination) =>
+        context is not null && fieldcraft.TryBuildVerticalAccess(context, destination);
 
     public void Update(CompanionInstance instance, Player owner, CompanionProfile profile)
     {
@@ -146,6 +157,14 @@ public sealed class AutoCompanionBrain
             selfRescue.ObserveAndRecover(ctx,
                 AutoPlan.Simple(AutoGoalId.FightBoss, AutoPlanKind.Support),
                 AutoTaskResult.Running);
+            CapturePersistentMemory(profile.AutoState, instance);
+            return;
+        }
+
+        // Lighting is for the observing player, not the perfect-information planner. It is a
+        // bounded one-tick maintenance action and never becomes a progression gate.
+        if (fieldcraft.TryMaintainUndergroundLighting(ctx))
+        {
             CapturePersistentMemory(profile.AutoState, instance);
             return;
         }
@@ -268,6 +287,7 @@ public sealed class AutoCompanionBrain
         context.Capabilities = capabilities;
         context.TaskRuntime = taskRuntime;
         context.Fishing = fishing;
+        context.Fieldcraft = fieldcraft;
         return context;
     }
 
@@ -315,7 +335,9 @@ public sealed class AutoCompanionBrain
             case AutoGoalId.DepositSurplus:
                 return AutoStorageController.DepositSurplus(ctx);
             case AutoGoalId.LootChest:
-                return AutoLootController.LootBestNearbyChest(ctx);
+                return plan.ItemType == AutoPlan.FoodRouteItemMarker
+                    ? AutoWorldSurvivalController.AcquireFood(ctx)
+                    : AutoLootController.LootBestNearbyChest(ctx);
             case AutoGoalId.ExploreWorld:
                 return AutoExplorationController.Explore(ctx);
             case AutoGoalId.FishOpportunity:
@@ -436,69 +458,56 @@ public sealed class AutoCompanionBrain
     }
 
     /// <summary>
-    /// The automation companion is hard to kill but not invincible. When it dies it stays down for
-    /// 1s (5s during a boss fight, measured at the moment of death) and then revives at a safe spot
-    /// that does not depend on the owner. Returns true while still dead so the rest of the brain
-    /// sits out those ticks. Death drops no items and clears no tasks.
+    /// The automation companion is damageable and can genuinely reach zero life, but it has no
+    /// respawn wait. A lethal state is recorded exactly once, then it revives at its own safe spot
+    /// and resumes the decision loop in this same update. Death drops no items and clears no tasks.
     /// </summary>
     private bool HandleDeathAndRevive(CompanionInstance instance, Player me, CompanionProfile profile)
     {
         AutoCompanionState state = profile.AutoState;
         bool down = me.dead || me.statLife <= 0;
-        if (!down && instance.ReviveTicksLeft <= 0)
-            return false;
-
-        if (instance.ReviveTicksLeft <= 0)
+        if (!down)
         {
-            bool bossFight = CompanionBrain.IsBossFightActive();
-            instance.ReviveTicksLeft = bossFight ? BossReviveTicks : NormalReviveTicks;
-            if (state is not null)
-            {
-                if (float.IsFinite(me.Center.X) && float.IsFinite(me.Center.Y))
-                {
-                    state.HasDeathReturnTarget = true;
-                    state.DeathReturnTarget = me.Center;
-                    state.DeathReturnAttempts++;
-                }
-                state.StrategyVariant++;
-                if (bossFight)
-                {
-                    state.StageFailureCount++;
-                    state.BossFailureCount++;
-                    taskRuntime.BossFailureCount = state.BossFailureCount;
-                    state.ArenaCompleted = false;
-                }
-                AutoProgressReporter.ReportRecovery(profile, "AutomationDeathRecorded", profile.Name);
-            }
-            CompanionEntitySystem.ResetCompanionDamageState(instance);
-        }
-
-        instance.ReviveTicksLeft--;
-        if (instance.ReviveTicksLeft <= 0)
-        {
+            // Migrate an older save which still carried a delayed-revive counter.
             instance.ReviveTicksLeft = 0;
-            me.dead = false;
-            me.respawnTimer = 0;
-            me.statLife = System.Math.Max(100, me.statLifeMax);
-            instance.PersistentLife = me.statLife;
-            instance.PersistentLifeInitialized = true;
-            instance.LastSharedLifeMax = me.statLifeMax;
-            instance.AutoHealCooldownTicks = 0;
-            instance.AutoManaCooldownTicks = 0;
-            CompanionEntitySystem.ResetCompanionDamageState(instance);
-            CompanionBrain.ResetCorpseGibs(me);
-            ReviveAtSafeSpot(me, state);
-            return true; // revived this tick; resume normally next tick
+            return false;
         }
 
-        // Hold the corpse down and keep vanilla from respawning it before the timer ends.
-        me.dead = true;
-        me.statLife = 0;
-        instance.PersistentLife = 0;
+        bool bossFight = CompanionBrain.IsBossFightActive();
+        instance.ReviveTicksLeft = 0;
+        if (state is not null)
+        {
+            if (float.IsFinite(me.Center.X) && float.IsFinite(me.Center.Y))
+            {
+                state.HasDeathReturnTarget = true;
+                state.DeathReturnTarget = me.Center;
+                state.DeathReturnAttempts++;
+            }
+            state.StrategyVariant++;
+            if (bossFight)
+            {
+                state.StageFailureCount++;
+                state.BossFailureCount++;
+                taskRuntime.BossFailureCount = state.BossFailureCount;
+                state.ArenaCompleted = false;
+            }
+            AutoProgressReporter.ReportRecovery(profile, "AutomationDeathRecorded", profile.Name);
+        }
+
+        int restoredLife = System.Math.Max(100,
+            instance.AutoMaxLife > 0 ? instance.AutoMaxLife : me.statLifeMax2);
+        me.dead = false;
+        me.respawnTimer = 0;
+        me.statLife = restoredLife;
+        instance.PersistentLife = restoredLife;
         instance.PersistentLifeInitialized = true;
-        me.velocity = Vector2.Zero;
-        me.respawnTimer = instance.ReviveTicksLeft + 60;
-        return true;
+        instance.LastSharedLifeMax = restoredLife;
+        instance.AutoHealCooldownTicks = 0;
+        instance.AutoManaCooldownTicks = 0;
+        CompanionEntitySystem.ResetCompanionDamageState(instance);
+        CompanionBrain.ResetCorpseGibs(me);
+        ReviveAtSafeSpot(me, state);
+        return false;
     }
 
     /// <summary>

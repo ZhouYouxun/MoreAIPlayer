@@ -35,6 +35,17 @@ public static class AutoCombatPreparationController
         return false;
     }
 
+    public static int OwnedBuffStackCount(CompanionProfile profile)
+    {
+        int total = 0;
+        foreach (Item[] items in new[] { profile.Hotbar, profile.Backpack })
+        foreach (Item item in items)
+            if (item is not null && !item.IsAir && item.consumable && item.buffType > 0 &&
+                item.buffTime > 0)
+                total += item.stack;
+        return total;
+    }
+
     private static bool TryUseBuff(AutoContext ctx, int buffType)
     {
         if (ctx.Me.HasBuff(buffType))

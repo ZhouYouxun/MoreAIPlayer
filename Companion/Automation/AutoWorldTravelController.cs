@@ -24,6 +24,8 @@ public static class AutoWorldTravelController
 
         Vector2 delta = destination - me.Center;
         Vector2 direction = delta.SafeNormalize(Vector2.UnitX * me.direction);
+        if (ctx.Fieldcraft.TryBuildVerticalAccess(ctx, destination))
+            return AutoTaskResult.Running;
         if (TryMineImmediateCorridor(ctx, direction))
             return AutoTaskResult.Running;
 
@@ -42,7 +44,7 @@ public static class AutoWorldTravelController
             ctx.Instance.AimWorld = me.Center + new Vector2(direction.X * 10f * 16f, -8f * 16f);
             me.controlHook = true;
         }
-        ctx.Navigator.Navigate(me, waypoint);
+        ctx.Navigator.NavigateToward(me, waypoint, destination);
         return AutoTaskResult.Running;
     }
 

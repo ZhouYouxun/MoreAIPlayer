@@ -16,6 +16,10 @@ namespace MoreAIPlayer.Companion.Automation;
 /// </summary>
 public static class AutoWorldKnowledge
 {
+    private const int MaximumRootSpreadEachSide = 2;
+    private const int MinimumMainTrunkRun = 3;
+    private const int MaximumMeasuredTrunkRun = 32;
+
     /// <summary>Ore tiles a pre-hardmode pickaxe should legally target for the early metal chain.
     /// Evil ores, meteorite and hellstone are deliberately excluded — they gate on pick power and
     /// bosses handled in later phases.</summary>
@@ -25,10 +29,10 @@ public static class AutoWorldKnowledge
         TileID.Silver, TileID.Tungsten, TileID.Gold, TileID.Platinum
     ];
 
-    /// <summary>Finds the nearest actual tree base, never the nearest branch/canopy tile. A base is
-    /// an axe tile resting directly on solid ground. Locking this coordinate makes one ordinary axe
-    /// hit fell the whole vanilla tree instead of shaving off whichever irregular branch happened
-    /// to be closest to the player's tile-reach area.</summary>
+    /// <summary>Finds the nearest actual main-trunk root, never the nearest side root, branch or
+    /// canopy tile. Terraria trees may have two or three grounded tiles at their lowest row; only
+    /// the member which continues vertically into a real trunk is eligible. Distance ranks whole
+    /// trees only after that structural resolution, so a nearby decorative root cannot win.</summary>
     public static Point? FindNearestTreeBase(Vector2 center, int radius,
         Func<Point, bool> accept = null)
     {
@@ -40,6 +44,49 @@ public static class AutoWorldKnowledge
         if (!WorldGen.InWorld(point.X, point.Y, 4))
             return false;
         return IsTreeBase(point.X, point.Y, Main.tile[point.X, point.Y]);
+    }
+
+    /// <summary>Resolves any grounded member of a tree's bottom row to the one main-trunk root.
+    /// The result is based on connected bottom-row roots and same-type vertical continuity, not
+    /// which tile is closest to a player.</summary>
+    public static bool TryResolveMainTreeRoot(Point groundedMember, out Point mainRoot)
+    {
+        mainRoot = default;
+        if (!WorldGen.InWorld(groundedMember.X, groundedMember.Y, 4))
+            return false;
+        Tile member = Main.tile[groundedMember.X, groundedMember.Y];
+        if (!IsGroundedAxeTile(groundedMember.X, groundedMember.Y, member.TileType))
+            return false;
+
+        int type = member.TileType;
+        int left = groundedMember.X;
+        int right = groundedMember.X;
+        while (left > groundedMember.X - MaximumRootSpreadEachSide &&
+            IsGroundedAxeTile(left - 1, groundedMember.Y, type))
+            left--;
+        while (right < groundedMember.X + MaximumRootSpreadEachSide &&
+            IsGroundedAxeTile(right + 1, groundedMember.Y, type))
+            right++;
+
+        int bestX = -1;
+        int bestRun = 0;
+        int bestCenterDistance = int.MaxValue;
+        int doubledCenter = left + right;
+        for (int x = left; x <= right; x++)
+        {
+            int run = MeasureVerticalTrunkRun(x, groundedMember.Y, type);
+            int centerDistance = System.Math.Abs(x * 2 - doubledCenter);
+            if (run < MinimumMainTrunkRun || run < bestRun ||
+                run == bestRun && centerDistance >= bestCenterDistance)
+                continue;
+            bestRun = run;
+            bestCenterDistance = centerDistance;
+            bestX = x;
+        }
+        if (bestX < 0 || !WorldGen.CanKillTile(bestX, groundedMember.Y))
+            return false;
+        mainRoot = new Point(bestX, groundedMember.Y);
+        return true;
     }
 
     public static bool IsChoppableTreeTile(Point point)
@@ -99,13 +146,38 @@ public static class AutoWorldKnowledge
 
     private static bool IsTreeBase(int x, int y, Tile tile)
     {
-        if (!tile.HasTile || tile.IsActuated || tile.TileType >= Main.tileAxe.Length ||
-            !Main.tileAxe[tile.TileType] || !WorldGen.CanKillTile(x, y) ||
-            !WorldGen.InWorld(x, y + 1, 4))
+        if (!tile.HasTile || !TryResolveMainTreeRoot(new Point(x, y), out Point mainRoot))
+            return false;
+        return mainRoot.X == x && mainRoot.Y == y;
+    }
+
+    private static bool IsGroundedAxeTile(int x, int y, int requiredType)
+    {
+        if (!WorldGen.InWorld(x, y, 4))
+            return false;
+        Tile tile = Main.tile[x, y];
+        if (!tile.HasTile || tile.IsActuated || tile.TileType != requiredType ||
+            tile.TileType >= Main.tileAxe.Length || !Main.tileAxe[tile.TileType])
             return false;
         Tile ground = Main.tile[x, y + 1];
         return ground.HasTile && !ground.IsActuated && ground.TileType < Main.tileSolid.Length &&
             Main.tileSolid[ground.TileType] && !Main.tileSolidTop[ground.TileType];
+    }
+
+    private static int MeasureVerticalTrunkRun(int x, int baseY, int requiredType)
+    {
+        int run = 0;
+        for (int y = baseY; y >= baseY - MaximumMeasuredTrunkRun + 1; y--)
+        {
+            if (!WorldGen.InWorld(x, y, 4))
+                break;
+            Tile tile = Main.tile[x, y];
+            if (!tile.HasTile || tile.IsActuated || tile.TileType != requiredType ||
+                tile.TileType >= Main.tileAxe.Length || !Main.tileAxe[tile.TileType])
+                break;
+            run++;
+        }
+        return run;
     }
 
     /// <summary>Nearest tile of the given type within radius that can be legally broken, or null.</summary>

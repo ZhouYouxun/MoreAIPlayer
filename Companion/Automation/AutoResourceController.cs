@@ -62,6 +62,16 @@ public static class AutoResourceController
                 : AutoExplorationController.Explore(ctx);
         }
 
+        // Re-resolve the retained bottom-row member before navigation and again before every axe
+        // request. A side root from an older runtime cache, or a tree changed by the player while
+        // we approached it, must never be treated as the main trunk merely because it still exists.
+        if (!AutoWorldKnowledge.TryResolveMainTreeRoot(treeTile, out Point canonicalRoot) ||
+            canonicalRoot != treeTile)
+        {
+            ctx.TaskRuntime.RejectActiveTarget(8, 1800);
+            return AutoTaskResult.AlternativeRequired;
+        }
+
         int axe = AutoInventory.BestToolIndex(ctx.Me, item => item.axe);
         if (axe < 0)
             return AutoTaskResult.AlternativeRequired;
@@ -92,6 +102,12 @@ public static class AutoResourceController
         {
             ctx.Navigator.Navigate(ctx.Me, standing);
             return AutoTaskResult.Running;
+        }
+        if (!AutoWorldKnowledge.TryResolveMainTreeRoot(treeTile, out canonicalRoot) ||
+            canonicalRoot != treeTile)
+        {
+            ctx.TaskRuntime.RejectActiveTarget(8, 1800);
+            return AutoTaskResult.AlternativeRequired;
         }
         ctx.Navigator.Idle(ctx.Me);
         // A finishing animation is normal. Preserve the root target and resume next tick instead

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Reflection;
 using Microsoft.Xna.Framework;
+using MoreAIPlayer.Companion.Automation;
 using Terraria;
 using Terraria.DataStructures;
 using Terraria.ID;
@@ -530,6 +531,7 @@ public sealed class CompanionEntitySystem : ModSystem
             bool updated = CompanionFaultGuard.Run($"companion update #{slot}", () =>
             {
                 instance.BindProfile(owner, profile);
+                ClearUnsupportedGravityBuff(instance.Entity);
                 if (instance.IsAutoIdentity)
                 {
                     // An automation slot must fail closed. A missing state is corrupted binding
@@ -621,12 +623,23 @@ public sealed class CompanionEntitySystem : ModSystem
         int companions = 0;
         foreach (CompanionInstance instance in BySlot.Values)
         {
+            // A copied/accessory-applied Gravitation buff makes a synthetic player keep drifting
+            // upward after its movement brain has already selected a grounded route. Companions
+            // have no player-facing gravity controls, so remove this unsupported buff on both
+            // sides of the vanilla player update rather than letting it persist for a frame.
+            ClearUnsupportedGravityBuff(instance.Entity);
             if (instance.Entity.active)
                 companions++;
         }
         Main.CurrentFrameFlags.ActivePlayersCount =
             System.Math.Max(0, Main.CurrentFrameFlags.ActivePlayersCount - companions);
         RestoreHijackedLocalPlayer();
+    }
+
+    private static void ClearUnsupportedGravityBuff(Player companion)
+    {
+        if (companion is not null && companion.active && companion.HasBuff(BuffID.Gravitation))
+            companion.ClearBuff(BuffID.Gravitation);
     }
 
     private static bool previousMouseRight;
@@ -932,12 +945,16 @@ public sealed class CompanionEntitySystem : ModSystem
         if (!CompanionRuntimePolicy.IsAuthoritativeDamageSide || BySlot.Count == 0)
             return;
 
-        bool damageEnabled = MoreAIPlayerClientConfig.CompanionDamageEnabled;
+        bool configuredDamageEnabled = MoreAIPlayerClientConfig.CompanionDamageEnabled;
         foreach (CompanionInstance instance in BySlot.Values)
         {
             Player companion = instance.Entity;
             if (!companion.active)
                 continue;
+
+            // Ordinary companions retain the user-facing invulnerability option. The automation
+            // identity is always a real combatant and therefore never inherits that toggle.
+            bool damageEnabled = instance.IsAutoIdentity || configuredDamageEnabled;
 
             // ModPlayer.PostUpdate order is mod-dependent. Capture once more here, after every
             // player hook and projectile update, so a later-loaded mod's direct heal/DoT cannot
@@ -1734,6 +1751,7 @@ public sealed class CompanionEntitySystem : ModSystem
             modifiers.FinalDamage *= 0.8f;
         if (companion.beetleDefense && companion.beetleOrbs > 0)
             modifiers.FinalDamage *= 1f - 0.15f * companion.beetleOrbs;
+        AutoCompanionDamagePolicy.ApplyFinalDamageReduction(companion, ref modifiers);
         return modifiers.ToHurtInfo(sourceDamage, companion.statDefense,
             companion.DefenseEffectiveness.Value, 4.5f, companion.noKnockback);
     }

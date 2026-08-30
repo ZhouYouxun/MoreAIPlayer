@@ -41,7 +41,8 @@ public static class AutoProgressionPlanner
     public static AutoPlan Plan(AutoContext ctx)
     {
         bool needsPersonalFoundation = AutoCampaignController.NeedsPersonalFoundation(ctx);
-        if (ctx.State.CampaignStage == AutoCampaignStage.Completed && !needsPersonalFoundation)
+        if (ctx.State.CampaignStage == AutoCampaignStage.Completed &&
+            AutoCampaignController.CanCompleteAutomation(ctx))
             return AutoPlan.Idle(AutoTaskResult.Succeeded);
 
         Portfolio.Clear();
@@ -54,7 +55,7 @@ public static class AutoProgressionPlanner
         // not erase available late-world chests, resources or current campaign gates.
         if (needsPersonalFoundation)
             AddFoundationCandidates(ctx);
-        if (ctx.State.CampaignStage is not AutoCampaignStage.Foundation and not AutoCampaignStage.Completed)
+        if (ctx.State.CampaignStage is not AutoCampaignStage.Foundation)
             AddCampaignCandidates(ctx);
 
         // There is always productive frontier work. It is intentionally low utility, so any
@@ -89,6 +90,13 @@ public static class AutoProgressionPlanner
 
     private static void AddEmergencyCandidates(AutoContext ctx)
     {
+        if (AutoWorldSurvivalController.NeedsFood(ctx))
+        {
+            Portfolio.Add(AutoPlan.FoodRoute(),
+                AutoNeed.ImmediateSafety | AutoNeed.Recovery | AutoNeed.Materials, 490,
+                completionBonus: 90);
+        }
+
         if (AutoBossController.HasActiveBoss())
         {
             Portfolio.Add(AutoPlan.Simple(AutoGoalId.FightBoss, AutoPlanKind.HardGate, 5),
@@ -190,6 +198,10 @@ public static class AutoProgressionPlanner
         bool furnace = StationStanding(state.Furnace, TileID.Furnaces);
         bool anvil = StationStanding(state.Anvil, TileID.Anvils);
         bool basicLoadout = AutoGearController.HasBasicMetalLoadout(ctx.Profile);
+        bool starterArsenal = AutoStarterArsenalController.RequirementSatisfied(ctx.Profile);
+        int starterWood = AutoStarterArsenalController.MissingWoodCost(ctx.Profile) +
+            (bench ? 0 : WoodForBench);
+        int starterStone = AutoStarterArsenalController.MissingStoneCost(ctx.Profile);
 
         int woodTarget = FoundationWoodTarget(ctx, woodBudget, bench, furnace, basicLoadout);
         if (cap.Wood < woodTarget)
@@ -221,6 +233,34 @@ public static class AutoProgressionPlanner
                         System.Math.Max(woodTarget, WoodForBench), AutoPlanKind.Capability, 4),
                     AutoNeed.Materials | AutoNeed.CraftingAccess, 110,
                     completionBonus: 30);
+            }
+        }
+
+        // Merge these with the broader material routes by stable key. While the opening kit is
+        // absent, their smaller immediate targets and higher utility win; as soon as those inputs
+        // exist, one CraftGear transaction can make sword, bow and arrow batches in the same tick.
+        if (!starterArsenal)
+        {
+            if (cap.Wood < starterWood)
+            {
+                Portfolio.Add(AutoPlan.Gather(AutoGoalId.GatherWood, starterWood,
+                        AutoPlanKind.Capability, 5),
+                    AutoNeed.Materials | AutoNeed.Equipment | AutoNeed.WeaponPower, 360,
+                    completionBonus: 85);
+            }
+            if (cap.Stone < starterStone)
+            {
+                Portfolio.Add(AutoPlan.Gather(AutoGoalId.GatherStone, starterStone,
+                        AutoPlanKind.Capability, 5),
+                    AutoNeed.Materials | AutoNeed.Equipment | AutoNeed.Ammunition, 360,
+                    completionBonus: 85);
+            }
+            if (bench && cap.Wood >= starterWood && cap.Stone >= starterStone)
+            {
+                Portfolio.Add(AutoPlan.Simple(AutoGoalId.CraftGear,
+                        AutoPlanKind.Capability, 5),
+                    AutoNeed.Equipment | AutoNeed.WeaponPower | AutoNeed.Ammunition,
+                    390, completionBonus: 110);
             }
         }
 
@@ -314,6 +354,7 @@ public static class AutoProgressionPlanner
     private static void AddCampaignCandidates(AutoContext ctx)
     {
         AutoCompanionState state = ctx.State;
+        bool terminalWorldAdaptation = state.CampaignStage == AutoCampaignStage.Completed;
         AutoResourceBudget.WoodBudget woodBudget = AutoResourceBudget.Evaluate(ctx);
         int woodRefillTrigger = System.Math.Max(50, woodBudget.RawWoodTarget * 4 / 5);
         if (ctx.Capabilities.Wood < woodRefillTrigger)
@@ -349,10 +390,14 @@ public static class AutoProgressionPlanner
         }
 
         bool loadoutWork = AutoCampaignController.NeedsLoadoutWork(ctx);
-        bool preparationWindow = loadoutWork &&
-            (state.ExplorationSegments + state.StageFailureCount * 3) % 6 < 3;
         if (loadoutWork)
-            AddWeaponRoutes(ctx, preparationWindow);
+            AddWeaponRoutes(ctx);
+
+        // A completed imported world remains a rich sandbox in which this new profile must build
+        // its own durable capability. It should use chests, ore, stations and parallel providers,
+        // but must neither build a pointless boss arena nor attempt to replay a cleared campaign.
+        if (terminalWorldAdaptation)
+            return;
 
         bool undergroundArena = state.CampaignStage is AutoCampaignStage.WallOfFlesh or
             AutoCampaignStage.Plantera or AutoCampaignStage.Golem;
@@ -366,7 +411,8 @@ public static class AutoProgressionPlanner
                 AutoNeed.Materials | AutoNeed.Arena, 72);
         }
 
-        bool arenaReady = AutoArenaController.IsPrepared(state);
+        bool arenaReady = !AutoArenaController.RequiresPreparedArena(state.CampaignStage) ||
+            AutoArenaController.IsPrepared(state);
         if (!arenaReady)
         {
             Portfolio.Add(AutoPlan.Simple(AutoGoalId.PrepareArena,
@@ -374,27 +420,18 @@ public static class AutoProgressionPlanner
                 AutoNeed.Arena | AutoNeed.WorldGate, 86);
         }
 
-        bool mayAttempt = !loadoutWork || !preparationWindow;
-        if (arenaReady && mayAttempt && !needsSupplies)
+        AutoEncounterReadiness readiness = AutoEncounterReadiness.Evaluate(ctx);
+        if (readiness.ReadyExceptTiming)
         {
-            if (AutoCampaignController.RequiresNight(state.CampaignStage) && Main.dayTime)
-            {
-                Portfolio.Add(AutoPlan.Explore(System.Math.Max(0, state.StrategyVariant),
-                        AutoPlanKind.Support, 3),
-                    AutoNeed.Opportunity | AutoNeed.Exploration | AutoNeed.Materials, 72,
-                    opportunityBonus: 25);
-            }
-            else
-            {
-                Portfolio.Add(AutoPlan.Simple(AutoGoalId.SummonBoss,
-                        AutoPlanKind.HardGate, 8),
-                    AutoNeed.Encounter | AutoNeed.WorldGate, 205,
-                    completionBonus: 55);
-            }
+            Portfolio.Add(AutoPlan.Simple(AutoGoalId.SummonBoss,
+                    AutoPlanKind.HardGate, 8),
+                AutoNeed.Encounter | AutoNeed.WorldGate,
+                readiness.TimingReady ? 205 : 92,
+                completionBonus: 55);
         }
     }
 
-    private static void AddWeaponRoutes(AutoContext ctx, bool preparationWindow)
+    private static void AddWeaponRoutes(AutoContext ctx)
     {
         foreach (AutoWeaponRouteKind route in WeaponRoutes)
         {
@@ -416,10 +453,7 @@ public static class AutoProgressionPlanner
                 AutoWeaponRouteKind.Fishing => 35,
                 _ => 0
             };
-            if (preparationWindow)
-                utility += 38;
-            else
-                utility -= 36;
+            utility += 38;
 
             AutoNeed coverage = AutoNeed.WeaponPower | AutoNeed.Equipment;
             if (route is AutoWeaponRouteKind.WorldChest or AutoWeaponRouteKind.Fishing or

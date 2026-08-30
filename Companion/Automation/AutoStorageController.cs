@@ -8,7 +8,7 @@ namespace MoreAIPlayer.Companion.Automation;
 
 /// <summary>
 /// The DepositSurplus branch (design §4.4.1): when the backpack fills, the companion no longer spins
-/// on an infinite RetryLater. It adopts or builds its own chest and moves surplus raw materials into
+/// on an infinite RetryLater. It finds or builds only its own chest and moves surplus raw materials into
 /// it, protecting task-critical items (tools, weapons, accessories, ammo, a torch/light supply and a
 /// keep-stock of each crafting material). If it cannot build storage yet, it returns RetryLater and
 /// the watchdog escalates it into an honest Blocked state rather than a silent stall.
@@ -25,7 +25,7 @@ public static class AutoStorageController
 
     // Keep-stock per crafting material; only the excess above this is deposited. Junk (anything not
     // listed and not essential) has a keep of zero and is deposited in full.
-    private static int KeepThreshold(int type, AutoCompanionState state)
+    internal static int KeepThreshold(int type, AutoCompanionState state)
     {
         AutoCampaignStage stage = state?.CampaignStage ?? AutoCampaignStage.Foundation;
         return type switch
@@ -69,7 +69,7 @@ public static class AutoStorageController
         if (AutoInventory.HasBackpackSpace(ctx.Profile))
             return AutoTaskResult.Succeeded;
 
-        // 1. A usable chest: the recorded one, or one nearby to adopt.
+        // 1. A usable chest: the recorded one, or a nearby chest proven to be automation-owned.
         int chestId = ResolveChest(ctx);
         if (chestId < 0)
             return EnsureChest(ctx);
@@ -193,25 +193,23 @@ public static class AutoStorageController
         return active;
     }
 
-    /// <summary>Returns a valid chest id (recorded or freshly adopted), or -1 if none is in range.</summary>
+    /// <summary>Returns a proven automation-owned chest id, or -1 if none is in range.</summary>
     private static int ResolveChest(AutoContext ctx)
     {
         AutoCompanionState st = ctx.State;
         if (st.Chest is Point recorded)
         {
             int recordedId = Chest.FindChest(recorded.X, recorded.Y);
-            if (recordedId >= 0 && ChestHasEmptySlot(Main.chest[recordedId]))
+            if (recordedId >= 0 &&
+                AutoChestProvenanceSystem.IsAutomationOwnedChest(Main.chest[recordedId]) &&
+                ChestHasEmptySlot(Main.chest[recordedId]))
                 return recordedId;
-            st.Chest = null; // it was removed or is completely saturated
+            st.Chest = null; // removed, replaced/claimed by a player, or completely saturated
         }
 
-        // After local storage has failed repeatedly, perfect world knowledge may adopt the nearest
-        // unlocked world chest as temporary overflow. This gives a full early-game backpack a
-        // route to recovery even before it has the iron bars and free result slot needed to craft
-        // its own chest; the completed aerial house later replaces this anchor with owned storage.
-        int searchRadius = ctx.TaskRuntime.RecoveryLevel >= 4
-            ? System.Math.Max(Main.maxTilesX, Main.maxTilesY) : ChestSearchRadius;
-        int nearby = FindNearbyChestId(ctx.Me, searchRadius);
+        // Placement and state capture can land on adjacent ticks. Reacquire only a nearby chest
+        // whose placement callback proves that this automation companion created it.
+        int nearby = FindNearbyAutomationChestId(ctx.Me, ChestSearchRadius);
         if (nearby >= 0)
         {
             st.Chest = new Point(Main.chest[nearby].x, Main.chest[nearby].y);
@@ -246,12 +244,23 @@ public static class AutoStorageController
             }
         }
 
-        bool crafted = AutoCraftingService.TryCraft(ctx.Instance, ctx.Profile, ItemID.Chest);
-        return crafted ? AutoTaskResult.Running :
-            AutoCraftingService.IsAvailable ? AutoTaskResult.RetryLater : AutoTaskResult.Faulted;
+        if (!AutoCraftingService.TryCraft(ctx.Instance, ctx.Profile, ItemID.Chest))
+            return AutoCraftingService.IsAvailable
+                ? AutoTaskResult.RetryLater : AutoTaskResult.Faulted;
+
+        // No fake inventory-opening or deliberation frame: the legal craft and the first physical
+        // placement/navigation request share this update.
+        chestItemIndex = AutoInventory.FindAndBindInventoryIndex(me, ctx.Profile,
+            item => item.createTile == TileID.Containers);
+        if (chestItemIndex < 0)
+            return AutoTaskResult.Faulted;
+        if (AutoWorldKnowledge.FindStationSpot(me, 2) is not Point craftedSpot)
+            return AutoTaskResult.AlternativeRequired;
+        ctx.Actuator.MoveAndPlace(ctx.Instance, me, ctx.Navigator, chestItemIndex, craftedSpot);
+        return AutoTaskResult.Running;
     }
 
-    private static int FindNearbyChestId(Player me, int radiusTiles)
+    private static int FindNearbyAutomationChestId(Player me, int radiusTiles)
     {
         Point origin = me.Center.ToTileCoordinates();
         int best = -1;
@@ -259,7 +268,9 @@ public static class AutoStorageController
         for (int i = 0; i < Main.chest.Length; i++)
         {
             Chest chest = Main.chest[i];
-            if (chest is null || Chest.IsLocked(chest.x, chest.y) || !ChestHasEmptySlot(chest))
+            if (chest is null || Chest.IsLocked(chest.x, chest.y) ||
+                !AutoChestProvenanceSystem.IsAutomationOwnedChest(chest) ||
+                !ChestHasEmptySlot(chest))
                 continue;
             int distance = Math.Abs(chest.x - origin.X) + Math.Abs(chest.y - origin.Y);
             if (distance <= radiusTiles && distance < bestDistance)
@@ -288,7 +299,8 @@ public static class AutoStorageController
         if (ctx.State.Chest is not Point recorded)
             return false;
         int chestId = Chest.FindChest(recorded.X, recorded.Y);
-        if (chestId < 0 || Main.chest[chestId] is not Chest chest)
+        if (chestId < 0 || Main.chest[chestId] is not Chest chest ||
+            !AutoChestProvenanceSystem.IsAutomationOwnedChest(chest))
             return false;
         Vector2 center = new(chest.x * 16f + 16f, chest.y * 16f + 16f);
         if (Vector2.DistanceSquared(ctx.Me.Center, center) > 4f * 16f * 4f * 16f)

@@ -32,8 +32,8 @@ public enum AutoSelfRescueAction : byte
 ///
 /// A detected incident escalates through four bounded remedies: mine the immediate body/corridor,
 /// reject the bad target and change route, physically return to a verified checkpoint, then use a
-/// safe single-player checkpoint recall if even the return route fails. Real task/world progress
-/// resets the ladder; exhausting the forced-recall rung defers the failed route before starting a
+/// legally owned recall item if even the return route fails. Real task/world progress resets the
+/// ladder; exhausting the recall rung defers the failed route before starting a
 /// fresh ladder, so the same route cannot immediately send it back into the same loop.
 /// </summary>
 public sealed class AutoSelfRescueController
@@ -41,7 +41,7 @@ public sealed class AutoSelfRescueController
     private const int SampleIntervalTicks = 15;
     private const int MaximumSamples = 32;                 // rolling eight-second trace
     private const int MaximumMeaninglessIdleTicks = 60;    // absolute one-second ceiling
-    private const float MeaninglessIdleMovementPixels = 10f;
+    private const float PurposeApproachPixels = 10f;
     private const int EmbeddedTriggerTicks = 45;
     private const int BaseStationaryTriggerTicks = 210;    // 3.5s
     private const int BaseOscillationTriggerTicks = 330;   // 5.5s
@@ -59,8 +59,12 @@ public sealed class AutoSelfRescueController
     private int embeddedTicks;
     private int cooldownTicks;
     private int recoveryLevel;
-    private Vector2 meaninglessIdleAnchor;
     private int meaninglessIdleTicks;
+    private float bestPurposeDistance = float.MaxValue;
+    private Point? observedWorkTile;
+    private int observedWorkDamage;
+    private int observedCombatNpc = -1;
+    private int observedCombatLife;
 
     private bool recoveryPending;
     private int pendingLevel;
@@ -72,6 +76,22 @@ public sealed class AutoSelfRescueController
     private float bestReturnDistanceSquared = float.MaxValue;
     private int returnTicks;
     private int returnTicksWithoutApproach;
+
+    /// <summary>A live backpack edit changes the facts the previous failed route was based on.
+    /// Cancel a queued/ongoing route recovery so it cannot delay the next inventory-driven plan;
+    /// a genuinely unresolved physical obstruction will be detected again from the fresh trace.</summary>
+    public void NotifyExternalInventoryEdit(Vector2 currentPosition)
+    {
+        recoveryPending = false;
+        returningToCheckpoint = false;
+        recoveryLevel = 0;
+        cooldownTicks = 0;
+        ticksWithoutRealProgress = 0;
+        embeddedTicks = 0;
+        observedPlanKey = 0;
+        lastSignature = 0;
+        ClearSpatialWindow(currentPosition);
+    }
 
     /// <summary>Runs a previously scheduled remedy before ordinary task controllers can overwrite
     /// its inputs. Returns true when self-rescue owns this tick.</summary>
@@ -171,9 +191,10 @@ public sealed class AutoSelfRescueController
         // task/world fact, no real tile action, no live fight and no cast bobber. Switching between
         // plans cannot reset it. At exactly one second the bad route is deferred and exploration is
         // started in this same frame, so there is no extra recovery frame spent standing still.
-        if (MovedSinceMeaninglessIdleAnchor(ctx.Me.Center) || IsMeaningfulStationaryWork(ctx, plan))
+        if (PurposefullyApproached(ctx) || HasAdvancedPhysicalWork(ctx) ||
+            HasAdvancedCombat(ctx) ||
+            IsLegitimatePassiveWork(ctx, plan))
         {
-            meaninglessIdleAnchor = ctx.Me.Center;
             meaninglessIdleTicks = 0;
         }
         else if (++meaninglessIdleTicks >= MaximumMeaninglessIdleTicks)
@@ -247,32 +268,103 @@ public sealed class AutoSelfRescueController
         ClearSpatialWindow(ctx.Me.Center);
     }
 
-    private bool MovedSinceMeaninglessIdleAnchor(Vector2 position) =>
-        Vector2.DistanceSquared(position, meaninglessIdleAnchor) >=
-        MeaninglessIdleMovementPixels * MeaninglessIdleMovementPixels;
-
-    private static bool IsMeaningfulStationaryWork(AutoContext ctx, AutoPlan plan)
+    private bool PurposefullyApproached(AutoContext ctx)
     {
-        if (ctx.Instance.WorkTile.HasValue &&
-            (ctx.Instance.WantsUseItem || ctx.Me.controlUseItem || ctx.Me.itemAnimation > 0))
-            return true;
+        if (!ctx.Navigator.IsTryingToMove || ctx.Navigator.CurrentGoalWorld is not Vector2 goal)
+            return false;
+
+        float distance = Vector2.Distance(ctx.Me.Center, goal);
+        if (bestPurposeDistance == float.MaxValue)
+        {
+            bestPurposeDistance = distance;
+            return false;
+        }
+        if (distance > bestPurposeDistance - PurposeApproachPixels)
+            return false;
+        bestPurposeDistance = distance;
+        return true;
+    }
+
+    /// <summary>A long mining swing is meaningful only while Terraria's own HitTile damage is
+    /// advancing. Merely waving a seed/tool at an invalid tile no longer grants an unlimited idle
+    /// exemption, while a genuinely hard block may still take more than one second to break.</summary>
+    private bool HasAdvancedPhysicalWork(AutoContext ctx)
+    {
+        if (ctx.Instance.WorkTile is not Point work ||
+            !(ctx.Instance.WantsUseItem || ctx.Me.controlUseItem || ctx.Me.itemAnimation > 0))
+        {
+            observedWorkTile = null;
+            observedWorkDamage = 0;
+            return false;
+        }
+
+        int damage = System.Math.Max(HitDamage(ctx.Me.hitTile, work, hitType: 1),
+            System.Math.Max(HitDamage(ctx.Me.hitTile, work, hitType: 2),
+                HitDamage(ctx.Me.hitReplace, work, hitType: 1)));
+        if (observedWorkTile != work)
+        {
+            observedWorkTile = work;
+            observedWorkDamage = damage;
+            return false;
+        }
+        if (damage <= observedWorkDamage)
+            return false;
+        observedWorkDamage = damage;
+        return true;
+    }
+
+    private static int HitDamage(HitTile hitTile, Point work, int hitType)
+    {
+        if (hitTile?.data is null)
+            return 0;
+        int best = 0;
+        foreach (HitTile.HitTileObject entry in hitTile.data)
+            if (entry is not null && entry.type == hitType && entry.X == work.X &&
+                entry.Y == work.Y)
+                best = System.Math.Max(best, entry.damage);
+        return best;
+    }
+
+    private bool HasAdvancedCombat(AutoContext ctx)
+    {
+        if (!(ctx.Instance.WantsUseItem || ctx.Me.controlUseItem || ctx.Me.itemAnimation > 0))
+        {
+            observedCombatNpc = -1;
+            observedCombatLife = 0;
+            return false;
+        }
+        NPC target = null;
+        float bestAimDistance = 8f * 16f * (8f * 16f);
+        foreach (NPC npc in Main.ActiveNPCs)
+        {
+            if (!npc.active || npc.friendly || npc.townNPC || npc.life <= 0 || npc.dontTakeDamage)
+                continue;
+            float aimDistance = Vector2.DistanceSquared(ctx.Instance.AimWorld, npc.Center);
+            if (aimDistance >= bestAimDistance)
+                continue;
+            bestAimDistance = aimDistance;
+            target = npc;
+        }
+        if (target is null)
+            return false;
+        if (observedCombatNpc != target.whoAmI)
+        {
+            observedCombatNpc = target.whoAmI;
+            observedCombatLife = target.life;
+            return false;
+        }
+        bool damaged = target.life < observedCombatLife;
+        observedCombatLife = target.life;
+        return damaged;
+    }
+
+    private static bool IsLegitimatePassiveWork(AutoContext ctx, AutoPlan plan)
+    {
 
         if (plan.Goal == AutoGoalId.FishOpportunity)
         {
             foreach (Projectile projectile in Main.ActiveProjectiles)
                 if (projectile.owner == ctx.Me.whoAmI && projectile.bobber)
-                    return true;
-        }
-
-        if (plan.Goal == AutoGoalId.FightBoss)
-        {
-            if (AutoCampaignController.HasLiveTarget())
-                return true;
-            float radiusSquared = 12f * 16f * (12f * 16f);
-            foreach (NPC npc in Main.ActiveNPCs)
-                if (npc.active && !npc.friendly && !npc.townNPC && npc.life > 0 &&
-                    npc.damage > 0 && !npc.dontTakeDamage &&
-                    Vector2.DistanceSquared(ctx.Me.Center, npc.Center) <= radiusSquared)
                     return true;
         }
 
@@ -329,16 +421,10 @@ public sealed class AutoSelfRescueController
     private void ForceRecall(AutoContext ctx, AutoSelfRescueReason reason, bool incrementCount)
     {
         Player me = ctx.Me;
-        Vector2 checkpoint = FindSafeCheckpoint(ctx);
-        // Synthetic automation players are single-player-only. Keep the authority guard explicit
-        // so this cannot become a client-side teleport if that policy changes later.
-        if (Main.netMode != NetmodeID.MultiplayerClient)
-        {
-            me.Center = checkpoint;
-            me.velocity = Vector2.Zero;
-            me.fallStart = (int)(me.position.Y / 16f);
-        }
+        bool usedRecall = AutoRecallController.TryUseOwnedRecall(ctx);
         ctx.Navigator.Reset();
+        if (!usedRecall)
+            AutoExplorationController.Explore(ctx);
         returningToCheckpoint = false;
         recoveryPending = false;
         recoveryLevel = 0; // the failed route is deferred; a new route gets a fresh bounded ladder
@@ -351,7 +437,9 @@ public sealed class AutoSelfRescueController
             ctx.TaskRuntime.SelfRescueCount++;
         ctx.TaskRuntime.LastSelfRescueReason = reason;
         ctx.TaskRuntime.LastSelfRescueAction = AutoSelfRescueAction.ForceRecall;
-        ctx.TaskRuntime.Log($"self-rescue force recall ({reason})");
+        ctx.TaskRuntime.Log(usedRecall
+            ? $"self-rescue used owned recall ({reason})"
+            : $"self-rescue no recall item; route deferred ({reason})");
         AutoProgressReporter.ReportSelfRescue(ctx.Profile, reason, 4,
             AutoSelfRescueAction.ForceRecall);
     }
@@ -479,8 +567,12 @@ public sealed class AutoSelfRescueController
         samples.Clear();
         samples.Enqueue(new SpatialSample(position));
         sampleCountdown = SampleIntervalTicks - 1;
-        meaninglessIdleAnchor = position;
         meaninglessIdleTicks = 0;
+        bestPurposeDistance = float.MaxValue;
+        observedWorkTile = null;
+        observedWorkDamage = 0;
+        observedCombatNpc = -1;
+        observedCombatLife = 0;
     }
 
     private static int StationaryTrigger(AutoGoalId goal) => goal switch

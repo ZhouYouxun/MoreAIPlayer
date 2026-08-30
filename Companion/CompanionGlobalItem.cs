@@ -9,6 +9,17 @@ namespace MoreAIPlayer.Companion;
 /// </summary>
 public sealed class CompanionGlobalItem : GlobalItem
 {
+    /// <summary>The automation companion keeps one real torch for cave visibility, but placing it
+    /// does not reduce the stack. Other placeables, ropes, platforms and all ordinary companions
+    /// retain vanilla consumption.</summary>
+    public override bool ConsumeItem(Item item, Player player)
+    {
+        bool torch = item.type > Terraria.ID.ItemID.None &&
+            item.type < Terraria.ID.ItemID.Sets.Torches.Length &&
+            Terraria.ID.ItemID.Sets.Torches[item.type];
+        return !torch || !CompanionEntitySystem.IsAutoCompanion(player);
+    }
+
     /// <summary>
     /// Lets a companion fire an ammo-consuming weapon with an empty inventory. Vanilla's
     /// PickAmmo already implements exactly the wanted fallback: when nothing suitable is

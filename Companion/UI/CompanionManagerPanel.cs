@@ -95,39 +95,60 @@ public static class CompanionManagerPanel
             return;
         }
 
-        List<CompanionInstance> entries = CollectEntries();
+        List<CompanionInstance> entries = CollectQuickEntries();
         if (entries.Count == 0)
         {
             lastQuickHoveredSlot = -1;
             return;
         }
-        PruneStalePreviews(entries);
+        List<CompanionInstance> ordinaryEntries = entries.FindAll(entry => !entry.IsAutoIdentity);
+        PruneStalePreviews(ordinaryEntries);
 
         const int cellSize = 54;
         const int gap = 6;
         const int top = 18;
         const int sideMargin = 24;
-        int maxColumns = System.Math.Max(1, (Main.screenWidth - sideMargin * 2 + gap) / (cellSize + gap));
-        int columns = System.Math.Min(entries.Count, maxColumns);
         Rectangle mouseRect = new((int)Main.MouseScreen.X, (int)Main.MouseScreen.Y, 2, 2);
         bool leftClick = Main.mouseLeft && Main.mouseLeftRelease;
         int hoveredSlot = -1;
-        var previewDraws = new List<(Rectangle Area, CompanionInstance Instance)>(entries.Count);
+        var previewDraws = new List<(Rectangle Area, CompanionInstance Instance)>(ordinaryEntries.Count);
 
-        for (int i = 0; i < entries.Count; i++)
+        CompanionInstance automation = entries.Find(entry => entry.IsAutoIdentity);
+        int ordinaryTop = top;
+        if (automation is not null)
+        {
+            const int automationWidth = 174;
+            const int automationHeight = 34;
+            Rectangle tab = new((Main.screenWidth - automationWidth) / 2, top,
+                automationWidth, automationHeight);
+            DrawAutomationQuickTab(tab, automation, tab.Intersects(mouseRect));
+            if (tab.Intersects(mouseRect))
+            {
+                hoveredSlot = automation.Slot;
+                ClaimQuickAccessMouse();
+                if (leftClick)
+                    OpenQuickAccess(automation.Slot);
+            }
+            ordinaryTop = tab.Bottom + gap;
+        }
+
+        int maxColumns = System.Math.Max(1, (Main.screenWidth - sideMargin * 2 + gap) / (cellSize + gap));
+        int columns = System.Math.Min(ordinaryEntries.Count, maxColumns);
+
+        for (int i = 0; i < ordinaryEntries.Count; i++)
         {
             int row = i / columns;
             int column = i % columns;
-            int entriesInRow = System.Math.Min(columns, entries.Count - row * columns);
+            int entriesInRow = System.Math.Min(columns, ordinaryEntries.Count - row * columns);
             int rowWidth = entriesInRow * cellSize + (entriesInRow - 1) * gap;
             int rowLeft = (Main.screenWidth - rowWidth) / 2;
             Rectangle cell = new(
                 rowLeft + column * (cellSize + gap),
-                top + row * (cellSize + gap),
+                ordinaryTop + row * (cellSize + gap),
                 cellSize,
                 cellSize);
 
-            CompanionInstance companion = entries[i];
+            CompanionInstance companion = ordinaryEntries[i];
             if (companion?.Entity is null || !companion.Entity.active)
                 continue;
             bool hovered = cell.Intersects(mouseRect);
@@ -151,16 +172,10 @@ public static class CompanionManagerPanel
                 continue;
 
             hoveredSlot = companion.Slot;
-            Main.blockMouse = true;
-            Main.LocalPlayer.mouseInterface = true;
+            ClaimQuickAccessMouse();
 
             if (leftClick)
-            {
-                Main.mouseLeftRelease = false;
-                Main.LocalPlayer.controlUseItem = false;
-                CompanionUISystem.Open(companion.Slot);
-                SoundEngine.PlaySound(SoundID.MenuOpen with { Volume = 0.55f, Pitch = 0.08f });
-            }
+                OpenQuickAccess(companion.Slot);
         }
 
         DrawQuickPreviews(previewDraws);
@@ -179,6 +194,48 @@ public static class CompanionManagerPanel
         if (hoveredSlot >= 0 && hoveredSlot != lastQuickHoveredSlot)
             SoundEngine.PlaySound(SoundID.MenuTick with { Volume = 0.32f, Pitch = 0.22f });
         lastQuickHoveredSlot = hoveredSlot;
+    }
+
+    private static void DrawAutomationQuickTab(Rectangle tab, CompanionInstance companion, bool hovered)
+    {
+        bool selected = CompanionUISystem.IsOpen && CompanionUISystem.TargetSlot == companion.Slot;
+        Color back = hovered ? new Color(35, 76, 94, 242) : new Color(17, 42, 55, 226);
+        Color border = selected ? new Color(100, 255, 170)
+            : hovered ? new Color(105, 225, 255)
+            : new Color(58, 150, 185);
+        DrawRect(tab, back);
+        DrawBorder(tab, border, selected ? 3 : 2);
+
+        string name = companion.Entity.name;
+        Vector2 measured = FontAssets.MouseText.Value.MeasureString(name);
+        float scale = System.Math.Min(0.76f, (tab.Width - 18f) / System.Math.Max(1f, measured.X));
+        Vector2 textPosition = new(tab.Center.X - measured.X * scale * 0.5f,
+            tab.Y + 5f - measured.Y * (0.76f - scale) * 0.1f);
+        Utils.DrawBorderString(Main.spriteBatch, name, textPosition,
+            hovered ? new Color(235, 252, 255) : new Color(195, 235, 246), scale);
+
+        int maxLife = System.Math.Max(1, companion.Entity.statLifeMax2);
+        float lifeRatio = MathHelper.Clamp(companion.Entity.statLife / (float)maxLife, 0f, 1f);
+        Rectangle lifeBack = new(tab.X + 5, tab.Bottom - 6, tab.Width - 10, 3);
+        Rectangle lifeFill = new(lifeBack.X, lifeBack.Y,
+            (int)(lifeBack.Width * lifeRatio), lifeBack.Height);
+        DrawRect(lifeBack, new Color(8, 13, 17, 235));
+        DrawRect(lifeFill,
+            Color.Lerp(new Color(220, 65, 65), new Color(75, 220, 120), lifeRatio));
+    }
+
+    private static void ClaimQuickAccessMouse()
+    {
+        Main.blockMouse = true;
+        Main.LocalPlayer.mouseInterface = true;
+    }
+
+    private static void OpenQuickAccess(int slot)
+    {
+        Main.mouseLeftRelease = false;
+        Main.LocalPlayer.controlUseItem = false;
+        CompanionUISystem.Open(slot);
+        SoundEngine.PlaySound(SoundID.MenuOpen with { Volume = 0.55f, Pitch = 0.08f });
     }
 
     /// <summary>Runs inside an interface layer (UI scale batch): draws the panel and handles clicks.
@@ -333,6 +390,25 @@ public static class CompanionManagerPanel
                 entries.Add(instance);
         }
         entries.Sort((a, b) => a.ProfileId.CompareTo(b.ProfileId));
+        return entries;
+    }
+
+    private static List<CompanionInstance> CollectQuickEntries()
+    {
+        List<CompanionInstance> entries = [];
+        foreach (CompanionInstance instance in CompanionEntitySystem.All)
+        {
+            if (instance is not null && instance.OwnerWhoAmI == Main.myPlayer &&
+                instance.Entity is not null && instance.Entity.active)
+                entries.Add(instance);
+        }
+        // The one automation identity owns the dedicated thin tab; ordinary companions keep
+        // their stable profile order below it.
+        entries.Sort((a, b) =>
+        {
+            int automationOrder = b.IsAutoIdentity.CompareTo(a.IsAutoIdentity);
+            return automationOrder != 0 ? automationOrder : a.ProfileId.CompareTo(b.ProfileId);
+        });
         return entries;
     }
 

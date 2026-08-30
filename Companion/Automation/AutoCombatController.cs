@@ -12,7 +12,6 @@ namespace MoreAIPlayer.Companion.Automation;
 public static class AutoCombatController
 {
     private const float SearchTiles = 55f;
-    private const float AttackTiles = 7f;
 
     public static AutoTaskResult GatherGel(AutoContext ctx)
     {
@@ -28,28 +27,18 @@ public static class AutoCombatController
         if (potResult != AutoTaskResult.AlternativeRequired)
             return potResult;
 
+        // Deliberately hunting a slime is never the way to discover that the fresh profile owns
+        // no real combat kit. Let the high-priority starter-arsenal provider run first.
+        if (!AutoStarterArsenalController.RequirementSatisfied(ctx.Profile))
+            return AutoTaskResult.AlternativeRequired;
+
         // No usable pot remains in this area (including temporarily rejected bad targets). This is
         // the real plan B, not another scan that immediately selects the same pot again.
         NPC target = FindNearestSlime(ctx.Me.Center);
         if (target is null)
             return AutoTaskResult.AlternativeRequired;
-
-        float distance = Vector2.Distance(ctx.Me.Center, target.Center);
-        if (distance > AttackTiles * 16f)
-        {
-            ctx.Navigator.Navigate(ctx.Me, target.Center);
-            return AutoTaskResult.Running;
-        }
-
-        int weapon = BestCombatInventoryIndex(ctx, target, out _);
-        if (weapon < 0)
-            weapon = AutoInventory.BestToolIndex(ctx.Me, item => item.axe);
-        if (weapon < 0)
-            return AutoTaskResult.AlternativeRequired;
-
-        ctx.Navigator.Idle(ctx.Me);
-        ctx.Actuator.UseItemInSlot(ctx.Instance, ctx.Me, weapon, target.Center);
-        return AutoTaskResult.Running;
+        return AutoThreatController.TryEngageTarget(ctx, target)
+            ? AutoTaskResult.Running : AutoTaskResult.AlternativeRequired;
     }
 
     public static int BestCombatInventoryIndex(AutoContext ctx, NPC target,

@@ -1,5 +1,6 @@
 using System;
 using Terraria;
+using Terraria.ID;
 using Terraria.ModLoader;
 
 namespace MoreAIPlayer.Companion.Automation;
@@ -26,7 +27,7 @@ public static class AutoCraftingService
     /// <summary>
     /// Attempts to craft one batch of <paramref name="targetItemType"/> at the companion's current
     /// position. Returns true only if a real craft happened (ingredients consumed, result added to
-    /// the companion's backpack). Safe to call every so often; it is throttled by its caller.
+    /// the companion's backpack). There is no UI emulation, thinking animation or artificial wait.
     /// </summary>
     public static bool TryCraft(CompanionInstance instance, CompanionProfile profile, int targetItemType)
     {
@@ -80,14 +81,17 @@ public static class AutoCraftingService
                 Recipe.FindRecipes();
 
                 Recipe recipe = null;
+                long bestCost = long.MaxValue;
                 for (int i = 0; i < Main.numAvailableRecipes; i++)
                 {
                     Recipe candidate = Main.recipe[Main.availableRecipe[i]];
-                    if (candidate.createItem.type == targetItemType)
-                    {
-                        recipe = candidate;
-                        break;
-                    }
+                    if (candidate.createItem.type != targetItemType)
+                        continue;
+                    long cost = RecipeCost(candidate, profile);
+                    if (cost >= bestCost)
+                        continue;
+                    bestCost = cost;
+                    recipe = candidate;
                 }
                 if (recipe is null)
                     break;
@@ -114,5 +118,27 @@ public static class AutoCraftingService
             if (savedList is not null)
                 Array.Copy(savedList, Main.availableRecipe, savedNum);
         }
+    }
+
+    /// <summary>Available recipes are not equivalent. Prefer the route which preserves the live
+    /// campaign reserve and consumes common low-value inputs. A reserve penalty is deliberately
+    /// finite: if the requested product is itself the current hard requirement, crafting may still
+    /// use the only legal recipe instead of deadlocking forever.</summary>
+    private static long RecipeCost(Recipe recipe, CompanionProfile profile)
+    {
+        long cost = 0;
+        foreach (Item required in recipe.requiredItem)
+        {
+            if (required is null || required.IsAir || required.stack <= 0)
+                continue;
+            int held = AutoInventory.Count(profile, required.type);
+            int keep = AutoStorageController.KeepThreshold(required.type, profile.AutoState);
+            int reserveShortfall = System.Math.Max(0, keep - (held - required.stack));
+            cost += reserveShortfall * 1_000_000L;
+            cost += required.stack * (100L + System.Math.Max(0, required.value) / 100L);
+            cost += required.rare > ItemRarityID.White
+                ? required.stack * (long)required.rare * 10_000L : 0L;
+        }
+        return cost;
     }
 }

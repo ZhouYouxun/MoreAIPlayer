@@ -242,6 +242,7 @@ Mods: {
 					Clic sinistro: evoca il compagno automatico; un altro clic sinistro lo richiama e salva posizione, inventario e memoria dei progressi
 					Clic destro: sposta la visuale sul compagno automatico; clicca di nuovo per tornare a te
 					Proverà autonomamente a esplorare, raccogliere, costruire, combattere e avanzare nel mondo; al termine salverà i progressi e si fermerà senza entrare nel sistema di seguito dei compagni normali
+					[c/FF4040:Avviso: il compagno automatico non segue i tuoi comandi. Prende decisioni autonome e continua il processo; puoi richiamarlo con il clic sinistro per sospenderlo, ma non modificarne le decisioni.]
 					Può ancora bloccarsi, sbagliare o incontrare altri bug. Esegui prima un backup del mondo. Solo giocatore singolo.
 					'''
 			}

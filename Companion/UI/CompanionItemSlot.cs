@@ -24,6 +24,7 @@ public sealed class CompanionItemSlot : UIElement
     private readonly int emptyItemGhostType;
     private readonly int emptySilhouetteIndex;
     private readonly Func<bool> isVisible;
+    private readonly Action onChanged;
 
     /// <summary>Border colour of a slot that plays a special role, drawn permanently so the slot
     /// reads as different at a glance. The in-use highlight still wins while it is showing.</summary>
@@ -38,7 +39,7 @@ public sealed class CompanionItemSlot : UIElement
     public CompanionItemSlot(Item[] items, int index, Func<Item, bool> canAccept, string rejectionText,
         Func<bool> isHighlighted = null, Color? accentColor = null, Func<bool> isLocked = null, string lockedText = null,
         int drawContext = ItemSlot.Context.BankItem, int emptyItemGhostType = ItemID.None, int emptySilhouetteIndex = -1,
-        Func<bool> isVisible = null)
+        Func<bool> isVisible = null, Action onChanged = null)
     {
         this.items = items;
         this.index = index;
@@ -52,6 +53,7 @@ public sealed class CompanionItemSlot : UIElement
         this.emptyItemGhostType = emptyItemGhostType;
         this.emptySilhouetteIndex = emptySilhouetteIndex;
         this.isVisible = isVisible;
+        this.onChanged = onChanged;
         Width.Set(SlotSize, 0f);
         Height.Set(SlotSize, 0f);
     }
@@ -108,7 +110,19 @@ public sealed class CompanionItemSlot : UIElement
             if (locked)
                 Main.instance.MouseText(lockedText);
             else if (mayRemoveExistingItem || canAccept(Main.mouseItem))
+            {
+                Item before = items[index];
+                int beforeType = before.type;
+                int beforeStack = before.stack;
+                int beforePrefix = before.prefix;
+                bool beforeFavorite = before.favorited;
                 ItemSlot.Handle(items, ItemSlot.Context.BankItem, index);
+                Item after = items[index];
+                if (!ReferenceEquals(before, after) || beforeType != after.type ||
+                    beforeStack != after.stack || beforePrefix != after.prefix ||
+                    beforeFavorite != after.favorited)
+                    onChanged?.Invoke();
+            }
             else
                 Main.instance.MouseText(rejectionText);
         }

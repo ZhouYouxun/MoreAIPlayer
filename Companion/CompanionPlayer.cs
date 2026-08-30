@@ -537,6 +537,7 @@ public sealed class CompanionPlayer : ModPlayer
             return;
 
         ApplyExtraAccessoryEffects(profile);
+        AutoCompanionDamagePolicy.ApplyBuiltInDefense(Player);
         PrepareCompanionLifeForVanillaUpdate(instance, owner);
     }
 
@@ -660,7 +661,7 @@ public sealed class CompanionPlayer : ModPlayer
         Player.statLifeMax = sharedMaxLife;
         Player.statLifeMax2 = sharedMaxLife;
 
-        if (!MoreAIPlayerClientConfig.CompanionDamageEnabled &&
+        if (!instance.IsAutoIdentity && !MoreAIPlayerClientConfig.CompanionDamageEnabled &&
             instance.PersistentLifeInitialized && instance.PersistentLife > 0)
         {
             // This protection must run before the lethal check. Otherwise the final poison/fire
@@ -829,6 +830,15 @@ public sealed class CompanionPlayer : ModPlayer
     public override bool ImmuneTo(PlayerDeathReason damageSource, int cooldownCounter, bool dodgeable) =>
         CompanionEntitySystem.IsCompanion(Player) &&
         !CompanionEntitySystem.IsOwnedDamageEvaluation(Player);
+
+    public override void ModifyHurt(ref Player.HurtModifiers modifiers)
+    {
+        // Normal Player.Hurt reaches a synthetic player only inside the owned collision pass.
+        // Keeping the rule here lets every vanilla and third-party modifier participate before
+        // applying the automation companion's explicit final reduction.
+        if (CompanionEntitySystem.IsOwnedDamageEvaluation(Player))
+            AutoCompanionDamagePolicy.ApplyFinalDamageReduction(Player, ref modifiers);
+    }
 
     public override void OnHurt(Player.HurtInfo info)
     {

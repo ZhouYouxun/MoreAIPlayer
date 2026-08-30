@@ -126,6 +126,7 @@ public sealed class AutoTaskRuntime
     private readonly string[] transitionLog = new string[LogCapacity];
     private int logHead;
     private int logCount;
+    private long lastDiagnosticLogTick = -60;
 
     public void Reset()
     {
@@ -225,6 +226,33 @@ public sealed class AutoTaskRuntime
 
     public void RecordWorldProgress() => ProgressSerial++;
 
+    /// <summary>The observer edited this automation profile through its live backpack panel.
+    /// Inventory facts are authoritative: a newly supplied item may finish the current route,
+    /// while a removed tool or weapon may invalidate it. Drop only transient commitment/backoff
+    /// state so the very next planner pass re-evaluates every parallel route from the new loadout;
+    /// spatial target rejections remain valid world knowledge.</summary>
+    public void NotifyExternalInventoryEdit()
+    {
+        CurrentPlanKey = 0;
+        CurrentGoal = AutoGoalId.Idle;
+        CurrentStep = AutoGoalId.Idle;
+        AttemptCount = 0;
+        RecoveryLevel = 0;
+        TicksWithoutProgress = 0;
+        TicksWithoutMetricChange = 0;
+        LastProgressSignature = 0;
+        LastResult = AutoTaskResult.Running;
+        LastFailureReason = AutoBlockReason.None;
+        BlockedUntilTick = 0;
+        ClearActiveTarget();
+        deferredPlans.Clear();
+        planRecoveryLevels.Clear();
+        ResetPortfolioSwitchPressure();
+        RecordWorldProgress();
+        LastObservedProgressSerial = ProgressSerial;
+        Log("external inventory edit; replan");
+    }
+
     public void Defer(AutoPlan plan, int ticks)
     {
         if (deferredPlans.Count >= PlanDeferralCapacity && !deferredPlans.ContainsKey(plan.StableKey))
@@ -290,7 +318,7 @@ public sealed class AutoTaskRuntime
 
     /// <summary>Support detours must not erase how far the blocked parent route had already
     /// escalated. Otherwise every return from chopping/mining resets it to recovery level zero and
-    /// the level-seven insurance paths are unreachable.</summary>
+    /// the route never reaches its final rejection/deferral rung.</summary>
     public int RecoveryFor(long planKey) => planKey != 0 &&
         planRecoveryLevels.TryGetValue(planKey, out int level) ? level : 0;
 
@@ -345,10 +373,22 @@ public sealed class AutoTaskRuntime
 
     public void Log(string entry)
     {
-        transitionLog[logHead] = $"[{Main.GameUpdateCount % 100000}] {entry}";
+        long now = (long)Main.GameUpdateCount;
+        transitionLog[logHead] = $"[{now % 100000}] {entry}";
         logHead = (logHead + 1) % LogCapacity;
         if (logCount < LogCapacity)
             logCount++;
+
+        // Keep a rate-limited copy in client.log. The in-game ring is convenient after a failure,
+        // but it disappears when the world closes—the exact moment a reported pacing bug needs
+        // evidence. Transition-only callers plus this quarter-second cap avoid per-frame spam.
+        if (now - lastDiagnosticLogTick >= 15)
+        {
+            lastDiagnosticLogTick = now;
+            global::MoreAIPlayer.MoreAIPlayer.Instance?.Logger?.Debug(
+                $"Automation [{now % 100000}] {entry} at " +
+                $"({LastKnownPosition.X / 16f:0.0},{LastKnownPosition.Y / 16f:0.0})");
+        }
     }
 
     /// <summary>Most-recent-first snapshot of the transition ring log.</summary>
@@ -387,7 +427,10 @@ public sealed class AutoTaskRuntime
                 return (StationExists(ctx, plan.TileType) ? 1_000_000L : 0L) +
                     AutoInventory.Count(profile, plan.ItemType);
             case AutoGoalId.CraftGear:
-                return CountBars(profile);
+                return AutoInventory.BestPickaxe(profile).pick * 1_000_000_000L +
+                    AutoWeaponEvaluator.BestUsableScore(ctx.Me, profile) * 1_000_000L +
+                    (profile.Armor[0].defense + profile.Armor[1].defense +
+                        profile.Armor[2].defense) * 1000L + CountBars(profile);
             case AutoGoalId.CraftConsumable:
                 return AutoInventory.Count(profile, plan.ItemType);
             case AutoGoalId.BuildShelter:
@@ -395,13 +438,16 @@ public sealed class AutoTaskRuntime
             case AutoGoalId.DepositSurplus:
                 return EmptyBackpackSlots(profile);
             case AutoGoalId.LootChest:
-                return ctx.State.ReviewedChestCount * 1_000_000L + EmptyBackpackSlots(profile);
+                return plan.ItemType == AutoPlan.FoodRouteItemMarker
+                    ? AutoWorldSurvivalController.ProgressSignature(ctx)
+                    : ctx.State.ReviewedChestCount * 1_000_000L + EmptyBackpackSlots(profile);
             case AutoGoalId.ExploreWorld:
                 return ctx.State.ExplorationSegments;
             case AutoGoalId.FishOpportunity:
                 return ctx.State.FishingAttemptsThisSegment * 1_000_000L + ProgressInventoryScore(profile);
             case AutoGoalId.FightBoss:
-                return AutoBossController.RemainingBossLife();
+                return AutoBossController.RemainingBossLife() * 100_000L +
+                    AutoCombatPreparationController.OwnedBuffStackCount(profile);
             case AutoGoalId.AcquireVitalUpgrade:
                 return ctx.State.LifeCrystals * 1000L + ctx.State.LifeFruits;
             case AutoGoalId.ReturnToDeathSite:
@@ -411,7 +457,7 @@ public sealed class AutoTaskRuntime
             case AutoGoalId.AcquireExplosives:
                 return AutoExplosiveController.Count(profile);
             case AutoGoalId.SummonBoss:
-                return AutoCampaignController.HasLiveTarget() ? 1L : 0L;
+                return AutoEncounterTriggerController.ProgressSignature(ctx);
             case AutoGoalId.RiskRecovery:
                 return ctx.Me.statLife;
             case AutoGoalId.UpgradeClassLoadout:
@@ -420,9 +466,8 @@ public sealed class AutoTaskRuntime
                     AutoWeaponEvaluator.BestScore(profile) * 1000L +
                     profile.Armor[0].defense + profile.Armor[1].defense + profile.Armor[2].defense;
             case AutoGoalId.AcquireWeaponUpgrade:
-                return AutoWeaponEvaluator.BestScore(profile) * 1_000_000L +
-                    ctx.State.ReviewedChestCount * 1000L +
-                    ctx.State.ExplorationSegments + (ctx.State.FirstEvilOrbBroken ? 1_000_000_000_000L : 0L);
+                return AutoWeaponEvaluator.BestUsableScore(ctx.Me, profile) * 1_000_000L +
+                    (ctx.State.FirstEvilOrbBroken ? 1_000_000_000_000L : 0L);
             case AutoGoalId.AcquireCombatSupplies:
                 return AutoCombatSupplyController.CountAllUsefulAmmo(profile);
             case AutoGoalId.EscapeTerrain:

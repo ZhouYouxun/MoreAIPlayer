@@ -17,11 +17,19 @@ public static class AutoArenaController
 
     internal static void ResetWorldSession() => nextExplosionTick = 0;
 
+    public static bool RequiresPreparedArena(AutoCampaignStage stage) => stage is
+        AutoCampaignStage.EyeOfCthulhu or AutoCampaignStage.EvilBoss or
+        AutoCampaignStage.Skeletron or AutoCampaignStage.WallOfFlesh or
+        AutoCampaignStage.MechanicalBosses or AutoCampaignStage.Plantera or
+        AutoCampaignStage.Golem or AutoCampaignStage.MoonLord;
+
     public static bool IsPrepared(AutoCompanionState state)
     {
         if (!state.ArenaCompleted || state.ArenaAnchor is not Point anchor ||
             state.ArenaStage != state.CampaignStage)
             return false;
+        if (state.CampaignStage == AutoCampaignStage.Golem)
+            return NaturalTempleRoomViable(anchor);
         int width = Width(state);
         return Validate(anchor, width, Rows(state.CampaignStage), Underground(state.CampaignStage)) &&
             CampfiresComplete(anchor, width);
@@ -67,6 +75,8 @@ public static class AutoArenaController
             state.ArenaAnchor = null;
             state.ArenaCompleted = false;
         }
+        if (state.CampaignStage == AutoCampaignStage.Golem)
+            return AdoptNaturalTempleRoom(ctx);
         if (state.ArenaAnchor is not Point anchor || !WorldGen.InWorld(anchor.X, anchor.Y, 80))
         {
             Point? selected = SelectAnchor(ctx);
@@ -101,13 +111,16 @@ public static class AutoArenaController
                 return AutoTaskResult.Running;
         }
 
-        // Insurance runs only after the ordinary recipe has converted the conservative raw-wood
-        // budget into the exact platform count. Running it before this point consumed one raw wood
-        // per platform and could strand a half-built long bridge despite having budgeted 2:1.
-        if (ctx.TaskRuntime.RecoveryLevel >= 7 && ForcePrepareInsurance(ctx, anchor, width, rows))
+        // A site which survives every physical pick/explosive/placement recovery is a bad site,
+        // not permission to rewrite the world. Reject it and let the parallel planner choose a
+        // shifted arena on the next attempt.
+        if (ctx.TaskRuntime.RecoveryLevel >= 7)
         {
-            ctx.TaskRuntime.RecordWorldProgress();
-            return AutoTaskResult.Running;
+            state.ArenaAnchor = null;
+            state.ArenaCompleted = false;
+            state.StrategyVariant++;
+            ctx.Navigator.Reset();
+            return AutoTaskResult.AlternativeRequired;
         }
 
         Point? obstruction = FindObstruction(anchor, width, rows, Underground(state.CampaignStage));
@@ -125,6 +138,41 @@ public static class AutoArenaController
         }
 
         return AutoTaskResult.RetryLater;
+    }
+
+    /// <summary>Lihzahrd brick normally cannot be mined until after Golem. The generated altar
+    /// chamber is therefore the legal arena; requiring a pre-Golem rectangular excavation creates
+    /// a circular gate. We validate useful open space and adopt it without rewriting temple tiles.</summary>
+    private static AutoTaskResult AdoptNaturalTempleRoom(AutoContext ctx)
+    {
+        Point? altar = AutoWorldIndexSystem.FindNearest(ctx.Me.Center, [TileID.LihzahrdAltar]);
+        if (altar is not Point tile)
+            return AutoWorldIndexSystem.ScanComplete
+                ? AutoTaskResult.AlternativeRequired : AutoExplorationController.Explore(ctx);
+        Point anchor = new(tile.X, tile.Y - 5);
+        ctx.State.ArenaAnchor = anchor;
+        ctx.State.ArenaStage = AutoCampaignStage.Golem;
+        ctx.State.ArenaCompleted = NaturalTempleRoomViable(anchor);
+        if (ctx.State.ArenaCompleted)
+            return AutoTaskResult.Succeeded;
+        ctx.State.StrategyVariant++;
+        return AutoTaskResult.AlternativeRequired;
+    }
+
+    private static bool NaturalTempleRoomViable(Point anchor)
+    {
+        if (!WorldGen.InWorld(anchor.X, anchor.Y, 35))
+            return false;
+        int open = 0;
+        int total = 0;
+        for (int x = anchor.X - 26; x <= anchor.X + 26; x += 2)
+        for (int y = anchor.Y - 14; y <= anchor.Y + 12; y += 2)
+        {
+            total++;
+            if (!WorldGen.SolidTile(x, y))
+                open++;
+        }
+        return total > 0 && open * 100 / total >= 48;
     }
 
     private static AutoTaskResult Excavate(AutoContext ctx, Point anchor, Point target)
@@ -176,10 +224,15 @@ public static class AutoArenaController
                 Main.maxTilesY - 170);
         if (stage == AutoCampaignStage.Plantera)
         {
-            Point? jungle = AutoWorldIndexSystem.FindJungleLandmark(ctx.Me.Center);
+            Point? bulb = AutoWorldIndexSystem.FindNearest(ctx.Me.Center, [TileID.PlanteraBulb]);
+            Point? jungle = bulb ?? AutoWorldIndexSystem.FindJungleLandmark(ctx.Me.Center);
             if (jungle is Point j)
-                return new Point(System.Math.Clamp(j.X + shift / 3, 100, Main.maxTilesX - 100),
+            {
+                int offset = bulb.HasValue ? (ctx.State.StrategyVariant % 2 == 0 ? 42 : -42) :
+                    shift / 3;
+                return new Point(System.Math.Clamp(j.X + offset, 100, Main.maxTilesX - 100),
                     System.Math.Clamp(j.Y, (int)Main.rockLayer + 60, Main.maxTilesY - 300));
+            }
             return null;
         }
         if (stage == AutoCampaignStage.Golem)
@@ -206,15 +259,9 @@ public static class AutoArenaController
 
     private static int FindSurface(int x)
     {
-        int start = System.Math.Max(80, (int)Main.worldSurface - 180);
-        int end = System.Math.Min(Main.maxTilesY - 200, (int)Main.worldSurface + 240);
-        for (int y = start; y < end; y++)
-        {
-            Tile tile = Main.tile[x, y];
-            if (tile.HasTile && Main.tileSolid[tile.TileType] && !Main.tileSolidTop[tile.TileType])
-                return y;
-        }
-        return Main.spawnTileY;
+        int radius = AutoWorldTopology.UsesInvertedProgression ? 360 : 420;
+        return AutoWorldTopology.FindStandingFloorRow(x,
+            AutoWorldTopology.PreferredHabitableRow, radius) ?? Main.spawnTileY;
     }
 
     private static Point? FindObstruction(Point anchor, int width, int rows, bool underground)
@@ -348,81 +395,6 @@ public static class AutoArenaController
         for (int row = 0; row < rows; row++)
             if (y == anchor.Y - row * RowSpacing)
                 return true;
-        return false;
-    }
-
-    private static bool ForcePrepareInsurance(AutoContext ctx, Point anchor, int width, int rows)
-    {
-        bool singlePlayerAuthority = Main.netMode == NetmodeID.SinglePlayer;
-        if (!singlePlayerAuthority)
-            return false;
-        // Last rung only: a protected/modded tile layout defeated actual pick and explosive use.
-        // Consume the same wood budget, then force the minimum safe geometry so the campaign can
-        // continue instead of reporting a permanent unsupported world.
-        int needed = 0;
-        int half = width / 2;
-        for (int row = 0; row < rows; row++)
-        for (int x = anchor.X - half + 1; x < anchor.X + half; x++)
-            if (!IsTile(x, anchor.Y - row * RowSpacing, TileID.Platforms))
-                needed++;
-        int availablePlatforms = AutoInventory.Count(ctx.Profile, ItemID.WoodPlatform);
-        int availableWood = AutoInventory.Count(ctx.Profile, ItemID.Wood);
-        if (availablePlatforms + availableWood * 2 < needed)
-            return false;
-
-        if (Underground(ctx.State.CampaignStage))
-        {
-            int top = anchor.Y - (rows - 1) * RowSpacing - 5;
-            int bottom = anchor.Y + 3;
-            for (int y = top; y <= bottom; y++)
-            for (int x = anchor.X - half + 1; x < anchor.X + half; x++)
-            {
-                Tile tile = Main.tile[x, y];
-                if (!tile.HasTile)
-                    continue;
-                WorldGen.KillTile(x, y, false, false, true);
-                if (Main.tile[x, y].HasTile)
-                    Main.tile[x, y].ClearTile();
-            }
-        }
-
-        for (int row = 0; row < rows; row++)
-        {
-            int y = anchor.Y - row * RowSpacing;
-            for (int x = anchor.X - half + 1; x < anchor.X + half; x++)
-            {
-                if (IsTile(x, y, TileID.Platforms))
-                    continue;
-                if (!ConsumePlacementMaterial(ctx.Profile))
-                    return false;
-                if (Main.tile[x, y].HasTile)
-                    WorldGen.KillTile(x, y, false, false, true);
-                WorldGen.PlaceTile(x, y, TileID.Platforms, true, true);
-            }
-        }
-        return Validate(anchor, width, rows, false);
-    }
-
-    private static bool ConsumePlacementMaterial(CompanionProfile profile)
-    {
-        foreach (Item[] items in new[] { profile.Hotbar, profile.Backpack })
-        foreach (Item item in items)
-        {
-            if (item.type != ItemID.WoodPlatform || item.stack <= 0)
-                continue;
-            if (--item.stack <= 0)
-                item.TurnToAir();
-            return true;
-        }
-        foreach (Item[] items in new[] { profile.Hotbar, profile.Backpack })
-        foreach (Item item in items)
-        {
-            if (item.type != ItemID.Wood || item.stack <= 0)
-                continue;
-            if (--item.stack <= 0)
-                item.TurnToAir();
-            return true; // one wood crafts two platforms; consuming one is conservative
-        }
         return false;
     }
 

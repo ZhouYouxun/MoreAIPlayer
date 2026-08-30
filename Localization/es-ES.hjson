@@ -242,6 +242,7 @@ Mods: {
 					Clic izquierdo: invoca al compañero automático; otro clic izquierdo lo retira y guarda su posición, inventario y memoria de progreso
 					Clic derecho: mueve la cámara al compañero automático; otro clic derecho vuelve a ti
 					Intentará explorar, reunir, construir, luchar y avanzar por el mundo de forma independiente; al terminar guardará la partida y se detendrá sin unirse al sistema de seguimiento de compañeros normales
+					[c/FF4040:Advertencia: el compañero automático no sigue tus órdenes. Toma sus propias decisiones y continúa el proceso; puedes retirarlo con clic izquierdo para pausarlo, pero no cambiar sus decisiones.]
 					Todavía puede atascarse, equivocarse o sufrir otros errores. Haz una copia del mundo primero. Solo un jugador.
 					'''
 			}

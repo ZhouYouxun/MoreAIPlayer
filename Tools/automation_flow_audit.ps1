@@ -47,6 +47,7 @@ $campaign = Read-Raw 'Companion\Automation\AutoCampaignController.cs'
 $weaponStrategy = Read-Raw 'Companion\Automation\AutoVanillaWeaponStrategy.cs'
 $weaponRoutes = Read-Raw 'Companion\Automation\AutoVanillaWeaponRouteController.cs'
 $worldIndex = Read-Raw 'Companion\Automation\AutoWorldIndexSystem.cs'
+$worldKnowledge = Read-Raw 'Companion\Automation\AutoWorldKnowledge.cs'
 $background = Read-Raw 'Companion\Automation\AutoBackgroundController.cs'
 $selfRescue = Read-Raw 'Companion\Automation\AutoSelfRescueController.cs'
 $navigator = Read-Raw 'Companion\AI\CompanionNavigator.cs'
@@ -58,14 +59,40 @@ $book = Read-Raw 'Companion\Content\CompanionAutomationBook.cs'
 $bootstrap = Read-Raw 'Companion\Automation\AutoWorldBootstrapController.cs'
 $spawnResolver = Read-Raw 'Companion\Automation\AutoSpawnResolver.cs'
 $loot = Read-Raw 'Companion\Automation\AutoLootController.cs'
+$chestProvenance = Read-Raw 'Companion\Automation\AutoChestProvenanceSystem.cs'
 $crackDraw = Read-Raw 'Companion\Automation\AutoMiningCrackDrawSystem.cs'
 $crafting = Read-Raw 'Companion\Automation\AutoCraftingService.cs'
+$inventory = Read-Raw 'Companion\Automation\AutoInventory.cs'
+$station = Read-Raw 'Companion\Automation\AutoStationController.cs'
 $storage = Read-Raw 'Companion\Automation\AutoStorageController.cs'
 $gear = Read-Raw 'Companion\Automation\AutoGearController.cs'
 $campaignGear = Read-Raw 'Companion\Automation\AutoCampaignGearController.cs'
 $budget = Read-Raw 'Companion\Automation\AutoResourceBudget.cs'
 $shelter = Read-Raw 'Companion\Automation\AutoShelterController.cs'
 $worldSession = Read-Raw 'Companion\Automation\AutoWorldSessionSystem.cs'
+$encounterTrigger = Read-Raw 'Companion\Automation\AutoEncounterTriggerController.cs'
+$encounterReadiness = Read-Raw 'Companion\Automation\AutoEncounterReadiness.cs'
+$planSource = Read-Raw 'Companion\Automation\AutoPlan.cs'
+$boss = Read-Raw 'Companion\Automation\AutoBossController.cs'
+$topology = Read-Raw 'Companion\Automation\AutoWorldTopology.cs'
+$combatPhone = Read-Raw 'Companion\Automation\AutoCombatPhoneService.cs'
+$weaponHunt = Read-Raw 'Companion\Automation\AutoWeaponDropHuntController.cs'
+$survival = Read-Raw 'Companion\Automation\AutoWorldSurvivalController.cs'
+$recall = Read-Raw 'Companion\Automation\AutoRecallController.cs'
+$recovery = Read-Raw 'Companion\Automation\AutoRecoveryController.cs'
+$phoneWorld = Read-Raw 'Companion\Automation\AutoPhoneWorldService.cs'
+$worldTravel = Read-Raw 'Companion\Automation\AutoWorldTravelController.cs'
+$fieldcraft = Read-Raw 'Companion\Automation\AutoExpeditionFieldcraftController.cs'
+$threat = Read-Raw 'Companion\Automation\AutoThreatController.cs'
+$combat = Read-Raw 'Companion\Automation\AutoCombatController.cs'
+$starterArsenal = Read-Raw 'Companion\Automation\AutoStarterArsenalController.cs'
+$damagePolicy = Read-Raw 'Companion\Automation\AutoCompanionDamagePolicy.cs'
+$actuator = Read-Raw 'Companion\Automation\AutoActuator.cs'
+$globalItem = Read-Raw 'Companion\CompanionGlobalItem.cs'
+$managerPanel = Read-Raw 'Companion\UI\CompanionManagerPanel.cs'
+$inventoryPanel = Read-Raw 'Companion\UI\CompanionInventoryUI.cs'
+$itemSlot = Read-Raw 'Companion\UI\CompanionItemSlot.cs'
+$uiSystem = Read-Raw 'Companion\UI\CompanionUISystem.cs'
 
 $executed = @([regex]::Matches($brain, 'case\s+AutoGoalId\.(?<name>\w+)\s*:') |
     ForEach-Object { $_.Groups['name'].Value } | Sort-Object -Unique)
@@ -133,7 +160,7 @@ Require ($brain -match 'MarkAutomationCompletedForCurrentWorld\(\)[\s\S]{0,800}i
     'Moon Lord completion does not retire the live automation entity safely.'
 Require ($brain -match 'AutoWorldBootstrapController\.Reconcile\(ctx\)[\s\S]{0,900}CanCompleteAutomation\(ctx\)' -and
     $brain -notmatch 'if\s*\(NPC\.downedMoonlord\)' -and
-    $campaign -match 'NPC\.downedMoonlord\s*&&\s*!NeedsPersonalFoundation\(ctx\)') `
+    $campaign -match 'NPC\.downedMoonlord\s*&&\s*AutoEncounterReadiness\.TerminalWorldCapabilityReady\(ctx\)') `
     'An imported completed world can still dismiss a zero-start automation profile before bootstrap.'
 Require ($book -match 'profile\.EnsureAutomationRunning\(\)[\s\S]{0,900}CompanionEntitySystem\.Summon') `
     'The Automation Tome does not repair an unfinished binding before summon.'
@@ -170,6 +197,14 @@ Require ($resource -match 'TileID\.AshGrass' -and $resource -match 'TileID\.Snow
 Require ($worldIndex -match 'List<Point>\s+TreeBases' -and
     $worldIndex -match 'FindNearestTreeBase\(') `
     'Whole-world tree-root indexing is missing.'
+Require ($worldKnowledge -match 'MinimumMainTrunkRun\s*=\s*[3-9]' -and
+    $worldKnowledge -match 'TryResolveMainTreeRoot\(' -and
+    $worldKnowledge -match 'MeasureVerticalTrunkRun\(' -and
+    $worldKnowledge -match 'IsGroundedAxeTile\(' -and
+    $worldKnowledge -match 'doubledCenter\s*=\s*left\s*\+\s*right' -and
+    $resource -match 'TryResolveMainTreeRoot\(treeTile, out Point canonicalRoot\)' -and
+    ([regex]::Matches($resource, 'canonicalRoot != treeTile').Count -ge 2)) `
+    'Tree selection can regress from the grounded main-trunk center to a nearer side root.'
 Require ($resource -match 'AutoWorldIndexSystem\.FindNearestTreeBase' -and
     $resource -match 'AutoWorldIndexSystem\.ScanComplete[\s\S]{0,180}AutoExplorationController\.Explore') `
     'GatherWood cannot leave an exhausted local forest without watchdog pacing.'
@@ -203,9 +238,9 @@ Require ($planner -match 'AutoPlanPortfolio' -and
 Require ($campaign -match 'DetermineWorldStage\(' -and
     $campaign -match 'NeedsPersonalFoundation\(ctx\)' -and
     $planner -match 'if\s*\(needsPersonalFoundation\)[\s\S]{0,100}AddFoundationCandidates\(ctx\)' -and
-    $planner -match 'CampaignStage is not AutoCampaignStage\.Foundation and not AutoCampaignStage\.Completed[\s\S]{0,100}AddCampaignCandidates\(ctx\)') `
+    $planner -match 'CampaignStage is not AutoCampaignStage\.Foundation[\s\S]{0,100}AddCampaignCandidates\(ctx\)') `
     'Established-world progress and the automation player personal bootstrap are no longer parallel facts.'
-Require ($planner -match 'CampaignStage == AutoCampaignStage\.Completed\s*&&\s*!needsPersonalFoundation' -and
+Require ($planner -match 'CampaignStage == AutoCampaignStage\.Completed\s*&&[\s\S]{0,120}CanCompleteAutomation\(ctx\)' -and
     $planner -notmatch 'if\s*\(ctx\.State\.CampaignStage == AutoCampaignStage\.Completed\)\s*\r?\n\s*return AutoPlan\.Idle') `
     'A completed imported world can still suppress the personal foundation portfolio.'
 Require ($brain -match 'AutoWorldBootstrapController\.Reconcile\(ctx\)' -and
@@ -222,8 +257,8 @@ Require ($campaignGear -match 'WorldHasSeededHardmodeOre\(ctx\)' -and
     $campaignGear -match 'WorldGen\.SavedOreTiers\.Cobalt' -and
     $campaignGear -match 'ctx\.State\.AltarsBroken\s*=\s*3') `
     'An imported Hardmode world can regress into unnecessary personal altar seeding.'
-foreach ($controller in @('AutoCampaignController', 'AutoArenaController',
-    'AutoCampaignGearController', 'AutoPhoneWorldService', 'AutoResourceBudget')) {
+foreach ($controller in @('AutoCampaignController', 'AutoEncounterTriggerController',
+    'AutoArenaController', 'AutoPhoneWorldService', 'AutoResourceBudget')) {
     Require ($worldSession -match "$controller\.ResetWorldSession\(\)") `
         "Per-world transient reset is missing for '$controller'."
 }
@@ -253,8 +288,9 @@ foreach ($action in @('MineEscape', 'ChangeRoute', 'ReturnHome', 'ForceRecall'))
         "Self-rescue ladder action '$action' is missing."
 }
 Require ($selfRescue -match 'ReturnNoApproachTicks' -and
-    $selfRescue -match 'ReturnRouteFailed[\s\S]{0,300}ForceRecall') `
-    'Physical checkpoint return has no bounded forced-recall fallback.'
+    $selfRescue -match 'ReturnRouteFailed[\s\S]{0,300}ForceRecall' -and
+    $selfRescue -match 'AutoRecallController\.TryUseOwnedRecall') `
+    'Physical checkpoint return has no bounded legal-recall fallback.'
 Require ($selfRescue -match 'RejectActiveTarget' -and $selfRescue -match 'StrategyVariant\+\+' -and
     $selfRescue -match 'ExplorationDirection') `
     'Route recovery no longer rejects the bad target and changes both route and strategy.'
@@ -265,14 +301,96 @@ Require ($selfRescue -match '!planChanged && signature != lastSignature' -and
     'A portfolio switch can still reset physical deadlock detection without real progress.'
 Require ($selfRescue -match 'MaximumMeaninglessIdleTicks\s*=\s*60' -and
     $selfRescue -match 'RecoverMeaninglessIdle\(ctx, plan\)' -and
+    $selfRescue -match 'PurposefullyApproached\(ctx\)' -and
+    $selfRescue -notmatch 'MovedSinceMeaninglessIdleAnchor' -and
     $selfRescue -match 'RecoverMeaninglessIdle[\s\S]{0,500}ChangeRoute\(ctx, plan[\s\S]{0,220}AutoExplorationController\.Explore\(ctx\)') `
     'The one-second meaningless-idle breaker no longer changes route in the same frame.'
 Require ($crafting -match 'TryCraftUntil\(' -and
     $crafting -match 'MaximumCraftsPerTransaction\s*=\s*[1-9]' -and
     $crafting -match 'for \(int operation = 0; operation < MaximumCraftsPerTransaction' -and
     $crafting -match 'AutoInventory\.CanFit\(profile, result\)' -and
-    $crafting -notmatch 'controlLeft|controlRight|Navigator\.Idle') `
+    $crafting -match 'RecipeCost\(candidate, profile\)' -and
+    $crafting -match 'KeepThreshold\(required\.type, profile\.AutoState\)' -and
+    $crafting -notmatch 'controlLeft|controlRight|Navigator\.Idle|Thread\.Sleep|Task\.Delay|itemAnimation|[Cc]raft(Cooldown|Delay|Wait)') `
     'Instant batch crafting can regress into per-frame or movement-blocking work.'
+Require ($station -match 'TryCraft\(ctx\.Instance, ctx\.Profile, itemType\)[\s\S]{0,900}FindAndBindInventoryIndex[\s\S]{0,500}MoveAndPlace' -and
+    $shelter -match 'bool made = AutoCraftingService\.TryCraft[\s\S]{0,500}FindAndBindInventoryIndex[\s\S]{0,180}AutoTaskResult\.Succeeded' -and
+    $storage -match 'TryCraft\(ctx\.Instance, ctx\.Profile, ItemID\.Chest\)[\s\S]{0,900}FindAndBindInventoryIndex[\s\S]{0,500}MoveAndPlace' -and
+    $inventory -match 'FindAndBindInventoryIndex\([\s\S]{0,700}BackpackToInventoryIndex') `
+    'A newly crafted placeable can regain an artificial presentation frame before physical use.'
+
+Require ($chestProvenance -match 'PostWorldGen\(\)[\s\S]{0,400}CaptureGeneratedChests\(\)' -and
+    $chestProvenance -match 'SaveWorldData\(TagCompound tag\)' -and
+    $chestProvenance -match 'LoadWorldData\(TagCompound tag\)' -and
+    $chestProvenance -match 'No marker means this is an old/foreign save' -and
+    $chestProvenance -match 'IsWorldGeneratedChest\(Chest chest\)' -and
+    $chestProvenance -match 'IsAutomationOwnedChest\(Chest chest\)' -and
+    $chestProvenance -match 'override void PlaceInWorld' -and
+    $chestProvenance -match 'override void RightClick') `
+    'The persistent fail-closed chest provenance ledger is incomplete.'
+Require (([regex]::Matches($loot, 'AutoChestProvenanceSystem\.IsWorldGeneratedChest').Count -ge 3) -and
+    $loot -match 'Re-prove provenance immediately before moving the first item') `
+    'Chest looting is not provenance-gated at discovery, target validation and final transfer.'
+Require ($storage -match 'FindNearbyAutomationChestId' -and
+    $storage -notmatch 'FindNearbyChestId' -and
+    ([regex]::Matches($storage, 'AutoChestProvenanceSystem\.IsAutomationOwnedChest').Count -ge 3) -and
+    $bootstrap -match 'AutoChestProvenanceSystem\.IsAutomationOwnedChest' -and
+    $shelter -match 'AutoChestProvenanceSystem\.IsAutomationOwnedChest') `
+    'Player containers can still be adopted by storage, bootstrap or shelter capture.'
+
+Require ($campaign -notmatch 'SpawnOnPlayer|SpawnWOF|TriggerLunarApocalypse' -and
+    $campaignGear -notmatch 'SpawnOnPlayer|SpawnWOF|TriggerLunarApocalypse' -and
+    $encounterTrigger -notmatch 'SpawnOnPlayer|SpawnWOF|TriggerLunarApocalypse') `
+    'Campaign progression contains a direct boss/event spawn bypass.'
+Require ($boss -notmatch 'ApplyFailureInsurance|statDefense\s*\+=|immune\s*=\s*true|statLife\s*=') `
+    'Boss failure recovery can still inject defense, immunity or life.'
+Require ($arena -notmatch 'ForcePrepareInsurance|ClearTile\(' -and
+    $weaponRoutes -notmatch 'ForceExposeOrb|ClearTile\(') `
+    'Last-rung recovery can still rewrite blocked terrain instead of rejecting the route.'
+Require ($encounterReadiness -match 'ReadyToStart\s*=>\s*VitalityReady\s*&&\s*MiningAndArmourReady\s*&&\s*WeaponReady\s*&&' -and
+    $planner -match 'if\s*\(readiness\.ReadyExceptTiming\)' -and
+    $campaign -match 'if\s*\(!readiness\.TimingReady\)[\s\S]{0,100}AutoEncounterTriggerController\.Prepare\(ctx\)') `
+    'Encounter permission is no longer a strict conjunction of preparation facts.'
+Require ($encounterTrigger -match 'SuspiciousLookingEye' -and
+    $encounterTrigger -match 'BloodySpine\s*:\s*ItemID\.WormFood' -and
+    $encounterTrigger -match 'GuideVoodooDoll' -and
+    $encounterTrigger -match 'PlanteraBulb' -and
+    $encounterTrigger -match 'LihzahrdPowerCell' -and
+    $encounterTrigger -match 'CelestialSigil') `
+    'Legal vanilla encounter trigger routes are incomplete.'
+Require ($planSource -match 'identityParameter\s*=\s*Goal is AutoGoalId\.ExploreWorld or' -and
+    $planSource -match 'AutoGoalId\.AcquireWeaponUpgrade\s*\?\s*Amount\s*:\s*0') `
+    'Live gather/craft amounts can still erase stable plan recovery history.'
+Require ($runtime -notmatch 'case AutoGoalId\.AcquireWeaponUpgrade:[\s\S]{0,260}ReviewedChestCount' -and
+    $runtime -notmatch 'case AutoGoalId\.AcquireWeaponUpgrade:[\s\S]{0,260}ExplorationSegments' -and
+    $runtime -match 'case AutoGoalId\.SummonBoss:[\s\S]{0,100}AutoEncounterTriggerController\.ProgressSignature') `
+    'Task progress can still be faked by unrelated exploration/chest counters.'
+Require ($topology -match 'Main\.remixWorld\s*\|\|\s*Main\.zenithWorld' -and
+    $planner -match 'terminalWorldAdaptation' -and
+    $arena -match 'NaturalTempleRoomViable') `
+    'Inverted-world or natural Golem-room adaptation is missing.'
+Require ($combatPhone -match 'assessment\.Confidence' -and
+    $combatPhone -match 'DecisionScore\s*=') `
+    'Weapon-selection confidence no longer affects the actual comparison score.'
+Require ($worldTravel -match 'NavigateToward\(me, waypoint, destination\)' -and
+    $navigator -match 'CurrentGoalWorld\s*=\s*purposeWorld') `
+    'Long waypoint travel no longer exposes net approach to the one-second purpose detector.'
+Require ($weaponRoutes -match 'HuntDrops\s*=>\s*AutoWeaponDropHuntController\.Hunt' -and
+    $weaponHunt -match 'FindFeasibleTarget\(ctx\)' -and
+    $weaponHunt -match 'AutoThreatController\.TryEngageTarget') `
+    'The weapon-drop hunt has regressed to generic exploration without a hunted target.'
+Require ($survival -match 'Main\.dontStarveWorld' -and
+    $survival -match 'AutoLootController\.LootBestWorldItem' -and
+    $planSource -match 'FoodRouteItemMarker' -and
+    $planner -match 'AutoPlan\.FoodRoute\(\)') `
+    'Constant-world food survival has no legal parallel supply route.'
+Require ($recall -match 'UseItemInSlot' -and
+    $recall -match 'MagicMirror' -and
+    $phoneWorld -notmatch '\.Center\s*=' -and
+    $watchdog -notmatch '\.Center\s*=' -and
+    $recovery -notmatch '\.Center\s*=' -and
+    $selfRescue -notmatch '\.Center\s*=') `
+    'A recovery path can still teleport without a real recall item.'
 Require ($storage -match 'TryDropJunkWhenFull\(' -and
     $storage -match 'noGrabDelay:\s*true' -and
     $storage -match 'DroppedJunkPickupDelayTicks\s*=\s*[1-9]' -and
@@ -285,6 +403,114 @@ Require ($portfolio -match 'SwitchMargin\s*=\s*[1-9]' -and
     $portfolio -match 'CoverageScore' -and
     $portfolio -match 'PortfolioSwitchesWithoutProgress') `
     'Parallel portfolio anti-thrashing or multi-need scoring is incomplete.'
+Require ($runtime -match 'lastDiagnosticLogTick' -and
+    $runtime -match 'now - lastDiagnosticLogTick >= 15' -and
+    $runtime -match 'Logger\?\.Debug' -and
+    $runtime -match 'LastKnownPosition\.X / 16f') `
+    'Transition diagnostics are no longer preserved in client.log for live pacing reports.'
+Require ($managerPanel -match 'CollectQuickEntries\(\)' -and
+    $managerPanel -match 'DrawAutomationQuickTab\(' -and
+    $managerPanel -match 'automationWidth\s*=\s*174' -and
+    $managerPanel -match 'CompanionUISystem\.Open\(slot\)' -and
+    $managerPanel -match '!instance\.IsAutoIdentity\)\s*\r?\n\s*entries\.Add\(instance\)') `
+    'The automation identity no longer has a thin live-backpack tab separate from the ordinary manager.'
+Require ($itemSlot -match 'Action\s+onChanged' -and
+    $itemSlot -match 'beforeStack\s*!=\s*after\.stack' -and
+    $itemSlot -match 'onChanged\?\.Invoke\(\)' -and
+    $inventoryPanel -match 'NotifyInventoryEdited\(' -and
+    $inventoryPanel -match 'BackpackContentSignature\(\)\s*!=\s*before' -and
+    $inventoryPanel -match 'companion\.AutoBrain\.NotifyExternalInventoryEdit\(\)' -and
+    $runtime -match 'void\s+NotifyExternalInventoryEdit\(\)[\s\S]{0,700}CurrentPlanKey\s*=\s*0' -and
+    $runtime -match 'NotifyExternalInventoryEdit\(\)[\s\S]{0,900}deferredPlans\.Clear\(\)' -and
+    $brain -match 'NotifyExternalInventoryEdit\(\)[\s\S]{0,320}selfRescue\.NotifyExternalInventoryEdit' -and
+    $brain -match 'NotifyExternalInventoryEdit\(\)[\s\S]{0,420}fieldcraft\.NotifyExternalInventoryEdit' -and
+    $selfRescue -match 'NotifyExternalInventoryEdit\(Vector2 currentPosition\)[\s\S]{0,400}returningToCheckpoint\s*=\s*false') `
+    'Live backpack insertion/removal no longer forces immediate automation replanning.'
+Require ($uiSystem -match 'BuildStamp\s*=\s*"2026-08-30\s+#53\s+bounded-unarmed-retreat"') `
+    'The live diagnostic build stamp was not advanced with bounded unarmed retreat.'
+Require ($starterArsenal -match 'DesiredArrowStock\s*=\s*100' -and
+    $starterArsenal -match 'ItemID\.WoodenSword' -and
+    $starterArsenal -match 'ItemID\.WoodenBow' -and
+    $starterArsenal -match 'ItemID\.WoodenArrow' -and
+    $starterArsenal -match 'HasCloseRangeWeapon\(profile\).*HasBow\(profile\).*CountArrows\(profile\)' -and
+    $starterArsenal -match 'TryCraftUntil\(ctx\.Instance, ctx\.Profile' -and
+    $gear -match 'AutoStarterArsenalController\.Ensure\(ctx\)[\s\S]{0,180}starter != AutoTaskResult\.Succeeded' -and
+    $planner -match 'AutoStarterArsenalController\.MissingWoodCost' -and
+    $planner -match 'AutoStarterArsenalController\.MissingStoneCost' -and
+    $planner -match 'if \(bench && cap\.Wood >= starterWood && cap\.Stone >= starterStone\)[\s\S]{0,350}AutoGoalId\.CraftGear') `
+    'The fresh profile can regress to fighting before a close weapon, bow and real arrow reserve.'
+Require ($combat -match 'AutoStarterArsenalController\.RequirementSatisfied' -and
+    $combat -match 'AutoThreatController\.TryEngageTarget\(ctx, target\)' -and
+    $combat -notmatch 'AttackTiles' -and
+    $combat -notmatch 'BestToolIndex\(ctx\.Me, item => item\.axe\)' -and
+    $threat -match 'MeleeApproachTiles\s*=\s*2\.25f' -and
+    $threat -match 'MeleeUseTiles\s*=\s*3\.5f' -and
+    $threat -match 'else if \(distance > stopRange\)' -and
+    $threat -match 'if \(ranged \|\| distance <= useRange\)' -and
+    $threat -match 'RetreatFromThreat\(ctx, target, 6f\)' -and
+    $threat -notmatch 'ctx\.Me\.Center \+ new Vector2\(away \* 6f') `
+    'Ordinary slime combat can regress to stopping outside melee reach or using an axe fallback.'
+Require ($damagePolicy -match 'BuiltInDefense\s*=\s*10' -and
+    $damagePolicy -match 'IncomingDamageMultiplier\s*=\s*0\.8f' -and
+    $damagePolicy -match 'modifiers\.FinalDamage \*= IncomingDamageMultiplier' -and
+    $player -match 'AutoCompanionDamagePolicy\.ApplyBuiltInDefense\(Player\)' -and
+    $player -match 'override void ModifyHurt\(ref Player\.HurtModifiers modifiers\)' -and
+    $player -match '!instance\.IsAutoIdentity && !MoreAIPlayerClientConfig\.CompanionDamageEnabled' -and
+    $entitySystem -match 'instance\.IsAutoIdentity \|\| configuredDamageEnabled' -and
+    $entitySystem -match 'AutoCompanionDamagePolicy\.ApplyFinalDamageReduction\(companion, ref modifiers\)') `
+    'Automation damage can regress to invulnerability or lose its explicit 10 defense/20% reduction.'
+Require ($brain -notmatch 'private const int (NormalReviveTicks|BossReviveTicks)' -and
+    $brain -match 'instance\.ReviveTicksLeft\s*=\s*0' -and
+    $brain -match 'ReviveAtSafeSpot\(me, state\);\s*\r?\n\s*return false;' -and
+    $state -match 'MemoryReviveTicks\s*=\s*0' -and
+    $state -match 'instance\.ReviveTicksLeft\s*=\s*0') `
+    'The automation identity can regain a delayed respawn instead of same-update revival.'
+Require ($fieldcraft -match 'TryMaintainUndergroundLighting\(' -and
+    $fieldcraft -match 'HasNearbyTorch\(' -and
+    $fieldcraft -match 'LightingSuccessCooldownTicks\s*=\s*[1-9]' -and
+    $fieldcraft -match 'pendingLightingTile' -and
+    $fieldcraft -match 'ResolvePendingLighting\(' -and
+    $fieldcraft -match 'TileIsTorch\(' -and
+    $fieldcraft -match 'LightingFailureLimit\s*=\s*[1-9]' -and
+    $fieldcraft -match 'EnsureReusableTorch\(' -and
+    $brain -match 'fieldcraft\.TryMaintainUndergroundLighting\(ctx\)' -and
+    $globalItem -match 'override bool ConsumeItem\(Item item, Player player\)[\s\S]{0,300}IsAutoCompanion\(player\)') `
+    'Observer-facing underground lighting or the automation-only reusable torch rule is incomplete.'
+Require ($fieldcraft -match 'TryBuildVerticalAccess\(' -and
+    $fieldcraft -match 'IsRopeItem' -and
+    $fieldcraft -match 'ItemID\.WoodPlatform' -and
+    $fieldcraft -match 'VerticalFailureLimit\s*=\s*[1-9]' -and
+    $fieldcraft -match 'ropeFailures' -and
+    $fieldcraft -match 'platformFailures' -and
+    $fieldcraft -match 'ropeBackoffUntil' -and
+    $fieldcraft -match 'platformBackoffUntil' -and
+    $worldTravel -match 'Fieldcraft\.TryBuildVerticalAccess\(ctx, destination\)' -and
+    $actuator -match 'AutoBrain\.TryBuildVerticalAccess\(center\)') `
+    'Vertical travel no longer prefers bounded rope placement with a platform fallback.'
+Require ($threat -match 'FindApproachingOrdinaryHostile\(' -and
+    $threat -match 'PrepareWeaponEarly\(' -and
+    $threat -match 'IsHighThreat\(' -and
+    $threat -match 'CanBeStoppedByBarrier\(' -and
+    $threat -match '!target\.noTileCollide\s*&&\s*!target\.noGravity' -and
+    $threat -match 'weaponSlot\s*<\s*0\s*\|\|\s*!assessment\.AmmoReady\s*\|\|\s*!assessment\.ManaReady' -and
+    $threat -match 'TryRetreatUnarmed\(ctx, target\)' -and
+    $fieldcraft -match 'TryBuildThreatBarrier\(' -and
+    $fieldcraft -match 'BarrierFailureLimit\s*=\s*[1-9]' -and
+    $fieldcraft -match 'barrierBackoffUntil' -and
+    $fieldcraft -match 'CountSpendableBarrierBlocks\(' -and
+    $fieldcraft -match 'AutoStorageController\.KeepThreshold' -and
+    $fieldcraft -match 'RetreatFromThreat\(' -and
+    $fieldcraft -match 'retreatGoalUntil') `
+    'Approaching-threat weapon preparation or bounded high-threat barricading is incomplete.'
+Require ($fieldcraft -match 'MaximumUnarmedRetreatTicks\s*=\s*(?:[1-5]?[0-9]|60)' -and
+    $fieldcraft -match 'UnarmedPlannerGraceTicks\s*=\s*[1-9][0-9]{2,}' -and
+    $fieldcraft -match 'TryRetreatUnarmed\(' -and
+    $fieldcraft -match 'unarmedRetreatGoal' -and
+    $fieldcraft -match 'unarmedRetreatStartedTick' -and
+    $fieldcraft -match 'unarmedPlannerGraceUntil' -and
+    $fieldcraft -match 'return false;[\s\S]{0,260}ctx\.Navigator\.Navigate\(ctx\.Me, unarmedRetreatGoal\)' -and
+    $fieldcraft -notmatch 'retreatNpc != threat\.whoAmI \|\| retreatSide != side') `
+    'Unarmed threat handling can regain infinite side-flipping before the opening plan executes.'
 Require ($planner -match 'AutoWeaponRouteKind\[\]\s+WeaponRoutes' -and
     $planner -match 'IsUpgradeRouteAvailable\(ctx, route\)') `
     'Weapon acquisition alternatives are no longer maintained in parallel.'

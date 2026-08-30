@@ -242,6 +242,7 @@ Mods: {
 					Linksklick: Beschwört den automatischen Begleiter; ein weiterer Linksklick ruft ihn zurück und speichert Position, Inventar und Fortschrittsgedächtnis
 					Rechtsklick: Bewegt die Kamera zum automatischen Begleiter; erneut rechtsklicken, um zurückzukehren
 					Er versucht selbstständig zu erkunden, zu sammeln, zu bauen, zu kämpfen und die Welt voranzutreiben; danach wird der Lauf gespeichert und beendet, ohne dem normalen Begleiter-Folgesystem beizutreten
+					[c/FF4040:Warnung: Der automatische Begleiter folgt keinen Befehlen. Er trifft eigene Entscheidungen und setzt seinen Lauf fort; du kannst ihn per Linksklick zurückrufen und anhalten, aber seine Entscheidungen nicht ändern.]
 					Er kann noch stecken bleiben, Fehler machen oder andere Bugs verursachen. Erstelle vorher eine Sicherung der Welt. Nur Einzelspieler.
 					'''
 			}

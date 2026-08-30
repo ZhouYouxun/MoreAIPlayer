@@ -11,7 +11,8 @@ public enum AutoWatchdogAction : byte
     /// <summary>No progress; the watchdog has applied a recovery step (repath / relocate / go home)
     /// and the brain should relocate this tick rather than keep grinding the same action.</summary>
     Recover,
-    /// <summary>The goal is on backoff (repeated RetryLater / blocked); idle until it clears.</summary>
+    /// <summary>The goal is on backoff (repeated RetryLater / blocked); run independent background
+    /// work until it clears.</summary>
     Wait,
     /// <summary>Every recovery and alternative has failed; sit in an honest blocked state and retry
     /// periodically.</summary>
@@ -29,7 +30,7 @@ public enum AutoWatchdogAction : byte
 /// <item>Relocate so a different same-type target comes into range.</item>
 /// <item>Relocate further / note that no alternate-route provider exists for this goal yet.</item>
 /// <item>Return to the shelter/spawn checkpoint and rebuild.</item>
-/// <item>One safe checkpoint teleport for a pure non-boss navigation deadlock.</item>
+/// <item>Attempt an owned recall item, or physically advance a different world frontier.</item>
 /// <item>Enter an honest Blocked state with a reason and periodic retry — never a silent jitter.</item>
 /// </list>
 ///
@@ -282,9 +283,11 @@ public sealed class AutoWatchdog
                 return AutoWatchdogAction.Recover;
 
             case 5:
-                // One safe checkpoint teleport is allowed for a pure non-boss navigation deadlock
-                // — never across an unopened world gate, and never as routine pathing.
-                RelocateToCheckpoint(ctx);
+                // The last recoverable rung still changes route physically. Direct checkpoint
+                // relocation made a stuck synthetic player less authentic than an ordinary one.
+                RejectCurrentTarget(plan.Goal);
+                runtime.Defer(plan, DeferralTicks(plan.Kind) * 2);
+                ctx.Navigator.Reset();
                 return AutoWatchdogAction.Recover;
 
             default:
@@ -321,25 +324,6 @@ public sealed class AutoWatchdog
         runtime.BlockedUntilTick = now + BlockedRetryTicks;
         runtime.Log($"blocked: {reason}");
         return AutoWatchdogAction.Blocked;
-    }
-
-    /// <summary>Teleports the automation companion to its verified shelter, or the world spawn, as a
-    /// last-resort deadlock break. Safe destinations only; never crosses a world gate.</summary>
-    private static void RelocateToCheckpoint(AutoContext ctx)
-    {
-        Player me = ctx.Me;
-        int x = Main.spawnTileX;
-        int y = Main.spawnTileY;
-        if (ctx.State?.HomeAnchor is Point home &&
-            AutoShelterController.IsShelterComplete(home, ctx.State))
-        {
-            x = home.X + 6;
-            y = home.Y + 6;
-        }
-        me.Center = new Vector2(x * 16f + 8f, y * 16f - me.height * 0.5f - 2f);
-        me.velocity = Vector2.Zero;
-        me.fallStart = (int)(me.position.Y / 16f);
-        ctx.Navigator.Reset();
     }
 
     private static int SoftWindow(AutoGoalId goal) => goal switch

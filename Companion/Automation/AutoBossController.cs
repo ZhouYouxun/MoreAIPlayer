@@ -17,7 +17,6 @@ public static class AutoBossController
 
     public static AutoTaskResult Fight(AutoContext ctx)
     {
-        ApplyFailureInsurance(ctx);
         NPC target = FindTarget(ctx.Me.Center, ignoreDistance: false,
             AutoCampaignController.TargetNpcType(ctx.State.CampaignStage));
         if (target is null)
@@ -53,7 +52,11 @@ public static class AutoBossController
         bool projectileDanger = IncomingProjectile(ctx.Me, out int projectileAway);
         if (projectileDanger)
             away = projectileAway;
-        if (distance < PanicDistanceTiles * 16f || bossClosing && distance < preferred * 0.75f ||
+        if (TryStageMovement(ctx, target, away, projectileDanger))
+        {
+            // Stage-specific movement owns this tick; aiming/attack still runs below.
+        }
+        else if (distance < PanicDistanceTiles * 16f || bossClosing && distance < preferred * 0.75f ||
             projectileDanger)
         {
             ctx.Navigator.Navigate(ctx.Me, ctx.Me.Center + new Vector2(away * 8f * 16f, -48f));
@@ -79,7 +82,12 @@ public static class AutoBossController
                 ctx.Navigator.Navigate(ctx.Me, new Vector2(x, y));
             }
             else
-                ctx.Navigator.Idle(ctx.Me);
+            {
+                int phase = (int)(Main.GameUpdateCount / 120 % 2);
+                float flank = (phase == 0 ? -1f : 1f) * preferred;
+                ctx.Navigator.Navigate(ctx.Me,
+                    target.Center + new Vector2(flank, -4f * 16f));
+            }
         }
 
         if (ctx.Me.velocity.Y > 6f && ctx.Profile.Hook[0] is Item hook && !hook.IsAir)
@@ -95,19 +103,65 @@ public static class AutoBossController
         return AutoTaskResult.Running;
     }
 
-    private static void ApplyFailureInsurance(AutoContext ctx)
+    /// <summary>Only movement rules whose geometry is fundamentally different from generic
+    /// distance keeping live here. They remain deterministic and use ordinary navigation/input.</summary>
+    private static bool TryStageMovement(AutoContext ctx, NPC target, int away,
+        bool projectileDanger)
     {
-        int failures = ctx.State.StageFailureCount;
-        if (failures >= 4)
+        Point? arena = ctx.State.ArenaAnchor;
+        if (target.type == NPCID.WallofFlesh)
         {
-            ctx.Me.statDefense += System.Math.Min(240, (failures - 3) * 24);
-            ctx.Me.lifeRegen += System.Math.Min(20, failures - 3);
+            int advance = target.velocity.X == 0f
+                ? (target.Center.X < Main.maxTilesX * 8f ? 1 : -1)
+                : System.Math.Sign(target.velocity.X);
+            float y = arena.HasValue ? arena.Value.Y * 16f - 20f : ctx.Me.Center.Y;
+            float x = System.Math.Clamp(target.Center.X + advance * 18f * 16f,
+                80f * 16f, (Main.maxTilesX - 80f) * 16f);
+            ctx.Navigator.Navigate(ctx.Me, new Vector2(x, y));
+            if (projectileDanger || System.Math.Abs(target.Center.X - ctx.Me.Center.X) < 7f * 16f)
+                ctx.Me.controlJump = true;
+            return true;
         }
-        if (failures >= 10)
+
+        if (arena is not Point anchor)
+            return false;
+        int phase;
+        Vector2 destination;
+        switch (ctx.State.CampaignStage)
         {
-            ctx.Me.immune = true;
-            ctx.Me.immuneTime = System.Math.Max(ctx.Me.immuneTime, 2);
-            ctx.Me.statLife = System.Math.Max(ctx.Me.statLife, ctx.Me.statLifeMax2 / 2);
+            case AutoCampaignStage.Plantera:
+                phase = (int)(Main.GameUpdateCount / 105 % 4);
+                destination = new Vector2(
+                    (anchor.X + (phase is 0 or 3 ? -24 : 24)) * 16f,
+                    (anchor.Y + (phase < 2 ? -10 : 10)) * 16f);
+                ctx.Navigator.Navigate(ctx.Me, destination);
+                return true;
+            case AutoCampaignStage.Golem:
+                phase = (int)(Main.GameUpdateCount / 135 % 2);
+                destination = new Vector2((anchor.X + (phase == 0 ? -20 : 20)) * 16f,
+                    (anchor.Y - 4) * 16f);
+                ctx.Navigator.Navigate(ctx.Me, destination);
+                if (projectileDanger || target.velocity.Y > 3f)
+                    ctx.Me.controlJump = true;
+                return true;
+            case AutoCampaignStage.MoonLord:
+                phase = (int)(Main.GameUpdateCount / 210 % 2);
+                destination = new Vector2(
+                    (anchor.X + (phase == 0 ? -70 : 70)) * 16f,
+                    (anchor.Y - 12) * 16f);
+                ctx.Navigator.Navigate(ctx.Me, destination);
+                if (projectileDanger)
+                    ctx.Me.controlJump = true;
+                return true;
+            case AutoCampaignStage.MechanicalBosses when target.type is NPCID.TheDestroyer or
+                NPCID.TheDestroyerBody or NPCID.TheDestroyerTail:
+                phase = (int)(Main.GameUpdateCount / 150 % 2);
+                destination = new Vector2((anchor.X + (phase == 0 ? -42 : 42)) * 16f,
+                    (anchor.Y - 20) * 16f);
+                ctx.Navigator.Navigate(ctx.Me, destination);
+                return true;
+            default:
+                return false;
         }
     }
 

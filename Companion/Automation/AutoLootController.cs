@@ -43,9 +43,10 @@ public static class AutoLootController
         return LootBestWorldItem(ctx, item => PortableWeaponScore(item) >= minimum);
     }
 
-    public static AutoTaskResult LootBestWorldItem(AutoContext ctx, Func<Item, bool> desired)
+    public static AutoTaskResult LootBestWorldItem(AutoContext ctx, Func<Item, bool> desired,
+        AutoGoalId targetGoal = AutoGoalId.AcquireWeaponUpgrade)
     {
-        Point? target = ResolveWorldTarget(ctx, desired);
+        Point? target = ResolveWorldTarget(ctx, desired, targetGoal);
         if (target is not Point chestPoint)
             return AutoTaskResult.AlternativeRequired;
         return LootChestAt(ctx, chestPoint, desired);
@@ -57,6 +58,16 @@ public static class AutoLootController
 
         int chestIndex = Chest.FindChest(chestPoint.X, chestPoint.Y);
         if (chestIndex < 0 || Main.chest[chestIndex] is not Chest chest || Chest.IsLocked(chest.x, chest.y))
+        {
+            ctx.State.MarkChestReviewed(chestPoint);
+            ctx.TaskRuntime.ClearActiveTarget();
+            return AutoTaskResult.AlternativeRequired;
+        }
+
+        // Re-prove provenance immediately before moving the first item. A target selected on an
+        // earlier tick may have been destroyed, replaced by a player, or claimed by a human while
+        // the companion was walking toward it.
+        if (!AutoChestProvenanceSystem.IsWorldGeneratedChest(chest))
         {
             ctx.State.MarkChestReviewed(chestPoint);
             ctx.TaskRuntime.ClearActiveTarget();
@@ -112,14 +123,15 @@ public static class AutoLootController
         return found;
     }
 
-    private static Point? ResolveWorldTarget(AutoContext ctx, Func<Item, bool> desired)
+    private static Point? ResolveWorldTarget(AutoContext ctx, Func<Item, bool> desired,
+        AutoGoalId targetGoal)
     {
-        if (ctx.TaskRuntime.TryGetActiveTarget(AutoGoalId.AcquireWeaponUpgrade,
+        if (ctx.TaskRuntime.TryGetActiveTarget(targetGoal,
             p => IsWorthwhileChest(ctx, p, desired), out Point active))
             return active;
         if (!TryFindBestChest(ctx, global: true, desired, out Point found, out _))
             return null;
-        ctx.TaskRuntime.SetActiveTarget(AutoGoalId.AcquireWeaponUpgrade, found);
+        ctx.TaskRuntime.SetActiveTarget(targetGoal, found);
         return found;
     }
 
@@ -145,7 +157,8 @@ public static class AutoLootController
             int dy = point.Y - origin.Y;
             int distanceSquared = dx * dx + dy * dy;
             if (!global && distanceSquared > radiusSquared || ctx.State.WasChestReviewed(point) ||
-                ctx.State.Chest == point || Chest.IsLocked(chest.x, chest.y))
+                ctx.State.Chest == point || Chest.IsLocked(chest.x, chest.y) ||
+                !AutoChestProvenanceSystem.IsWorldGeneratedChest(chest))
                 continue;
             int utility = ChestUtility(ctx.Profile, chest, desired);
             if (!global)
@@ -168,6 +181,7 @@ public static class AutoLootController
         int index = Chest.FindChest(point.X, point.Y);
         Chest chest = index >= 0 ? Main.chest[index] : null;
         return chest is not null && !Chest.IsLocked(chest.x, chest.y) &&
+            AutoChestProvenanceSystem.IsWorldGeneratedChest(chest) &&
             ChestUtility(ctx.Profile, chest, desired) > 0;
     }
 
@@ -201,6 +215,8 @@ public static class AutoLootController
             return 80;
         if (item.type is ItemID.LifeCrystal or ItemID.ManaCrystal or ItemID.LifeFruit)
             return 120;
+        if (AutoWorldSurvivalController.IsFood(item))
+            return Main.dontStarveWorld ? 180 : 48;
         if (item.accessory || item.headSlot >= 0 || item.bodySlot >= 0 || item.legSlot >= 0 ||
             item.fishingPole > 0 || item.bait > 0 || item.ammo > 0)
             return 65;

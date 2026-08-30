@@ -68,6 +68,17 @@ public static class AutoCombatPhoneService
         try
         {
             assessment = AutoWeaponDecisionEngine.Assess(user, weapon, target, stage);
+            if (assessment.DecisionScore > 0)
+            {
+                // Unknown custom AI remains eligible, but an uncertain paper-DPS estimate must
+                // clear a slightly larger margin before replacing a proven vanilla weapon.
+                int confidenceFactor = 60 + assessment.Confidence * 2 / 5;
+                assessment = assessment with
+                {
+                    DecisionScore = System.Math.Max(1,
+                        assessment.DecisionScore * confidenceFactor / 100)
+                };
+            }
             return true;
         }
         catch (System.Exception exception)
