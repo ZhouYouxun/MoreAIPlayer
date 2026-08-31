@@ -44,6 +44,12 @@ public sealed class AutoChestProvenanceSystem : ModSystem
 
     public override void PostWorldGen()
     {
+        if (!CompanionRuntimePolicy.CanRunSyntheticPlayers)
+        {
+            Reset();
+            return;
+        }
+
         // Make the ledger usable immediately, then capture again on the first world tick (and on
         // an early save) so chests added by systems whose PostWorldGen hook runs after ours are
         // included too.
@@ -53,6 +59,16 @@ public sealed class AutoChestProvenanceSystem : ModSystem
 
     public override void PostUpdateWorld()
     {
+        // Chest interaction hooks are local-side callbacks and this ledger has deliberately not
+        // been made into multiplayer world state. Keeping a partial copy on a client or server
+        // would let a chest opened during multiplayer be misclassified when the world later
+        // returns to singleplayer. Invalidate the proof instead; unknown provenance is protected.
+        if (!CompanionRuntimePolicy.CanRunSyntheticPlayers)
+        {
+            Reset();
+            return;
+        }
+
         if (generationCapturePending)
             CaptureGeneratedChests();
         ResolvePendingPlacements();
@@ -60,6 +76,9 @@ public sealed class AutoChestProvenanceSystem : ModSystem
 
     public override void SaveWorldData(TagCompound tag)
     {
+        if (!CompanionRuntimePolicy.CanRunSyntheticPlayers)
+            Reset();
+
         if (generationCapturePending)
             CaptureGeneratedChests();
 
@@ -71,10 +90,9 @@ public sealed class AutoChestProvenanceSystem : ModSystem
 
     public override void LoadWorldData(TagCompound tag)
     {
-        NaturalChests.Clear();
-        AutomationChests.Clear();
-        PendingPlacements.Clear();
-        generationCapturePending = false;
+        Reset();
+        if (!CompanionRuntimePolicy.CanRunSyntheticPlayers)
+            return;
 
         // No marker means this is an old/foreign save. Guessing from tile style, chest name or
         // contents can misclassify player property, so unknown provenance stays protected.
@@ -89,6 +107,12 @@ public sealed class AutoChestProvenanceSystem : ModSystem
 
     public override void PostWorldLoad()
     {
+        if (!CompanionRuntimePolicy.CanRunSyntheticPlayers)
+        {
+            Reset();
+            return;
+        }
+
         RemoveStaleEntries(NaturalChests);
         RemoveStaleEntries(AutomationChests);
     }
@@ -103,7 +127,7 @@ public sealed class AutoChestProvenanceSystem : ModSystem
 
     internal static void RegisterPlacedContainer(int i, int j, bool automationOwned)
     {
-        if (Main.gameMenu)
+        if (!CompanionRuntimePolicy.CanRunSyntheticPlayers || Main.gameMenu)
             return;
         Point probe = new(i, j);
         if (TryFindContainingChest(probe, out Chest chest, out Point anchor, out int tileType))
@@ -127,6 +151,9 @@ public sealed class AutoChestProvenanceSystem : ModSystem
 
     internal static void InvalidateContainerAt(int i, int j)
     {
+        if (!CompanionRuntimePolicy.CanRunSyntheticPlayers)
+            return;
+
         Point probe = new(i, j);
         if (TryFindContainingChest(probe, out _, out Point anchor, out _))
         {
@@ -141,6 +168,9 @@ public sealed class AutoChestProvenanceSystem : ModSystem
 
     internal static void ClaimContainerAt(int i, int j)
     {
+        if (!CompanionRuntimePolicy.CanRunSyntheticPlayers)
+            return;
+
         // Once a human has opened even a naturally generated chest, it may contain their deposited
         // property. Permanently remove it from both automation access classes.
         InvalidateContainerAt(i, j);
@@ -316,7 +346,7 @@ public sealed class AutoChestProvenanceGlobalTile : GlobalTile
 {
     public override void PlaceInWorld(int i, int j, int type, Item item)
     {
-        if (!IsContainerTile(type))
+        if (!CompanionRuntimePolicy.CanRunSyntheticPlayers || !IsContainerTile(type))
             return;
         bool automationOwned = CompanionEntitySystem.IsAutoCompanion(Main.LocalPlayer);
         AutoChestProvenanceSystem.RegisterPlacedContainer(i, j, automationOwned);
@@ -325,13 +355,14 @@ public sealed class AutoChestProvenanceGlobalTile : GlobalTile
     public override void KillTile(int i, int j, int type, ref bool fail, ref bool effectOnly,
         ref bool noItem)
     {
-        if (!fail && !effectOnly && IsContainerTile(type))
+        if (CompanionRuntimePolicy.CanRunSyntheticPlayers && !fail && !effectOnly && IsContainerTile(type))
             AutoChestProvenanceSystem.InvalidateContainerAt(i, j);
     }
 
     public override void RightClick(int i, int j, int type)
     {
-        if (IsContainerTile(type) && !CompanionEntitySystem.IsAutoCompanion(Main.LocalPlayer))
+        if (CompanionRuntimePolicy.CanRunSyntheticPlayers && IsContainerTile(type) &&
+            !CompanionEntitySystem.IsAutoCompanion(Main.LocalPlayer))
             AutoChestProvenanceSystem.ClaimContainerAt(i, j);
     }
 

@@ -132,6 +132,25 @@ if ([string]::IsNullOrWhiteSpace($staffNetSend)) {
     Add-InvariantFailure -Name 'staff-net-context' -File $staffRel -Message 'NetSend reads Main.LocalPlayer.'
 }
 
+foreach ($field in @('profileId', 'staffIdentity', 'boundOwnerIdentity', 'boundOwnerName',
+        'staffNumber')) {
+    if ($staffNetSend -notmatch "writer\.Write\($field") {
+        Add-InvariantFailure -Name 'staff-net-fields' -File $staffRel -Message "NetSend does not serialize $field."
+    }
+}
+if ($staffNetSend -notmatch 'WriteSnapshot\(writer,\s*profileSnapshot\)') {
+    Add-InvariantFailure -Name 'staff-net-fields' -File $staffRel -Message 'NetSend does not serialize profileSnapshot.'
+}
+
+$staffNetReceive = (Get-MethodText -Path $staffPath -MethodName 'NetReceive') -replace '(?m)//.*$', ''
+foreach ($field in @('profileId', 'staffIdentity', 'boundOwnerIdentity', 'boundOwnerName',
+        'staffNumber', 'profileSnapshot')) {
+    if ([string]::IsNullOrWhiteSpace($staffNetReceive) -or
+        $staffNetReceive -notmatch "$field\s*=") {
+        Add-InvariantFailure -Name 'staff-net-fields' -File $staffRel -Message "NetReceive does not restore $field."
+    }
+}
+
 $staffText = Get-Content -LiteralPath $staffPath -Raw
 if ($staffText -notmatch 'MaximumNetworkSnapshotBytes\s*=\s*48\s*\*\s*1024') {
     Add-InvariantFailure -Name 'staff-packet-budget' -File $staffRel -Message 'Expected a 48 KiB compressed snapshot budget.'
@@ -158,7 +177,46 @@ foreach ($scaleConsumer in @('PlayerScaleGlobalItem.cs', 'PlayerScaleGlobalProje
     }
 }
 
-# Regression invariant 3: client UI hooks execute for multiplayer clients too; companion-only UI
+# Regression invariant 4: chest provenance is single-player proof, not synchronized world state.
+# Every lifecycle/interaction entry point must fail closed in multiplayer so a server cannot save
+# a ledger that missed client-local chest interactions and later authorize those chests in SP.
+$chestRel = 'Companion\Automation\AutoChestProvenanceSystem.cs'
+$chestPath = Join-Path $Root $chestRel
+foreach ($method in @('PostWorldGen', 'PostUpdateWorld', 'SaveWorldData', 'LoadWorldData',
+        'PostWorldLoad', 'RegisterPlacedContainer', 'InvalidateContainerAt', 'ClaimContainerAt',
+        'PlaceInWorld', 'KillTile', 'RightClick')) {
+    $methodText = Get-MethodText -Path $chestPath -MethodName $method
+    if ([string]::IsNullOrWhiteSpace($methodText) -or
+        $methodText -notmatch 'CanRunSyntheticPlayers') {
+        Add-InvariantFailure -Name 'chest-ledger-multiplayer-gate' -File $chestRel -Message "$method is not gated by CanRunSyntheticPlayers."
+    }
+}
+
+# Regression invariant 5: the whole-world automation index has no multiplayer consumer. In
+# particular, dedicated servers must not scan 30,000 tiles per tick for a disabled feature.
+$indexRel = 'Companion\Automation\AutoWorldIndexSystem.cs'
+$indexPath = Join-Path $Root $indexRel
+$indexUpdate = Get-MethodText -Path $indexPath -MethodName 'PostUpdateWorld'
+if ([string]::IsNullOrWhiteSpace($indexUpdate) -or
+    $indexUpdate -notmatch 'CanRunSyntheticPlayers') {
+    Add-InvariantFailure -Name 'world-index-multiplayer-gate' -File $indexRel -Message 'PostUpdateWorld is not gated by CanRunSyntheticPlayers.'
+}
+
+# Regression invariant 6: gameplay-relevant thrown-key state must use synchronized Projectile.ai,
+# and only the owning client may create the secondary explosion projectile.
+$thrownRel = 'TheKey\DevelopmentNoticeThrown.cs'
+$thrownPath = Join-Path $Root $thrownRel
+$thrownText = Get-Content -LiteralPath $thrownPath -Raw
+if ($thrownText -notmatch 'BounceCount\s*=>\s*\(int\)Projectile\.ai\[1\]' -or
+    $thrownText -notmatch 'Projectile\.ai\[1\]\s*=\s*BounceCount\s*\+\s*1' -or
+    $thrownText -notmatch 'Projectile\.netUpdate\s*=\s*true') {
+    Add-InvariantFailure -Name 'thrown-key-bounce-sync' -File $thrownRel -Message 'Bounce count is not carried by synchronized projectile AI state.'
+}
+if ($thrownText -notmatch 'Main\.netMode\s*==\s*NetmodeID\.SinglePlayer\s*\|\|\s*Projectile\.owner\s*==\s*Main\.myPlayer') {
+    Add-InvariantFailure -Name 'thrown-key-owner-authority' -File $thrownRel -Message 'Secondary explosions are not restricted to the owning client.'
+}
+
+# Regression invariant 7: client UI hooks execute for multiplayer clients too; companion-only UI
 # must not update or register interface layers when synthetic companions are disabled.
 $uiRel = 'Companion\UI\CompanionUISystem.cs'
 $uiPath = Join-Path $Root $uiRel

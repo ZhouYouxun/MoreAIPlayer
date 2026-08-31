@@ -31,7 +31,10 @@ public sealed class AutoWorldIndexSystem : ModSystem
 
     public override void PostUpdateWorld()
     {
-        if (Main.netMode == NetmodeID.MultiplayerClient || Main.maxTilesX <= 0 || Main.maxTilesY <= 0)
+        // This index exists only for synthetic automation players. They are disabled on both
+        // multiplayer clients and servers, so a dedicated server must not rescan its whole world
+        // every five minutes for data that no multiplayer feature can consume.
+        if (!CompanionRuntimePolicy.CanRunSyntheticPlayers || Main.maxTilesX <= 0 || Main.maxTilesY <= 0)
             return;
 
         // Hardmode conversion and plant growth add relevant tiles after world generation. A slow
