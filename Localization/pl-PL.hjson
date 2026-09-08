@@ -51,6 +51,11 @@ Mods: {
 					Tooltip: Pokazuje na czacie każdy istotny krok wykonany przez automatycznego gracza.
 				}
 
+				SilenceAllChatMessages: {
+					Label: "[i:Megaphone] Ukryj wszystkie wiadomości czatu"
+					Tooltip: Ukrywa wszystkie wiadomości na lokalnym czacie, w tym wydarzenia gry, powiadomienia modów i wiadomości graczy. Polecenia czatu nadal działają.
+				}
+
 				ShowCompanionHealthBars: {
 					Label: "[i:LifeCrystal] Pokaż dodatkowy pasek zdrowia towarzysza"
 					Tooltip: Rysuje własny pasek zdrowia tego moda. Włącz tylko, gdy domyślny pasek zdrowia nie działa.
@@ -66,6 +71,11 @@ Mods: {
 					Tooltip: Kolejny sposób na otwarcie plecaka; działa jak bezpośrednie kliknięcie jego karty.
 				}
 
+				AllowDraggingCompanionTabs: {
+					Label: "[i:HandOfCreation] Przeciąganie grupy kart towarzyszy"
+					Tooltip: Przytrzymaj i przeciągnij dowolną kartę towarzysza, aby przesunąć całą grupę. Pozycja zapisuje się po puszczeniu. Wyłączenie blokuje zapisaną pozycję; krótkie kliknięcie nadal otwiera plecak.
+				}
+
 				CompanionsFightAfterOwnerDeath: {
 					Label: "[i:EnchantedSword] Towarzysze walczą po śmierci gracza"
 					Tooltip: Gdy wyłączone, towarzysze znikają natychmiast po twojej śmierci.
@@ -74,6 +84,16 @@ Mods: {
 				CompanionsTakeDamage: {
 					Label: "[i:CobaltShield] Towarzysze otrzymują obrażenia"
 					Tooltip: Pozwala towarzyszom otrzymywać normalne obrażenia, ginąć i czekać na odrodzenie.
+				}
+
+				EnemiesIgnoreCompanions: {
+					Label: "[i:InvisibilityPotion] Niezauważani przez wrogów"
+					Tooltip: Wrogowie nie będą aktywnie wybierać towarzyszy jako celu. Nie zapewnia to nieśmiertelności: przypadkowe ataki i kontakt nadal mogą ich zranić.
+				}
+
+				CompanionsAlwaysIgnoreSpaceGravity: {
+					Label: "[i:GravityGlobe] Zawsze ignoruj niską grawitację kosmiczną"
+					Tooltip: Towarzysze ignorują niską grawitację kosmiczną na każdym etapie. Gdy opcja jest wyłączona, ochrona włącza się automatycznie w trybie Hardmode.
 				}
 
 				CompanionsRescueWhenOwnerHurt: {
@@ -129,6 +149,7 @@ Mods: {
 
 			DevelopmentNotice: {
 				DisplayName: Informacja o rozwoju Widmowych Towarzyszy
+				ConfigSuggestion: Koniecznie sprawdź najpierw opcje konfiguracji! Wiele pytań można rozwiązać bezpośrednio w ustawieniach.
 				CombatControls: Lewy przycisk: zamach kluczem | Prawy przycisk: rzut wirującym kluczem
 				Development: Ten mod jest nadal aktywnie rozwijany.
 				SoloCreator: Jest tworzony i utrzymywany przez jedną osobę.
@@ -137,7 +158,6 @@ Mods: {
 				Complexity: Bronie o podobnym wyglądzie mogą działać wewnętrznie zupełnie inaczej, więc część z nich wymaga znacznie więcej czasu na bezpieczną obsługę. Dziękuję za cierpliwość.
 				BetaControlsFirstLine: Ta wersja beta ma obecnie dwie metody sterowania: sześć książek albo Widmowy Kostur z kołem poleceń.
 				BetaControlsSecondLine: Wybierz wygodniejszą; sterowanie zostanie później uproszczone i uporządkowane.
-				ConfigSuggestion: Warto zajrzeć do opcji konfiguracji.
 				Tooltip: Informacje o stanie rozwoju i opcjach konfiguracji.
 			}
 
@@ -228,7 +248,8 @@ Mods: {
 					Hold right click: open the tactic wheel. Left click: switch the selected tactic on or off.
 					· Smart Build: while you place the same block along a line, companions continue that block in the same direction from their own or your inventory.
 					· Defensive Build: when an enemy is near, companions raise a short blocking pillar between you and the nearest threat.
-					· Battle Platform: while you stand on a platform whose facing edge breaks off ahead, companions extend flat platforms across the gap — about six tiles ahead, so keep walking to keep bridging. They will not drop off the bridge, and return to your side if knocked off.
+					· Battle Platform: while you stand on a platform whose facing edge breaks off ahead, companions extend flat platforms across the gap — about six tiles ahead, so keep walking to keep bridging.
+					They will not drop off the bridge, and return to your side if knocked off.
 					Builders take non-favourited materials from active companion backpacks first, then your inventory. Work pauses safely if supplies run out.
 					Companions never mine or replace blocks. Combat, rescue calls, waypoints and specialist modes always take priority. Single-player only.
 					'''
@@ -577,6 +598,7 @@ Mods: {
 			Reviving: "{0} wraca za {1}s"
 			ReviveChatStarted: "{0} został pokonany i wróci za {1}s."
 			ReviveChatFinished: "{0} odrodził się."
+			DragQuickAccess: Przytrzymaj i przeciągnij: przesuń wszystkie karty (pozycja zapisuje się automatycznie)
 			QuickAccess: "{0} · Kliknij, aby otworzyć ekwipunek i plecak"
 			LootBrag: Zobacz, co udało mi się znaleźć!
 			DumpAll: Wyrzuć wszystko

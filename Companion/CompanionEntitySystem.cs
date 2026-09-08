@@ -545,6 +545,8 @@ public sealed class CompanionEntitySystem : ModSystem
                 }
                 else
                     instance.Brain.Update(instance, owner, profile);
+                instance.MountController.Update(instance, profile);
+                instance.ChargeController.Update(instance, profile);
                 instance.AimWorld = SanitizeAim(instance.Entity, instance.AimWorld, instance);
                 CompanionModBridge.FeedMouseState(instance.Entity, instance.AimWorld, instance.WantsAltUse);
                 instance.ItemCheckPreparedFrame = Main.GameUpdateCount;

@@ -82,6 +82,12 @@ public sealed class DevelopmentNotice : ModItem
 
     public override void ModifyTooltips(System.Collections.Generic.List<TooltipLine> tooltips)
     {
+        // Lead the description, after the item name and before weapon stats or other text.
+        int nameIndex = tooltips.FindIndex(line => line.Mod == "Terraria" && line.Name == "ItemName");
+        tooltips.Insert(nameIndex + 1, new TooltipLine(Mod, "ConfigSuggestion", GetText("ConfigSuggestion"))
+        {
+            OverrideColor = new Color(145, 225, 255)
+        });
         tooltips.Add(new TooltipLine(Mod, "CombatControls", GetText("CombatControls"))
         {
             OverrideColor = new Color(255, 235, 145)
@@ -113,10 +119,6 @@ public sealed class DevelopmentNotice : ModItem
         tooltips.Add(new TooltipLine(Mod, "BetaControlsSecondLine", GetText("BetaControlsSecondLine"))
         {
             OverrideColor = new Color(255, 125, 205)
-        });
-        tooltips.Add(new TooltipLine(Mod, "ConfigSuggestion", GetText("ConfigSuggestion"))
-        {
-            OverrideColor = new Color(145, 225, 255)
         });
         tooltips.Add(new TooltipLine(Mod, "CatDoodle", CatDoodle)
         {

@@ -38,8 +38,20 @@ public static class CompanionManagerPanel
     private static int lastHoveredSlot = -1;
     private static int lastQuickHoveredSlot = -1;
     private static bool quickPreviewRenderingDisabled;
+    private static bool quickPointerDown;
+    private static bool quickDragging;
+    private static int quickPressedSlot = -1;
+    private static Vector2 quickPressPosition;
+    private static Vector2 quickDragOffset;
+    private static Vector2 quickDragAnchor;
 
     public static bool IsOpen => open;
+
+    internal static void InvalidatePreview(int slot)
+    {
+        PreviewsBySlot.Remove(slot);
+        quickPreviewRenderingDisabled = false;
+    }
 
     public static void Toggle()
     {
@@ -76,6 +88,7 @@ public static class CompanionManagerPanel
         positionInitialized = false;
         lastHoveredSlot = -1;
         lastQuickHoveredSlot = -1;
+        EndQuickDrag();
         PreviewsBySlot.Clear();
     }
 
@@ -92,6 +105,7 @@ public static class CompanionManagerPanel
             Main.hideUI || Main.mapFullscreen)
         {
             lastQuickHoveredSlot = -1;
+            EndQuickDrag();
             return;
         }
 
@@ -99,6 +113,7 @@ public static class CompanionManagerPanel
         if (entries.Count == 0)
         {
             lastQuickHoveredSlot = -1;
+            EndQuickDrag();
             return;
         }
         List<CompanionInstance> ordinaryEntries = entries.FindAll(entry => !entry.IsAutoIdentity);
@@ -106,34 +121,81 @@ public static class CompanionManagerPanel
 
         const int cellSize = 54;
         const int gap = 6;
-        const int top = 18;
         const int sideMargin = 24;
-        Rectangle mouseRect = new((int)Main.MouseScreen.X, (int)Main.MouseScreen.Y, 2, 2);
+        Vector2 viewport = new Vector2(Main.screenWidth, Main.screenHeight) / Main.UIScale;
+        Vector2 mouse = Vector2.Transform(Main.MouseScreen, Matrix.Invert(Main.UIScaleMatrix));
+        Rectangle mouseRect = new((int)mouse.X, (int)mouse.Y, 2, 2);
         bool leftClick = Main.mouseLeft && Main.mouseLeftRelease;
         int hoveredSlot = -1;
         var previewDraws = new List<(Rectangle Area, CompanionInstance Instance)>(ordinaryEntries.Count);
 
         CompanionInstance automation = entries.Find(entry => entry.IsAutoIdentity);
+        int maxColumns = System.Math.Max(1, ((int)viewport.X - sideMargin * 2 + gap) / (cellSize + gap));
+        int columns = System.Math.Min(ordinaryEntries.Count, maxColumns);
+        int rows = columns == 0 ? 0 : (ordinaryEntries.Count + columns - 1) / columns;
+        Vector2 groupSize = new(
+            System.Math.Max(automation is null ? 0 : 174, columns * (cellSize + gap) - (columns > 0 ? gap : 0)),
+            (automation is null ? 0 : 34 + (rows > 0 ? gap : 0)) + rows * (cellSize + gap) - (rows > 0 ? gap : 0));
+        Vector2 anchor = CompanionQuickBarPosition.ClampAnchor(
+            quickDragging ? quickDragAnchor : CompanionQuickBarPosition.GetAnchor(viewport), groupSize, viewport);
+        Rectangle groupBounds = new((int)(anchor.X - groupSize.X * 0.5f), (int)anchor.Y, (int)groupSize.X, (int)groupSize.Y);
+        int releasedClickSlot = -1;
+        bool canDrag = MoreAIPlayerClientConfig.Current?.AllowDraggingCompanionTabs == true;
+        if (!canDrag)
+            EndQuickDrag();
+        else
+        {
+            if (leftClick && groupBounds.Contains(mouse.ToPoint()))
+            {
+                quickPointerDown = true;
+                quickDragging = false;
+                quickPressPosition = mouse;
+                quickDragOffset = mouse - anchor;
+                quickPressedSlot = -1;
+                Main.mouseLeftRelease = false;
+            }
+            if (quickPointerDown)
+            {
+                ClaimQuickAccessMouse();
+                if (Main.mouseLeft)
+                {
+                    if (Vector2.DistanceSquared(mouse, quickPressPosition) >= 36f)
+                        quickDragging = true;
+                    if (quickDragging)
+                    {
+                        anchor = CompanionQuickBarPosition.ClampAnchor(mouse - quickDragOffset, groupSize, viewport);
+                        quickDragAnchor = anchor;
+                    }
+                }
+                else
+                {
+                    if (!quickDragging)
+                        releasedClickSlot = quickPressedSlot;
+                    EndQuickDrag();
+                }
+            }
+            leftClick = false;
+        }
+        int top = (int)anchor.Y;
         int ordinaryTop = top;
         if (automation is not null)
         {
             const int automationWidth = 174;
             const int automationHeight = 34;
-            Rectangle tab = new((Main.screenWidth - automationWidth) / 2, top,
+            Rectangle tab = new((int)anchor.X - automationWidth / 2, top,
                 automationWidth, automationHeight);
             DrawAutomationQuickTab(tab, automation, tab.Intersects(mouseRect));
             if (tab.Intersects(mouseRect))
             {
                 hoveredSlot = automation.Slot;
                 ClaimQuickAccessMouse();
-                if (leftClick)
+                if (quickPointerDown && !quickDragging && quickPressedSlot < 0)
+                    quickPressedSlot = automation.Slot;
+                if (leftClick || releasedClickSlot == automation.Slot)
                     OpenQuickAccess(automation.Slot);
             }
             ordinaryTop = tab.Bottom + gap;
         }
-
-        int maxColumns = System.Math.Max(1, (Main.screenWidth - sideMargin * 2 + gap) / (cellSize + gap));
-        int columns = System.Math.Min(ordinaryEntries.Count, maxColumns);
 
         for (int i = 0; i < ordinaryEntries.Count; i++)
         {
@@ -141,7 +203,7 @@ public static class CompanionManagerPanel
             int column = i % columns;
             int entriesInRow = System.Math.Min(columns, ordinaryEntries.Count - row * columns);
             int rowWidth = entriesInRow * cellSize + (entriesInRow - 1) * gap;
-            int rowLeft = (Main.screenWidth - rowWidth) / 2;
+            int rowLeft = (int)anchor.X - rowWidth / 2;
             Rectangle cell = new(
                 rowLeft + column * (cellSize + gap),
                 ordinaryTop + row * (cellSize + gap),
@@ -173,20 +235,23 @@ public static class CompanionManagerPanel
 
             hoveredSlot = companion.Slot;
             ClaimQuickAccessMouse();
-
-            if (leftClick)
+            if (quickPointerDown && !quickDragging && quickPressedSlot < 0)
+                quickPressedSlot = companion.Slot;
+            if (leftClick || releasedClickSlot == companion.Slot)
                 OpenQuickAccess(companion.Slot);
         }
 
         DrawQuickPreviews(previewDraws);
 
-        if (hoveredSlot >= 0)
+        if (hoveredSlot >= 0 && !quickDragging)
         {
             CompanionInstance hovered = CompanionEntitySystem.GetBySlot(hoveredSlot);
             if (hovered?.Entity is not null && hovered.Entity.active)
             {
                 string text = Language.GetTextValue(
                     "Mods.MoreAIPlayer.CompanionCommand.QuickAccess", hovered.Entity.name);
+                if (canDrag)
+                    text += "\n" + Language.GetTextValue("Mods.MoreAIPlayer.CompanionCommand.DragQuickAccess");
                 Main.instance.MouseText(text);
             }
         }
@@ -228,6 +293,16 @@ public static class CompanionManagerPanel
     {
         Main.blockMouse = true;
         Main.LocalPlayer.mouseInterface = true;
+        Main.LocalPlayer.controlUseItem = false;
+    }
+
+    private static void EndQuickDrag()
+    {
+        if (quickDragging)
+            CompanionQuickBarPosition.Save(quickDragAnchor, new Vector2(Main.screenWidth, Main.screenHeight) / Main.UIScale);
+        quickPointerDown = false;
+        quickDragging = false;
+        quickPressedSlot = -1;
     }
 
     private static void OpenQuickAccess(int slot)
@@ -573,8 +648,8 @@ public static class CompanionManagerPanel
 
             for (int i = 0; i < CompanionPlayer.ArmorSize; i++)
             {
-                preview.armor[i] = profile.Armor[i].Clone();
-                preview.armor[10 + i] = profile.Vanity[i].Clone();
+                preview.armor[i] = CompanionProfile.NormalizeEmptyEquipment(profile.Armor[i]).Clone();
+                preview.armor[10 + i] = CompanionProfile.NormalizeEmptyEquipment(profile.Vanity[i]).Clone();
                 preview.dye[i] = profile.Dyes[i].Clone();
             }
 

@@ -498,7 +498,14 @@ public sealed class CompanionInventoryUI : UIState, ICompanionPanelState
         System.Func<bool> isVisible = null)
     {
         CompanionItemSlot slot = new(items, index, rule, rejectionText, isHighlighted, accentColor, isLocked, lockedText,
-            drawContext, emptyItemGhostType, emptySilhouetteIndex, isVisible, NotifyInventoryEdited);
+            drawContext, emptyItemGhostType, emptySilhouetteIndex, isVisible, () =>
+            {
+                NotifyInventoryEdited();
+                if (ReferenceEquals(items, data.Armor) || ReferenceEquals(items, data.Vanity) ||
+                    ReferenceEquals(items, data.Dyes) || ReferenceEquals(items, data.Accessories) ||
+                    ReferenceEquals(items, data.ExtraAccessories))
+                    RefreshEquipmentAppearance();
+            });
         slot.Left.Set(left, 0f);
         slot.Top.Set(top, 0f);
         return slot;
@@ -517,6 +524,15 @@ public sealed class CompanionInventoryUI : UIState, ICompanionPanelState
         CompanionInstance companion = CompanionEntitySystem.GetBySlot(companionSlot);
         if (companion?.IsAutoIdentity == true)
             companion.AutoBrain.NotifyExternalInventoryEdit();
+    }
+
+    private void RefreshEquipmentAppearance()
+    {
+        CompanionManagerPanel.InvalidatePreview(companionSlot);
+        CompanionInstance companion = CompanionEntitySystem.GetBySlot(companionSlot);
+        if (companion is not null && companion.TryGetContext(out Player owner, out CompanionProfile profile))
+            CompanionFaultGuard.Run("companion equipment appearance", () =>
+                companion.RefreshEquipmentAppearance(owner, profile));
     }
 
     private long BackpackContentSignature()

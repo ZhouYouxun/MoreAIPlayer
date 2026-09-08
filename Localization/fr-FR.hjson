@@ -51,6 +51,11 @@ Mods: {
 					Tooltip: Affiche dans le chat chaque étape importante accomplie par le joueur automatique.
 				}
 
+				SilenceAllChatMessages: {
+					Label: "[i:Megaphone] Masquer tous les messages du chat"
+					Tooltip: Masque tous les messages du chat local, y compris les événements du jeu, les notifications des mods et les messages des joueurs. Les commandes restent utilisables.
+				}
+
 				ShowCompanionHealthBars: {
 					Label: "[i:LifeCrystal] Afficher une barre de vie supplémentaire"
 					Tooltip: Dessine la propre barre de vie de ce mod. À activer seulement si la barre de vie par défaut ne fonctionne pas.
@@ -66,6 +71,11 @@ Mods: {
 					Tooltip: Une autre manière d'ouvrir le sac ; équivaut à cliquer directement sur son onglet.
 				}
 
+				AllowDraggingCompanionTabs: {
+					Label: "[i:HandOfCreation] Déplacer le groupe des onglets"
+					Tooltip: Maintenez et faites glisser un onglet de compagnon pour déplacer tout le groupe. La position est enregistrée au relâchement. Désactiver verrouille la position enregistrée ; un clic bref ouvre toujours le sac.
+				}
+
 				CompanionsFightAfterOwnerDeath: {
 					Label: "[i:EnchantedSword] Les compagnons combattent après votre mort"
 					Tooltip: S'il est désactivé, les compagnons disparaissent immédiatement après votre mort.
@@ -74,6 +84,16 @@ Mods: {
 				CompanionsTakeDamage: {
 					Label: "[i:CobaltShield] Les compagnons subissent des dégâts"
 					Tooltip: Autorise les compagnons à subir des dégâts normaux, mourir et attendre de revenir à la vie.
+				}
+
+				EnemiesIgnoreCompanions: {
+					Label: "[i:InvisibilityPotion] Inaperçus des ennemis"
+					Tooltip: Les ennemis ne ciblent pas activement les compagnons. Cela ne les rend pas invincibles : les attaques perdues et le contact peuvent toujours les blesser.
+				}
+
+				CompanionsAlwaysIgnoreSpaceGravity: {
+					Label: "[i:GravityGlobe] Toujours ignorer la faible gravité spatiale"
+					Tooltip: Les compagnons ignorent la faible gravité spatiale à toute étape. Si cette option est désactivée, cette protection est automatiquement acquise en Hardmode.
 				}
 
 				CompanionsRescueWhenOwnerHurt: {
@@ -129,6 +149,7 @@ Mods: {
 
 			DevelopmentNotice: {
 				DisplayName: Note de développement des compagnons fantômes
+				ConfigSuggestion: Consultez impérativement les options de configuration en premier ! Beaucoup de vos questions peuvent être résolues directement dans les paramètres.
 				CombatControls: Clic gauche : manier la clé | Clic droit : lancer la clé tournoyante
 				Development: Ce mod est toujours en développement actif.
 				SoloCreator: Il est créé et maintenu par une seule personne.
@@ -137,7 +158,6 @@ Mods: {
 				Complexity: Des armes d'apparence similaire peuvent fonctionner très différemment en interne ; certaines demandent donc beaucoup plus de temps pour être prises en charge de manière fiable. Merci de votre patience.
 				BetaControlsFirstLine: Cette bêta propose actuellement deux méthodes de contrôle : six livres, ou le Bâton fantôme avec sa roue de commandes.
 				BetaControlsSecondLine: Choisissez celle qui vous convient ; les commandes seront simplifiées et réorganisées plus tard.
-				ConfigSuggestion: Pensez à consulter les options de configuration.
 				Tooltip: Informations sur le développement et les options de configuration.
 			}
 
@@ -228,7 +248,8 @@ Mods: {
 					Hold right click: open the tactic wheel. Left click: switch the selected tactic on or off.
 					· Smart Build: while you place the same block along a line, companions continue that block in the same direction from their own or your inventory.
 					· Defensive Build: when an enemy is near, companions raise a short blocking pillar between you and the nearest threat.
-					· Battle Platform: while you stand on a platform whose facing edge breaks off ahead, companions extend flat platforms across the gap — about six tiles ahead, so keep walking to keep bridging. They will not drop off the bridge, and return to your side if knocked off.
+					· Battle Platform: while you stand on a platform whose facing edge breaks off ahead, companions extend flat platforms across the gap — about six tiles ahead, so keep walking to keep bridging.
+					They will not drop off the bridge, and return to your side if knocked off.
 					Builders take non-favourited materials from active companion backpacks first, then your inventory. Work pauses safely if supplies run out.
 					Companions never mine or replace blocks. Combat, rescue calls, waypoints and specialist modes always take priority. Single-player only.
 					'''
@@ -577,6 +598,7 @@ Mods: {
 			Reviving: "{0} revient dans {1}s"
 			ReviveChatStarted: "{0} est tombé et reviendra dans {1}s."
 			ReviveChatFinished: "{0} est revenu."
+			DragQuickAccess: Maintenir et glisser : déplacer tous les onglets (position enregistrée automatiquement)
 			QuickAccess: "{0} · Cliquez pour ouvrir l'équipement et le sac"
 			LootBrag: Regarde ce que j'ai trouvé !
 			DumpAll: Tout déposer

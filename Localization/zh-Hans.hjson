@@ -51,6 +51,11 @@ Mods: {
 					Tooltip: 开启后自动玩家每推进一个有效步骤，都会在聊天框中显示
 				}
 
+				SilenceAllChatMessages: {
+					Label: "[i:Megaphone] 屏蔽全部聊天消息"
+					Tooltip: 屏蔽本机聊天框内全部消息，包括原版事件、所有模组提示和玩家聊天；不影响聊天指令执行。
+				}
+
 				ShowCompanionHealthBars: {
 					Label: "[i:LifeCrystal] 显示伙伴额外血条"
 					Tooltip: 绘制一条本模组自己的血条【仅建议当默认血条不起作用时再开启】
@@ -66,6 +71,11 @@ Mods: {
 					Tooltip: 多一种打开背包的方式，效果相当于直接点击选项卡
 				}
 
+				AllowDraggingCompanionTabs: {
+					Label: "[i:HandOfCreation] 拖动伙伴选项卡区域"
+					Tooltip: 按住顶部任意伙伴选项卡并拖动，可移动整个区域；松手后永久记住位置。关闭后锁定在已保存位置，短按仍可打开背包。
+				}
+
 				CompanionsFightAfterOwnerDeath: {
 					Label: "[i:EnchantedSword] 主控死亡后伙伴继续战斗"
 					Tooltip: 如果关闭则死亡后伙伴直接消失
@@ -74,6 +84,16 @@ Mods: {
 				CompanionsTakeDamage: {
 					Label: "[i:CobaltShield] 伙伴会受到伤害"
 					Tooltip: 允许伙伴正常受伤死亡并等待复活
+				}
+
+				EnemiesIgnoreCompanions: {
+					Label: "[i:InvisibilityPotion] 敌人眼中无我"
+					Tooltip: 敌人不会主动以伙伴为目标；这不等于无敌，流弹与接触仍可能造成伤害。
+				}
+
+				CompanionsAlwaysIgnoreSpaceGravity: {
+					Label: "[i:GravityGlobe] 始终免疫太空低重力"
+					Tooltip: 开启后，伙伴在任何进度下均不受太空低重力影响；关闭时，进入困难模式后仍会自动免疫。
 				}
 
 				CompanionsRescueWhenOwnerHurt: {
@@ -129,6 +149,7 @@ Mods: {
 
 			DevelopmentNotice: {
 				DisplayName: 幻影伙伴开发说明
+				ConfigSuggestion: 请务必查看配置选项！你的很多疑问，都可以直接在配置选项中解决。
 				CombatControls: 左键：挥舞钥匙斩击｜右键：投出高速旋转的钥匙
 				Development: 本模组仍在持续开发中。
 				SoloCreator: 目前由作者一人制作与维护。
@@ -137,7 +158,6 @@ Mods: {
 				Complexity: 外观相近的武器，底层代码机制可能完全不同；有些兼容需要更多时间才能安全完成，感谢理解与耐心等待。
 				BetaControlsFirstLine: 当前为测试版，有六本书和一个幻影法杖加轮盘两种操控方式
 				BetaControlsSecondLine: 挑选一种合适的使用即可，后续会进行简化和整理
-				ConfigSuggestion: 【考虑去看看配置选项】
 				Tooltip: 查看开发说明与配置选项。
 			}
 
@@ -228,7 +248,8 @@ Mods: {
 					按住右键：呼出战术轮盘。点击左键：开启或关闭当前所选战术。
 					· 智能建造：当你沿一条线持续放置同一种方块时，伙伴会用自己或你背包里的同种方块，朝同一方向继续建造。
 					· 防御建造：当附近有敌人时，伙伴会在你与最近的敌人之间竖起一小截方块柱进行阻挡。
-					· 战斗平台：当你站在平台上、且面朝方向前方的平台中断时，伙伴会用水平平台把缺口补上——大约只补你前方六格，所以要继续往前走才会继续铺。伙伴不会自己跳下平台，被打下去时会传送回你身边。
+					· 战斗平台：当你站在平台上、且面朝方向前方的平台中断时，伙伴会用水平平台把缺口补上——大约只补你前方六格，所以要继续往前走才会继续铺。
+					伙伴不会自己跳下平台，被打下去时会传送回你身边。
 					伙伴优先消耗已召唤伙伴背包内的非收藏材料，其次才消耗你的背包；材料耗尽时工程会安全暂停。
 					伙伴绝不会挖除或替换方块。战斗、护驾、信号标与专职模式永远优先于施工。目前仅支持单人模式。
 					'''
@@ -583,6 +604,7 @@ Mods: {
 			Reviving: "{0} 复活中 {1}s"
 			ReviveChatStarted: "{0} 已阵亡，将在 {1} 秒后复活。"
 			ReviveChatFinished: "{0} 已复活。"
+			DragQuickAccess: 按住并拖动：移动整个选项卡区域（自动保存位置）
 			QuickAccess: "{0} · 点击打开装备与背包"
 			LootBrag: 看看我捡的好东西！
 			DumpAll: 全部倒出

@@ -713,8 +713,9 @@ public sealed class CompanionNavigator
                 hold = !jumpHeldLastTick; // grounded: press on a fresh tick to launch
             else if (me.velocity.Y < 0f)
                 hold = true; // rising: keep the jump boosted
-            else if (me.wingTime > 0f)
-                hold = true; // falling with wings: fly
+            else if (me.wingTime > 0f || (me.mount.Active &&
+                (me.mount.CanHover() || (me.mount.CanFly() && me.mount.FlyTime > 0))))
+                hold = true; // falling with wings or an equipped flying mount: fly
             else if (me.AnyExtraJumpUsable())
                 hold = !jumpHeldLastTick; // release one tick, then press for the extra jump
         }

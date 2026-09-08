@@ -12,6 +12,9 @@ namespace MoreAIPlayer.Companion;
 /// </summary>
 public sealed class CompanionGlobalProjectile : GlobalProjectile
 {
+    public override bool InstancePerEntity => true;
+    private int chargeSession;
+
     public override void OnSpawn(Projectile projectile, IEntitySource source)
     {
         // Synthetic slots are a strictly single-player construct. A stale dictionary during a
@@ -42,6 +45,17 @@ public sealed class CompanionGlobalProjectile : GlobalProjectile
             projectile.owner = expectedOwner;
             CompanionEntitySystem.RegisterProjectileOwnerCorrection();
         }
+
+        CompanionInstance companion = CompanionEntitySystem.GetBySlot(projectile.owner);
+        if (companion is null || !companion.ChargeController.IsObserving)
+            return;
+        bool fromItem = source is EntitySource_ItemUse;
+        if (source is EntitySource_ItemUse itemUse && ReferenceEquals(itemUse.Player, companion.Entity))
+            chargeSession = companion.ChargeController.SourceSession(itemUse.Item);
+        else if (source is EntitySource_Parent { Entity: Projectile sourceProjectile } &&
+            sourceProjectile.owner == projectile.owner)
+            chargeSession = sourceProjectile.GetGlobalProjectile<CompanionGlobalProjectile>().chargeSession;
+        companion.ChargeController.ObserveSpawn(projectile, chargeSession, fromItem);
     }
 
     public override void OnHitNPC(Projectile projectile, NPC target, NPC.HitInfo hit, int damageDone)
@@ -52,6 +66,8 @@ public sealed class CompanionGlobalProjectile : GlobalProjectile
         CompanionInstance instance = CompanionEntitySystem.GetBySlot(projectile.owner);
         if (instance is null || instance.OwnerWhoAmI < 0 || instance.OwnerWhoAmI >= Main.maxPlayers)
             return;
+
+        instance.ChargeController.ObserveHit(chargeSession, damageDone);
 
         // Credit the real owner so loot, bestiary interaction and banner logic behave.
         target.playerInteraction[instance.OwnerWhoAmI] = true;

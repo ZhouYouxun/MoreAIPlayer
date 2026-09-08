@@ -51,6 +51,11 @@ Mods: {
 					Tooltip: Показывает в чате каждый значимый шаг автоматического игрока.
 				}
 
+				SilenceAllChatMessages: {
+					Label: "[i:Megaphone] Скрыть все сообщения чата"
+					Tooltip: Скрывает все сообщения локального чата, включая события игры, уведомления модов и сообщения игроков. Команды чата продолжают работать.
+				}
+
 				ShowCompanionHealthBars: {
 					Label: "[i:LifeCrystal] Показывать дополнительную шкалу здоровья"
 					Tooltip: Рисует собственную шкалу здоровья этого мода. Включайте, только если стандартная шкала здоровья не работает.
@@ -66,6 +71,11 @@ Mods: {
 					Tooltip: Ещё один способ открыть рюкзак; равнозначен прямому нажатию на его вкладку.
 				}
 
+				AllowDraggingCompanionTabs: {
+					Label: "[i:HandOfCreation] Перетаскивать группу вкладок спутников"
+					Tooltip: Удерживайте и перетаскивайте любую вкладку спутника, чтобы переместить всю группу. Положение сохраняется при отпускании. Отключение закрепляет сохранённое положение; короткое нажатие по-прежнему открывает рюкзак.
+				}
+
 				CompanionsFightAfterOwnerDeath: {
 					Label: "[i:EnchantedSword] Спутники сражаются после смерти игрока"
 					Tooltip: Если выключено, спутники исчезают сразу после вашей смерти.
@@ -74,6 +84,16 @@ Mods: {
 				CompanionsTakeDamage: {
 					Label: "[i:CobaltShield] Спутники получают урон"
 					Tooltip: Позволяет спутникам получать обычный урон, погибать и ждать возрождения.
+				}
+
+				EnemiesIgnoreCompanions: {
+					Label: "[i:InvisibilityPotion] Незаметность для врагов"
+					Tooltip: Враги не выбирают спутников своей целью. Это не даёт неуязвимость: случайные атаки и столкновения всё ещё могут нанести урон.
+				}
+
+				CompanionsAlwaysIgnoreSpaceGravity: {
+					Label: "[i:GravityGlobe] Всегда игнорировать низкую гравитацию космоса"
+					Tooltip: Спутники игнорируют низкую гравитацию космоса на любом этапе. Если опция отключена, эта защита всё равно автоматически включается в сложном режиме.
 				}
 
 				CompanionsRescueWhenOwnerHurt: {
@@ -129,6 +149,7 @@ Mods: {
 
 			DevelopmentNotice: {
 				DisplayName: Сведения о разработке призрачных спутников
+				ConfigSuggestion: Обязательно сначала проверьте настройки! Многие ваши вопросы можно решить прямо в параметрах мода.
 				CombatControls: Левая кнопка: взмах ключом | Правая кнопка: бросок вращающегося ключа
 				Development: Этот мод находится в активной разработке.
 				SoloCreator: Он создаётся и поддерживается одним человеком.
@@ -137,7 +158,6 @@ Mods: {
 				Complexity: Похожее оружие может иметь совершенно разные внутренние механики, поэтому некоторым экземплярам требуется гораздо больше времени для безопасной поддержки. Спасибо за терпение.
 				BetaControlsFirstLine: В этой бета-версии сейчас есть два способа управления: шесть книг или Призрачный посох с колесом команд.
 				BetaControlsSecondLine: Выберите удобный вариант; позже управление будет упрощено и приведено в порядок.
-				ConfigSuggestion: Загляните в параметры конфигурации.
 				Tooltip: Сведения о разработке и параметрах конфигурации.
 			}
 
@@ -228,7 +248,8 @@ Mods: {
 					Hold right click: open the tactic wheel. Left click: switch the selected tactic on or off.
 					· Smart Build: while you place the same block along a line, companions continue that block in the same direction from their own or your inventory.
 					· Defensive Build: when an enemy is near, companions raise a short blocking pillar between you and the nearest threat.
-					· Battle Platform: while you stand on a platform whose facing edge breaks off ahead, companions extend flat platforms across the gap — about six tiles ahead, so keep walking to keep bridging. They will not drop off the bridge, and return to your side if knocked off.
+					· Battle Platform: while you stand on a platform whose facing edge breaks off ahead, companions extend flat platforms across the gap — about six tiles ahead, so keep walking to keep bridging.
+					They will not drop off the bridge, and return to your side if knocked off.
 					Builders take non-favourited materials from active companion backpacks first, then your inventory. Work pauses safely if supplies run out.
 					Companions never mine or replace blocks. Combat, rescue calls, waypoints and specialist modes always take priority. Single-player only.
 					'''
@@ -577,6 +598,7 @@ Mods: {
 			Reviving: "{0} возрождается через {1}с"
 			ReviveChatStarted: "{0} повержен и возродится через {1}с."
 			ReviveChatFinished: "{0} возродился."
+			DragQuickAccess: Удерживайте и тяните: переместить все вкладки (положение сохраняется автоматически)
 			QuickAccess: "{0} · Нажмите, чтобы открыть снаряжение и рюкзак"
 			LootBrag: Смотри, что мне попалось!
 			DumpAll: Выложить всё

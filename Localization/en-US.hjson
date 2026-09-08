@@ -51,6 +51,11 @@ Mods: {
 					Tooltip: When enabled, every meaningful step advanced by the automation companion is shown in chat.
 				}
 
+				SilenceAllChatMessages: {
+					Label: "[i:Megaphone] Silence all chat messages"
+					Tooltip: Hides all messages in your local chat, including vanilla events, all mod notices, and player chat. Chat commands still work.
+				}
+
 				ShowCompanionHealthBars: {
 					Label: "[i:LifeCrystal] Display extra companion health bar"
 					Tooltip: Draws this mod's own health bar. Enable only if the default health bar does not work.
@@ -66,6 +71,11 @@ Mods: {
 					Tooltip: Another way to open the backpack; equivalent to clicking its tab directly.
 				}
 
+				AllowDraggingCompanionTabs: {
+					Label: "[i:HandOfCreation] Drag the companion tab group"
+					Tooltip: Hold and drag any companion tab to move the whole group. Its position is saved when released. Turning this off locks the saved position; a short click still opens the backpack.
+				}
+
 				CompanionsFightAfterOwnerDeath: {
 					Label: "[i:EnchantedSword] Companions fight after owner death"
 					Tooltip: When disabled, companions disappear immediately after you die.
@@ -74,6 +84,16 @@ Mods: {
 				CompanionsTakeDamage: {
 					Label: "[i:CobaltShield] Companions take damage"
 					Tooltip: Allows companions to take normal damage, die, and wait to revive.
+				}
+
+				EnemiesIgnoreCompanions: {
+					Label: "[i:InvisibilityPotion] Unseen by enemies"
+					Tooltip: Enemies will not actively target companions. This does not grant invincibility: stray attacks and contact can still hurt them.
+				}
+
+				CompanionsAlwaysIgnoreSpaceGravity: {
+					Label: "[i:GravityGlobe] Always ignore low space gravity"
+					Tooltip: Companions ignore low space gravity at any progression stage. With this off, they still gain this protection automatically in Hardmode.
 				}
 
 				CompanionsRescueWhenOwnerHurt: {
@@ -129,6 +149,7 @@ Mods: {
 
 			DevelopmentNotice: {
 				DisplayName: Phantom Companion Development Notice
+				ConfigSuggestion: Please check the configuration options first! Many of your questions can be resolved directly in the settings.
 				CombatControls: Left click: swing the key | Right click: throw the rapidly spinning key
 				Development: This mod is actively under development.
 				SoloCreator: It is made and maintained by one creator.
@@ -137,7 +158,6 @@ Mods: {
 				Complexity: Similar-looking weapons can use very different code internally; some therefore need much more time to support safely. Thank you for your patience.
 				BetaControlsFirstLine: This beta currently has two control methods: six books, or a Phantom Staff with its command wheel.
 				BetaControlsSecondLine: Choose whichever suits you; the controls will be simplified and reorganized later.
-				ConfigSuggestion: Consider checking the configuration options.
 				Tooltip: Development status and configuration options.
 			}
 
@@ -228,7 +248,8 @@ Mods: {
 					Hold right click: open the tactic wheel. Left click: switch the selected tactic on or off.
 					· Smart Build: while you place the same block along a line, companions continue that block in the same direction from their own or your inventory.
 					· Defensive Build: when an enemy is near, companions raise a short blocking pillar between you and the nearest threat.
-					· Battle Platform: while you stand on a platform whose facing edge breaks off ahead, companions extend flat platforms across the gap — about six tiles ahead, so keep walking to keep bridging. They will not drop off the bridge, and return to your side if knocked off.
+					· Battle Platform: while you stand on a platform whose facing edge breaks off ahead, companions extend flat platforms across the gap — about six tiles ahead, so keep walking to keep bridging.
+					They will not drop off the bridge, and return to your side if knocked off.
 					Builders take non-favourited materials from active companion backpacks first, then your inventory. Work pauses safely if supplies run out.
 					Companions never mine or replace blocks. Combat, rescue calls, waypoints and specialist modes always take priority. Single-player only.
 					'''
@@ -583,6 +604,7 @@ Mods: {
 			Reviving: "{0} reviving {1}s"
 			ReviveChatStarted: "{0} was defeated and will revive in {1}s."
 			ReviveChatFinished: "{0} has revived."
+			DragQuickAccess: Hold and drag: move all tabs together (position saved automatically)
 			QuickAccess: "{0} · Click to open equipment and backpack"
 			LootBrag: Look what I found!
 			DumpAll: Drop All

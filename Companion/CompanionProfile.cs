@@ -201,6 +201,9 @@ public sealed class CompanionProfile
 
     private readonly HashSet<string> preferAltUseWeapons = [];
 
+    // Learned from this weapon's damage after a natural release; left and right uses learn separately.
+    internal Dictionary<string, int> ChargeReleaseTicks { get; } = [];
+
     public bool PrefersAltUse(Item weapon) =>
         !weapon.IsAir && preferAltUseWeapons.Contains(CompanionWeaponOverrides.ItemKey(weapon));
 
@@ -404,6 +407,18 @@ public sealed class CompanionProfile
         visual.shoeColor = ShoeColor;
     }
 
+    internal static Item NormalizeEmptyEquipment(Item item)
+    {
+        // Item.TurnToAir() clears type/stack but deliberately keeps the old equip slots.
+        // PlayerFrame reads vanity head/body/leg slots without checking IsAir first.
+        if (item.IsAir && (item.headSlot >= 0 || item.bodySlot >= 0 || item.legSlot >= 0 ||
+            item.handOnSlot >= 0 || item.handOffSlot >= 0 || item.backSlot >= 0 || item.frontSlot >= 0 ||
+            item.shoeSlot >= 0 || item.waistSlot >= 0 || item.wingSlot >= 0 || item.shieldSlot >= 0 ||
+            item.neckSlot >= 0 || item.faceSlot >= 0 || item.balloonSlot >= 0 || item.beardSlot >= 0))
+            item.TurnToAir(fullReset: true);
+        return item;
+    }
+
     /// <summary>Makes this profile continuously mirror the owning player's complete dresser
     /// appearance. Inventory, equipment, name and progression remain independent.</summary>
     public void MirrorAppearanceFrom(Player owner)
@@ -507,6 +522,14 @@ public sealed class CompanionProfile
         return false;
     }
 
+    private List<TagCompound> SaveChargeLearning()
+    {
+        List<TagCompound> entries = [];
+        foreach ((string key, int ticks) in ChargeReleaseTicks)
+            entries.Add(new TagCompound { ["Weapon"] = key, ["Ticks"] = ticks });
+        return entries;
+    }
+
     public TagCompound Save()
     {
         TagCompound tag = new()
@@ -543,6 +566,7 @@ public sealed class CompanionProfile
             [nameof(Origin)] = (int)Origin,
             ["HotbarLayoutVersion"] = CurrentHotbarLayoutVersion,
             ["PreferAltUseWeapons"] = new List<string>(preferAltUseWeapons),
+            [nameof(ChargeReleaseTicks)] = SaveChargeLearning(),
             [nameof(Hotbar)] = SaveItems(Hotbar),
             [nameof(Ammo)] = SaveItems(Ammo),
             [nameof(Armor)] = SaveItems(Armor),
@@ -619,6 +643,17 @@ public sealed class CompanionProfile
         }
         if (tag.ContainsKey(nameof(AutoState)))
             profile.AutoState = AutoCompanionState.Load(tag.GetCompound(nameof(AutoState)));
+        if (tag.ContainsKey(nameof(ChargeReleaseTicks)))
+        {
+            foreach (TagCompound entry in tag.GetList<TagCompound>(nameof(ChargeReleaseTicks)))
+            {
+                string key = entry.GetString("Weapon");
+                int ticks = entry.GetInt("Ticks");
+                if (!string.IsNullOrWhiteSpace(key) && key.Length <= 256 && ticks >= 60 && ticks <= 1800 &&
+                    profile.ChargeReleaseTicks.Count < 128)
+                    profile.ChargeReleaseTicks[key] = ticks;
+            }
+        }
         int savedOrigin = tag.ContainsKey(nameof(Origin)) ? tag.GetInt(nameof(Origin)) : -1;
         if (savedOrigin >= (int)CompanionOrigin.OrdinaryDebug &&
             savedOrigin <= (int)CompanionOrigin.Automation)

@@ -37,6 +37,10 @@ public sealed class MoreAIPlayerClientConfig : ModConfig
     [DefaultValue(false)]
     public bool ShowAutomationProgress;
 
+    // Filters the local game's chat output, including vanilla and other mods.
+    [DefaultValue(false)]
+    public bool SilenceAllChatMessages;
+
     // Companions occupy real Main.player slots, so vanilla already draws a health bar over
     // them. Ours is off by default to avoid the duplicate bar; opt in to show it.
     [DefaultValue(false)]
@@ -52,6 +56,9 @@ public sealed class MoreAIPlayerClientConfig : ModConfig
     [DefaultValue(false)]
     public bool AllowRightClickOpenBackpack;
 
+    [DefaultValue(false)]
+    public bool AllowDraggingCompanionTabs;
+
     [DefaultValue(true)]
     public bool CompanionsFightAfterOwnerDeath;
 
@@ -59,6 +66,14 @@ public sealed class MoreAIPlayerClientConfig : ModConfig
     // must babysit; enabling this turns on the full vanilla damage-and-revive loop.
     [DefaultValue(false)]
     public bool CompanionsTakeDamage;
+
+    // Target selection and damage are independent: stray attacks may still hurt a companion.
+    [DefaultValue(false)]
+    public bool EnemiesIgnoreCompanions;
+
+    // Hardmode grants this automatically; this option also grants it before hardmode.
+    [DefaultValue(false)]
+    public bool CompanionsAlwaysIgnoreSpaceGravity;
 
     // Off by default: being hit should not pull every companion onto the same dangerous tile.
     // When enabled, the automatic rescue finds each companion a nearby, open landing spot.

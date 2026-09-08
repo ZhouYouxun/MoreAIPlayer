@@ -19,6 +19,8 @@ public sealed class CompanionInstance
     public Player Entity { get; init; }
     public Player OriginalPlayer { get; init; }
     public CompanionBrain Brain { get; } = new();
+    internal CompanionMountController MountController { get; } = new();
+    internal CompanionChargeController ChargeController { get; } = new();
 
     private Automation.AutoCompanionBrain autoBrain;
 
@@ -358,18 +360,7 @@ public sealed class CompanionInstance
         AssignIfChanged(me.miscEquips, 4, profile.HookTool);
         AssignIfChanged(me.miscEquips, 3, profile.MountTool);
 
-        for (int i = 0; i < CompanionPlayer.ArmorSize; i++)
-        {
-            AssignIfChanged(me.armor, i, profile.Armor[i]);
-            AssignIfChanged(me.armor, 10 + i, profile.Vanity[i]);
-            AssignIfChanged(me.dye, i, profile.Dyes[i]);
-        }
-
-        // Accessories past the world's limit are swapped for air, so a slot the player filled
-        // before hardmode simply stops applying until the world catches up.
-        int unlockedAccessories = CompanionSlotRules.UnlockedAccessorySlots();
-        for (int i = 0; i < CompanionPlayer.AccessorySize; i++)
-            AssignIfChanged(me.armor, 3 + i, profile.AccessoryForSlot(i, unlockedAccessories));
+        BindEquipment(profile);
 
         // Max HP tracks the owner's effective max (Life Fruit, accessories, buffs all folded
         // into statLifeMax2), so the companion always shares the owner's maximum health — except the
@@ -393,6 +384,36 @@ public sealed class CompanionInstance
         me.statManaMax = AutoMaxMana > 0 ? AutoMaxMana : System.Math.Max(20, owner.statManaMax2);
         if (me.statMana > me.statManaMax)
             me.statMana = me.statManaMax;
+    }
+
+    private void BindEquipment(CompanionProfile profile)
+    {
+        Player me = Entity;
+        for (int i = 0; i < CompanionPlayer.ArmorSize; i++)
+        {
+            AssignIfChanged(me.armor, i, CompanionProfile.NormalizeEmptyEquipment(profile.Armor[i]));
+            AssignIfChanged(me.armor, 10 + i, CompanionProfile.NormalizeEmptyEquipment(profile.Vanity[i]));
+            AssignIfChanged(me.dye, i, profile.Dyes[i]);
+        }
+
+        // Accessories past the world's limit are swapped for air, so a slot the player filled
+        // before hardmode simply stops applying until the world catches up.
+        int unlockedAccessories = CompanionSlotRules.UnlockedAccessorySlots();
+        for (int i = 0; i < CompanionPlayer.AccessorySize; i++)
+            AssignIfChanged(me.armor, 3 + i, CompanionProfile.NormalizeEmptyEquipment(profile.AccessoryForSlot(i, unlockedAccessories)));
+    }
+
+    internal void RefreshEquipmentAppearance(Player owner, CompanionProfile profile)
+    {
+        if (!CompanionEntitySystem.IsCompanion(Entity))
+            return;
+        BindEquipment(profile);
+        profile.ApplyAppearanceTo(Entity, owner);
+        // Slot edits happen during UI drawing, after this frame's Player.Update. Refresh only
+        // visuals here: rerunning UpdateEquips would apply armor stats and auras twice.
+        Entity.ResetVisibleAccessories();
+        Entity.UpdateDyes();
+        Entity.PlayerFrame();
     }
 
     /// <summary>Maps a profile hotbar/backpack position to the entity's inventory index.</summary>
@@ -435,7 +456,8 @@ public sealed class CompanionInstance
             int type = owner.buffType[i];
             int time = owner.buffTime[i];
             if (type <= 0 || time <= 0 || type >= Main.debuff.Length || Main.debuff[type] ||
-                type >= BuffID.Sets.TimeLeftDoesNotDecrease.Length || BuffID.Sets.TimeLeftDoesNotDecrease[type])
+                type >= BuffID.Sets.TimeLeftDoesNotDecrease.Length || BuffID.Sets.TimeLeftDoesNotDecrease[type] ||
+                CompanionMountController.IsMountBuff(type))
                 continue;
             companion.AddBuff(type, time, quiet: true);
         }
