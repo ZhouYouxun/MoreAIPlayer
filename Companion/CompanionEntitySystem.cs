@@ -42,6 +42,10 @@ public sealed class CompanionEntitySystem : ModSystem
 
     public static IEnumerable<CompanionInstance> All => BySlot.Values;
 
+    // Hot loops use the concrete collection so its struct enumerator is not boxed.
+    internal static Dictionary<int, CompanionInstance>.ValueCollection LiveInstances => BySlot.Values;
+    internal static bool HasCompanions => BySlot.Count != 0;
+
     public static bool IsCompanionSlot(int slot) => BySlot.ContainsKey(slot);
 
     public static CompanionInstance GetBySlot(int slot) =>
@@ -180,6 +184,7 @@ public sealed class CompanionEntitySystem : ModSystem
     public override void Unload()
     {
         ReleaseAll();
+        AI.CompanionMountController.ClearBuffLookup();
         CompanionModBridge.ClearCaches();
         CompanionWeaponOverrides.ClearCaches();
         ResetRuntimeState();
@@ -188,6 +193,7 @@ public sealed class CompanionEntitySystem : ModSystem
     public override void OnWorldLoad()
     {
         ReleaseAll();
+        AI.CompanionMountController.ClearBuffLookup();
         ResetRuntimeState(keepHookState: true);
     }
 
@@ -386,6 +392,9 @@ public sealed class CompanionEntitySystem : ModSystem
             // it leaked, and only then make the synthetic slot unrecognisable to the guard.
             RestoreHijackedLocalPlayer();
             BySlot.Remove(slot);
+            CompanionGlobalProjectile.ForgetChargeObservations(instance);
+            if (BySlot.Count == 0)
+                CompanionGlobalProjectile.ClearChargeObservations();
         }
     }
 
@@ -449,6 +458,7 @@ public sealed class CompanionEntitySystem : ModSystem
             }
         }
         BySlot.Clear();
+        CompanionGlobalProjectile.ClearChargeObservations();
     }
 
     /// <summary>
@@ -1916,6 +1926,7 @@ public sealed class CompanionEntitySystem : ModSystem
 
     private static void ResetRuntimeState(bool keepHookState = false)
     {
+        CompanionGlobalProjectile.ClearChargeObservations();
         HoveredSlot = -1;
         previousMouseRight = false;
         rescueDoubleClickWindow = 0;

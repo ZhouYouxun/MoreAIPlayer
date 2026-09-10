@@ -33,7 +33,8 @@ public sealed class CompanionSpaceGravitySystem : ModSystem
     }
 
     internal static float AdjustSpaceMultiplier(float multiplier, Player player) =>
-        CompanionEntitySystem.IsCompanion(player) &&
-        (Main.hardMode || MoreAIPlayerClientConfig.Current?.CompanionsAlwaysIgnoreSpaceGravity == true)
+        multiplier != 1f && CompanionEntitySystem.HasCompanions &&
+        (Main.hardMode || MoreAIPlayerClientConfig.Current?.CompanionsAlwaysIgnoreSpaceGravity == true) &&
+        CompanionEntitySystem.IsCompanion(player)
             ? 1f : multiplier;
 }

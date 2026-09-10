@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Terraria;
 using Terraria.ID;
 
@@ -11,6 +12,14 @@ internal sealed class CompanionMountController
     private int idleTicks;
     private int retryTicks;
     private int ownedMount = MountID.None;
+    private static Mount.MountData[] indexedMounts;
+    private static readonly HashSet<int> MountBuffs = [];
+
+    internal static void ClearBuffLookup()
+    {
+        indexedMounts = null;
+        MountBuffs.Clear();
+    }
 
     internal static bool IsMountBuff(int buffType)
     {
@@ -19,12 +28,21 @@ internal sealed class CompanionMountController
         if (buffType < BuffID.Sets.BasicMountData.Length && BuffID.Sets.BasicMountData[buffType] is not null)
             return true;
 
-        // Mod mounts need not opt into BasicMountData; their registered MountData still owns
-        // both the ordinary buff and (for minecarts) the alternate-direction buff.
-        foreach (Mount.MountData data in Mount.mounts)
-            if (data is not null && (data.buff == buffType || data.extraBuff == buffType))
-                return true;
-        return false;
+        // Registered mount data is stable after content setup. Index it once, including
+        // mod mounts without BasicMountData, instead of scanning all mounts for every buff.
+        if (!ReferenceEquals(indexedMounts, Mount.mounts))
+        {
+            MountBuffs.Clear();
+            indexedMounts = Mount.mounts;
+            foreach (Mount.MountData data in Mount.mounts)
+            {
+                if (data is null)
+                    continue;
+                if (data.buff > 0) MountBuffs.Add(data.buff);
+                if (data.extraBuff > 0) MountBuffs.Add(data.extraBuff);
+            }
+        }
+        return MountBuffs.Contains(buffType);
     }
 
     internal void Update(CompanionInstance instance, CompanionProfile profile)

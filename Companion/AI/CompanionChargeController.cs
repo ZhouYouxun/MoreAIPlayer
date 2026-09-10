@@ -26,9 +26,14 @@ internal sealed class CompanionChargeController
     private int pendingTicks;
     private bool outputWhileHeld;
     private int primarySpawns;
+    private Item keyItem;
+    private int keyItemType;
+    private bool keyAltUse;
+    private string cachedKey;
+    private bool excludedMode;
 
     internal int Session { get; private set; }
-    internal bool IsObserving => holding || releaseTicks > 0 || pendingTicks > 0;
+    internal bool IsObserving => (holding && !outputWhileHeld) || releaseTicks > 0 || pendingTicks > 0;
 
     internal void Update(CompanionInstance instance, CompanionProfile currentProfile)
     {
@@ -68,7 +73,20 @@ internal sealed class CompanionChargeController
             return;
         }
 
-        string key = CompanionWeaponOverrides.ItemKey(weapon) + (instance.WantsAltUse ? "/right" : "/left");
+        if (!ReferenceEquals(keyItem, weapon) || keyItemType != weapon.type || keyAltUse != instance.WantsAltUse)
+        {
+            keyItem = weapon;
+            keyItemType = weapon.type;
+            keyAltUse = instance.WantsAltUse;
+            cachedKey = CompanionWeaponOverrides.ItemKey(weapon) + (keyAltUse ? "/right" : "/left");
+            excludedMode = CompanionWeaponOverrides.GetMode(weapon) == CompanionAttackMode.CoinVolley;
+        }
+        if (excludedMode)
+        {
+            ResetUse();
+            return;
+        }
+        string key = cachedKey;
         if (!holding || weaponKey != key)
         {
             ResetUse();
@@ -92,6 +110,8 @@ internal sealed class CompanionChargeController
             return; // No live holdout is not evidence that releasing will help.
 
         bool learned = profile.ChargeReleaseTicks.TryGetValue(key, out int duration);
+        if (!learned && outputWhileHeld)
+            return; // Continuous fire already proved itself; skip further charge probing.
         if (!learned)
             duration = probeDurations.TryGetValue(key, out int next) ? next : (HasHoldoutName(holdout) ? 180 : 300);
         if (heldTicks < duration || (!learned && (silentTicks < duration || outputWhileHeld)))
@@ -107,8 +127,7 @@ internal sealed class CompanionChargeController
 
     private static bool IsCandidate(Item weapon) => !weapon.IsAir && weapon.ModItem is not null &&
         weapon.channel && weapon.shoot > ProjectileID.None && weapon.damage > 0 &&
-        !CompanionWeaponBehaviors.IsSummonStaff(weapon) && !CompanionWeaponBehaviors.IsFlailWeapon(weapon) &&
-        CompanionWeaponOverrides.GetMode(weapon) != CompanionAttackMode.CoinVolley;
+        !CompanionWeaponBehaviors.IsSummonStaff(weapon) && !CompanionWeaponBehaviors.IsFlailWeapon(weapon);
 
     private static bool HasHoldoutName(Projectile projectile)
     {

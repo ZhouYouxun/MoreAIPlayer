@@ -22,11 +22,12 @@ public sealed class CompanionTargetingSystem : ModSystem
     }
 
     private static bool Enabled => CompanionRuntimePolicy.CanRunSyntheticPlayers &&
+        CompanionEntitySystem.HasCompanions &&
         MoreAIPlayerClientConfig.Current?.EnemiesIgnoreCompanions == true;
 
     private static void UpdateNpcAI(OrigNpcAI orig, NPC npc)
     {
-        if (!Enabled || npc.friendly)
+        if (npc.friendly || !Enabled)
         {
             orig(npc);
             return;
@@ -45,7 +46,7 @@ public sealed class CompanionTargetingSystem : ModSystem
 
     private static void UpdateProjectileAI(OrigProjectileAI orig, Projectile projectile)
     {
-        if (!Enabled || !projectile.hostile)
+        if (!projectile.hostile || !Enabled)
         {
             orig(projectile);
             return;
@@ -67,7 +68,7 @@ public sealed class CompanionTargetingSystem : ModSystem
         {
             hidden = null;
             count = 0;
-            foreach (CompanionInstance instance in CompanionEntitySystem.All)
+            foreach (CompanionInstance instance in CompanionEntitySystem.LiveInstances)
             {
                 Player player = instance.Entity;
                 if (!player.active || !ReferenceEquals(Main.player[instance.Slot], player))
@@ -89,8 +90,9 @@ public sealed class CompanionTargetingSystem : ModSystem
                 if (CompanionEntitySystem.IsCompanion(player) &&
                     ReferenceEquals(Main.player[player.whoAmI], player))
                     player.active = true;
+                hidden[i] = null;
             }
-            ArrayPool<Player>.Shared.Return(hidden, clearArray: true);
+            ArrayPool<Player>.Shared.Return(hidden);
         }
     }
 }

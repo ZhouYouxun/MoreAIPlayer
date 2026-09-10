@@ -30,6 +30,11 @@ public static class CompanionManagerPanel
     private const int BorderThick = 2;
 
     private static readonly Dictionary<int, Player> PreviewsBySlot = [];
+    private static readonly List<CompanionInstance> QuickEntries = [];
+    private static readonly List<CompanionInstance> QuickOrdinaryEntries = [];
+    private static readonly List<(Rectangle Area, CompanionInstance Instance)> QuickPreviewDraws = [];
+    private static readonly HashSet<int> PreviewSlots = [];
+    private static readonly List<int> StalePreviewSlots = [];
     private static bool open;
     private static bool fadeOut;
     private static float opacity;
@@ -90,6 +95,11 @@ public static class CompanionManagerPanel
         lastQuickHoveredSlot = -1;
         EndQuickDrag();
         PreviewsBySlot.Clear();
+        QuickEntries.Clear();
+        QuickOrdinaryEntries.Clear();
+        QuickPreviewDraws.Clear();
+        PreviewSlots.Clear();
+        StalePreviewSlots.Clear();
     }
 
     /// <summary>
@@ -114,9 +124,16 @@ public static class CompanionManagerPanel
         {
             lastQuickHoveredSlot = -1;
             EndQuickDrag();
+            QuickOrdinaryEntries.Clear();
+            QuickPreviewDraws.Clear();
+            PreviewsBySlot.Clear();
             return;
         }
-        List<CompanionInstance> ordinaryEntries = entries.FindAll(entry => !entry.IsAutoIdentity);
+        List<CompanionInstance> ordinaryEntries = QuickOrdinaryEntries;
+        ordinaryEntries.Clear();
+        foreach (CompanionInstance entry in entries)
+            if (!entry.IsAutoIdentity)
+                ordinaryEntries.Add(entry);
         PruneStalePreviews(ordinaryEntries);
 
         const int cellSize = 54;
@@ -127,7 +144,8 @@ public static class CompanionManagerPanel
         Rectangle mouseRect = new((int)mouse.X, (int)mouse.Y, 2, 2);
         bool leftClick = Main.mouseLeft && Main.mouseLeftRelease;
         int hoveredSlot = -1;
-        var previewDraws = new List<(Rectangle Area, CompanionInstance Instance)>(ordinaryEntries.Count);
+        var previewDraws = QuickPreviewDraws;
+        previewDraws.Clear();
 
         CompanionInstance automation = entries.Find(entry => entry.IsAutoIdentity);
         int maxColumns = System.Math.Max(1, ((int)viewport.X - sideMargin * 2 + gap) / (cellSize + gap));
@@ -470,8 +488,9 @@ public static class CompanionManagerPanel
 
     private static List<CompanionInstance> CollectQuickEntries()
     {
-        List<CompanionInstance> entries = [];
-        foreach (CompanionInstance instance in CompanionEntitySystem.All)
+        List<CompanionInstance> entries = QuickEntries;
+        entries.Clear();
+        foreach (CompanionInstance instance in CompanionEntitySystem.LiveInstances)
         {
             if (instance is not null && instance.OwnerWhoAmI == Main.myPlayer &&
                 instance.Entity is not null && instance.Entity.active)
@@ -491,19 +510,15 @@ public static class CompanionManagerPanel
     {
         if (PreviewsBySlot.Count == 0)
             return;
-        List<int> stale = [];
+        // Linear membership check with reused storage; no per-frame lists or nested scan.
+        PreviewSlots.Clear();
+        foreach (CompanionInstance instance in entries)
+            PreviewSlots.Add(instance.Slot);
+        List<int> stale = StalePreviewSlots;
+        stale.Clear();
         foreach (int slot in PreviewsBySlot.Keys)
         {
-            bool alive = false;
-            foreach (CompanionInstance instance in entries)
-            {
-                if (instance.Slot == slot)
-                {
-                    alive = true;
-                    break;
-                }
-            }
-            if (!alive)
+            if (!PreviewSlots.Contains(slot))
                 stale.Add(slot);
         }
         foreach (int slot in stale)

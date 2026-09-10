@@ -12,11 +12,43 @@ namespace MoreAIPlayer.Companion;
 /// </summary>
 public sealed class CompanionGlobalProjectile : GlobalProjectile
 {
-    public override bool InstancePerEntity => true;
-    private int chargeSession;
+    // One bounded, lazily allocated table instead of a GlobalProjectile object on every
+    // projectile in the game. Only an observed companion attack writes an entry.
+    private struct ChargeObservation
+    {
+        public Projectile Projectile;
+        public CompanionInstance Companion;
+        public int Identity;
+        public int Session;
+    }
+    private static ChargeObservation[] chargeObservations;
+
+    internal static void ClearChargeObservations() => chargeObservations = null;
+
+    internal static void ForgetChargeObservations(CompanionInstance companion)
+    {
+        if (chargeObservations is null)
+            return;
+        // Dismissal is infrequent. Release references here instead of retaining an old
+        // companion's inventory until these projectile slots happen to be reused.
+        for (int i = 0; i < chargeObservations.Length; i++)
+            if (ReferenceEquals(chargeObservations[i].Companion, companion))
+                chargeObservations[i] = default;
+    }
+
+    private static int GetChargeSession(Projectile projectile, CompanionInstance companion)
+    {
+        if (chargeObservations is null || (uint)projectile.whoAmI >= chargeObservations.Length)
+            return 0;
+        ref ChargeObservation entry = ref chargeObservations[projectile.whoAmI];
+        return ReferenceEquals(entry.Projectile, projectile) && ReferenceEquals(entry.Companion, companion) &&
+            entry.Identity == projectile.identity && projectile.owner == companion.Slot ? entry.Session : 0;
+    }
 
     public override void OnSpawn(Projectile projectile, IEntitySource source)
     {
+        if (chargeObservations is not null && (uint)projectile.whoAmI < chargeObservations.Length)
+            chargeObservations[projectile.whoAmI] = default;
         // Synthetic slots are a strictly single-player construct. A stale dictionary during a
         // world transition must never rewrite an owner on a real multiplayer projectile.
         if (Main.netMode != Terraria.ID.NetmodeID.SinglePlayer)
@@ -49,12 +81,22 @@ public sealed class CompanionGlobalProjectile : GlobalProjectile
         CompanionInstance companion = CompanionEntitySystem.GetBySlot(projectile.owner);
         if (companion is null || !companion.ChargeController.IsObserving)
             return;
+        int chargeSession = 0;
         bool fromItem = source is EntitySource_ItemUse;
         if (source is EntitySource_ItemUse itemUse && ReferenceEquals(itemUse.Player, companion.Entity))
             chargeSession = companion.ChargeController.SourceSession(itemUse.Item);
         else if (source is EntitySource_Parent { Entity: Projectile sourceProjectile } &&
             sourceProjectile.owner == projectile.owner)
-            chargeSession = sourceProjectile.GetGlobalProjectile<CompanionGlobalProjectile>().chargeSession;
+            chargeSession = GetChargeSession(sourceProjectile, companion);
+        if (chargeSession > 0 && (uint)projectile.whoAmI < Main.maxProjectiles)
+        {
+            chargeObservations ??= new ChargeObservation[Main.maxProjectiles];
+            chargeObservations[projectile.whoAmI] = new ChargeObservation
+            {
+                Projectile = projectile, Companion = companion,
+                Identity = projectile.identity, Session = chargeSession
+            };
+        }
         companion.ChargeController.ObserveSpawn(projectile, chargeSession, fromItem);
     }
 
@@ -67,7 +109,8 @@ public sealed class CompanionGlobalProjectile : GlobalProjectile
         if (instance is null || instance.OwnerWhoAmI < 0 || instance.OwnerWhoAmI >= Main.maxPlayers)
             return;
 
-        instance.ChargeController.ObserveHit(chargeSession, damageDone);
+        if (instance.ChargeController.IsObserving)
+            instance.ChargeController.ObserveHit(GetChargeSession(projectile, instance), damageDone);
 
         // Credit the real owner so loot, bestiary interaction and banner logic behave.
         target.playerInteraction[instance.OwnerWhoAmI] = true;
